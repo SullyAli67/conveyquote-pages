@@ -17,6 +17,8 @@ type QuoteForm = {
   isCompany: string;
   buyToLet: string;
   giftedDeposit: string;
+  additionalProperty: string;
+  ukResidentForSdlt: string;
 
   saleMortgage: string;
   managementCompany: string;
@@ -62,6 +64,8 @@ const initialFormState: QuoteForm = {
   isCompany: "",
   buyToLet: "",
   giftedDeposit: "",
+  additionalProperty: "",
+  ukResidentForSdlt: "",
 
   saleMortgage: "",
   managementCompany: "",
@@ -214,6 +218,15 @@ function App() {
   const isRemortgage = form.type === "remortgage";
   const isTransfer = form.type === "transfer";
 
+  const sdltHint =
+    form.ukResidentForSdlt === "no"
+      ? "Non-UK resident surcharge may apply"
+      : form.additionalProperty === "yes"
+      ? "Higher rates of SDLT may apply"
+      : form.firstTimeBuyer === "yes"
+      ? "First-time buyer relief may apply"
+      : "Standard residential SDLT likely";
+
   return (
     <div className="page">
       <header className="hero">
@@ -338,7 +351,7 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Purchase Details</h2>
-                        <p>These questions help us assess the likely complexity and pricing.</p>
+                        <p>These questions help us assess the likely complexity, pricing and SDLT position.</p>
                       </div>
                     </div>
 
@@ -373,6 +386,38 @@ function App() {
                           id="firstTimeBuyer"
                           name="firstTimeBuyer"
                           value={form.firstTimeBuyer}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="additionalProperty">
+                          Will you own another property after completion?
+                        </label>
+                        <select
+                          id="additionalProperty"
+                          name="additionalProperty"
+                          value={form.additionalProperty}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="ukResidentForSdlt">
+                          UK resident for SDLT purposes?
+                        </label>
+                        <select
+                          id="ukResidentForSdlt"
+                          name="ukResidentForSdlt"
+                          value={form.ukResidentForSdlt}
                           onChange={handleChange}
                         >
                           <option value="">Please select</option>
@@ -439,6 +484,22 @@ function App() {
                           <option value="no">No</option>
                         </select>
                       </div>
+
+                      <div className="field field--full">
+                        <label htmlFor="sdltHint">SDLT guidance</label>
+                        <input
+                          id="sdltHint"
+                          type="text"
+                          value={sdltHint}
+                          readOnly
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-footer" style={{ paddingTop: "0" }}>
+                      <p className="form-note">
+                        SDLT is highly fact-sensitive. Any figure produced later will be an estimate only and may change depending on buyer status, reliefs, surcharge position and the final transaction structure.
+                      </p>
                     </div>
                   </>
                 )}
