@@ -35,6 +35,18 @@ type QuoteForm = {
   phone: string;
 };
 
+type ApprovedQuoteForm = {
+  clientName: string;
+  clientEmail: string;
+  transactionType: string;
+  tenure: string;
+  propertyPrice: string;
+  quoteAmount: string;
+  quoteReference: string;
+  feeBreakdown: string;
+  nextSteps: string;
+};
+
 const initialFormState: QuoteForm = {
   type: "",
   tenure: "",
@@ -68,13 +80,38 @@ const initialFormState: QuoteForm = {
   phone: "",
 };
 
+const initialApprovedQuoteState: ApprovedQuoteForm = {
+  clientName: "",
+  clientEmail: "",
+  transactionType: "",
+  tenure: "",
+  propertyPrice: "",
+  quoteAmount: "",
+  quoteReference: "",
+  feeBreakdown: "",
+  nextSteps:
+    "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.",
+};
+
 function App() {
   const [form, setForm] = useState<QuoteForm>(initialFormState);
+  const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
+    initialApprovedQuoteState
+  );
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleApprovedQuoteChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    setApprovedQuote({
+      ...approvedQuote,
+      [e.target.name]: e.target.value,
+    });
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -109,6 +146,46 @@ function App() {
     } catch (error) {
       alert("Sorry, something went wrong while submitting your enquiry.");
       console.error("Request error:", error);
+    }
+  };
+
+  const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const payload = {
+      name: approvedQuote.clientName,
+      email: approvedQuote.clientEmail,
+      type: approvedQuote.transactionType,
+      tenure: approvedQuote.tenure,
+      price: approvedQuote.propertyPrice,
+      quoteAmount: approvedQuote.quoteAmount,
+      quoteReference: approvedQuote.quoteReference,
+      feeBreakdown: approvedQuote.feeBreakdown,
+      nextSteps: approvedQuote.nextSteps,
+    };
+
+    try {
+      const response = await fetch("/api/send-approved-quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert("Approved client quote sent successfully.");
+        console.log("Approved quote email sent:", result);
+        setApprovedQuote(initialApprovedQuoteState);
+      } else {
+        alert("Sorry, there was a problem sending the approved quote.");
+        console.error("Approved quote send error:", result);
+      }
+    } catch (error) {
+      alert("Sorry, something went wrong while sending the approved quote.");
+      console.error("Approved quote request error:", error);
     }
   };
 
@@ -564,6 +641,150 @@ function App() {
               while still allowing legal oversight before the quote is issued.
             </p>
           </article>
+        </section>
+
+        <section className="card card--form" style={{ marginTop: "24px" }}>
+          <div className="section-heading">
+            <div>
+              <h2>Approve and Send Client Quote</h2>
+              <p>
+                Internal use only. Enter the approved quote details below and send the
+                client-facing quote email.
+              </p>
+            </div>
+          </div>
+
+          <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="clientName">Client name</label>
+                <input
+                  id="clientName"
+                  type="text"
+                  name="clientName"
+                  value={approvedQuote.clientName}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="Client full name"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="clientEmail">Client email</label>
+                <input
+                  id="clientEmail"
+                  type="email"
+                  name="clientEmail"
+                  value={approvedQuote.clientEmail}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="client@example.com"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="transactionType">Transaction type</label>
+                <select
+                  id="transactionType"
+                  name="transactionType"
+                  value={approvedQuote.transactionType}
+                  onChange={handleApprovedQuoteChange}
+                  required
+                >
+                  <option value="">Please select</option>
+                  <option value="purchase">Purchase</option>
+                  <option value="sale">Sale</option>
+                  <option value="remortgage">Remortgage</option>
+                  <option value="transfer">Transfer of Equity</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="approvedTenure">Tenure</label>
+                <select
+                  id="approvedTenure"
+                  name="tenure"
+                  value={approvedQuote.tenure}
+                  onChange={handleApprovedQuoteChange}
+                  required
+                >
+                  <option value="">Please select</option>
+                  <option value="freehold">Freehold</option>
+                  <option value="leasehold">Leasehold</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label htmlFor="propertyPrice">Property price / value (£)</label>
+                <input
+                  id="propertyPrice"
+                  type="text"
+                  name="propertyPrice"
+                  value={approvedQuote.propertyPrice}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="e.g. 325000"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="quoteAmount">Approved quote amount</label>
+                <input
+                  id="quoteAmount"
+                  type="text"
+                  name="quoteAmount"
+                  value={approvedQuote.quoteAmount}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="e.g. 1450 + VAT"
+                  required
+                />
+              </div>
+
+              <div className="field field--full">
+                <label htmlFor="quoteReference">Quote reference</label>
+                <input
+                  id="quoteReference"
+                  type="text"
+                  name="quoteReference"
+                  value={approvedQuote.quoteReference}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="e.g. CQ-1001"
+                />
+              </div>
+
+              <div className="field field--full">
+                <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
+                <textarea
+                  id="feeBreakdown"
+                  name="feeBreakdown"
+                  value={approvedQuote.feeBreakdown}
+                  onChange={handleApprovedQuoteChange}
+                  placeholder="Example: Legal fee estimate for standard sale. Excludes additional work outside the normal scope."
+                  rows={5}
+                />
+              </div>
+
+              <div className="field field--full">
+                <label htmlFor="nextSteps">Next steps</label>
+                <textarea
+                  id="nextSteps"
+                  name="nextSteps"
+                  value={approvedQuote.nextSteps}
+                  onChange={handleApprovedQuoteChange}
+                  rows={5}
+                />
+              </div>
+            </div>
+
+            <div className="form-footer">
+              <p className="form-note">
+                Internal tool only. This sends the approved client-facing quote email.
+              </p>
+              <button type="submit" className="primary-button">
+                Send Approved Quote
+              </button>
+            </div>
+          </form>
         </section>
       </main>
     </div>
