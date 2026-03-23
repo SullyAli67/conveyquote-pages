@@ -75,10 +75,38 @@ function App() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(form);
-    alert("Quote submitted. We will review and send your quote shortly.");
+
+    const quoteAmount = "1000"; // temporary test value
+
+    const payload = {
+      ...form,
+      quoteAmount,
+    };
+
+    try {
+      const response = await fetch("/api/send-quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert("Quote email sent successfully.");
+        console.log("Email sent:", result);
+      } else {
+        alert("Email failed to send.");
+        console.error("Send error:", result);
+      }
+    } catch (error) {
+      alert("Something went wrong while sending the quote.");
+      console.error("Request error:", error);
+    }
   };
 
   const isPurchase = form.type === "purchase";
