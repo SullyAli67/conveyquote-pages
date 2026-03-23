@@ -94,7 +94,7 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   quoteReference: "",
   feeBreakdown: "",
   nextSteps:
-    "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.",
+    "If you are happy to proceed, please click the Instruct Us button below. We will then send you our client care documentation and the next steps to get your matter opened.",
 };
 
 function App() {
