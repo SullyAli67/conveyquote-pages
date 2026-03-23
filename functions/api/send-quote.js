@@ -24,7 +24,7 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         from: "ConveyQuote <quotes@yourdomain.co.uk>",
         to: [email],
-        cc: ["liveandletlaw@outlook.com"],
+        cc: ["your-real-email@yourdomain.co.uk"],
         subject: "Your Conveyancing Quote",
         html: `
           <h2>Your Conveyancing Quote</h2>
