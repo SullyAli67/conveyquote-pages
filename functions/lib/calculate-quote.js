@@ -35,9 +35,8 @@ function calculateStandardSdlt(price) {
   let tax = 0;
 
   if (price > 250000) {
-    tax += Math.min(price, 925000) - 250000;
+    tax += (Math.min(price, 925000) - 250000) * 0.05;
   }
-  tax = tax > 0 ? tax * 0.05 : 0;
 
   if (price > 925000) {
     tax += (Math.min(price, 1500000) - 925000) * 0.10;
@@ -79,7 +78,7 @@ function calculateResidentialSdlt({
     return {
       amount: 0,
       manualReview: true,
-      note: "SDLT requires manual review",
+      note: "TBC pending review",
     };
   }
 
@@ -121,25 +120,25 @@ function getDisclaimerLines(enquiry) {
     );
   }
 
-  if (enquiry.newBuild === "yes") {
+  if (enquiry.new_build === "yes") {
     lines.push(
       "This estimate excludes additional work arising from developer deadlines, infrastructure agreements, planning or building regulation issues, or non-standard new-build documentation."
     );
   }
 
-  if (enquiry.giftedDeposit === "yes") {
+  if (enquiry.gifted_deposit === "yes") {
     lines.push(
       "This estimate excludes any lender-specific or donor-related work outside standard gifted deposit checks and source of funds enquiries."
     );
   }
 
-  if (enquiry.isCompany === "yes") {
+  if (enquiry.is_company === "yes") {
     lines.push(
       "This estimate excludes additional corporate, tax, trust, beneficial ownership or lender-related work outside a standard company purchase."
     );
   }
 
-  if (enquiry.sharedOwnership === "yes") {
+  if (enquiry.shared_ownership === "yes") {
     lines.push(
       "This estimate excludes additional housing association or scheme-specific requirements beyond a standard shared ownership transaction."
     );
@@ -151,7 +150,7 @@ function getDisclaimerLines(enquiry) {
     );
   }
 
-  if (enquiry.type === "remortgage") {
+  if (enquiry.transaction_type === "remortgage") {
     lines.push(
       "This estimate excludes unusual lender conditions, non-standard title issues, lease variations, indemnity policy negotiations or title rectification work."
     );
@@ -166,7 +165,7 @@ function calculateLegalFees(enquiry) {
 
   let baseFee = 0;
 
-  if (enquiry.type === "sale") {
+  if (enquiry.transaction_type === "sale") {
     baseFee = getPriceBandFee(price, [
       { max: 150000, fee: 795 },
       { max: 250000, fee: 895 },
@@ -180,12 +179,12 @@ function calculateLegalFees(enquiry) {
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
     if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 300);
-    if (enquiry.saleMortgage === "yes") addItem(legalFeeItems, "Mortgage redemption supplement", 50);
-    if (enquiry.managementCompany === "yes") addItem(legalFeeItems, "Management company / service charge supplement", 175);
+    if (enquiry.sale_mortgage === "yes") addItem(legalFeeItems, "Mortgage redemption supplement", 50);
+    if (enquiry.management_company === "yes") addItem(legalFeeItems, "Management company / service charge supplement", 175);
     if (enquiry.tenanted === "yes") addItem(legalFeeItems, "Tenanted property supplement", 150);
   }
 
-  if (enquiry.type === "purchase") {
+  if (enquiry.transaction_type === "purchase") {
     baseFee = getPriceBandFee(price, [
       { max: 150000, fee: 895 },
       { max: 250000, fee: 1025 },
@@ -200,15 +199,15 @@ function calculateLegalFees(enquiry) {
 
     if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 350);
     if (enquiry.mortgage === "mortgage") addItem(legalFeeItems, "Acting for lender supplement", 125);
-    if (enquiry.giftedDeposit === "yes") addItem(legalFeeItems, "Gifted deposit supplement", 95);
-    if (enquiry.newBuild === "yes") addItem(legalFeeItems, "New build supplement", 250);
-    if (enquiry.sharedOwnership === "yes") addItem(legalFeeItems, "Shared ownership supplement", 300);
-    if (enquiry.helpToBuy === "yes") addItem(legalFeeItems, "Help to Buy / scheme supplement", 200);
-    if (enquiry.isCompany === "yes") addItem(legalFeeItems, "Company buyer supplement", 400);
-    if (enquiry.buyToLet === "yes") addItem(legalFeeItems, "Buy to let supplement", 150);
+    if (enquiry.gifted_deposit === "yes") addItem(legalFeeItems, "Gifted deposit supplement", 95);
+    if (enquiry.new_build === "yes") addItem(legalFeeItems, "New build supplement", 250);
+    if (enquiry.shared_ownership === "yes") addItem(legalFeeItems, "Shared ownership supplement", 300);
+    if (enquiry.help_to_buy === "yes") addItem(legalFeeItems, "Help to Buy / scheme supplement", 200);
+    if (enquiry.is_company === "yes") addItem(legalFeeItems, "Company buyer supplement", 400);
+    if (enquiry.buy_to_let === "yes") addItem(legalFeeItems, "Buy to let supplement", 150);
   }
 
-  if (enquiry.type === "remortgage") {
+  if (enquiry.transaction_type === "remortgage") {
     baseFee = getPriceBandFee(price, [
       { max: 500000, fee: 595 },
       { max: 1000000, fee: 745 },
@@ -217,17 +216,17 @@ function calculateLegalFees(enquiry) {
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
     if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 250);
-    if (enquiry.additionalBorrowing === "yes") addItem(legalFeeItems, "Additional borrowing supplement", 75);
-    if (enquiry.remortgageTransfer === "yes") addItem(legalFeeItems, "Transfer of equity supplement", 350);
+    if (enquiry.additional_borrowing === "yes") addItem(legalFeeItems, "Additional borrowing supplement", 75);
+    if (enquiry.remortgage_transfer === "yes") addItem(legalFeeItems, "Transfer of equity supplement", 350);
   }
 
-  if (enquiry.type === "transfer") {
+  if (enquiry.transaction_type === "transfer") {
     baseFee = 550;
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
-    if (enquiry.transferMortgage === "yes") addItem(legalFeeItems, "Mortgage involved supplement", 150);
+    if (enquiry.transfer_mortgage === "yes") addItem(legalFeeItems, "Mortgage involved supplement", 150);
     if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 250);
-    if (enquiry.ownersChanging === "two" || enquiry.ownersChanging === "more") {
+    if (enquiry.owners_changing === "two" || enquiry.owners_changing === "more") {
       addItem(legalFeeItems, "Multiple owners changing supplement", 150);
     }
   }
@@ -236,7 +235,7 @@ function calculateLegalFees(enquiry) {
 }
 
 function getBuyerCount(enquiry) {
-  if (enquiry.ownershipType === "joint") return 2;
+  if (enquiry.ownership_type === "joint") return 2;
   return 1;
 }
 
@@ -244,7 +243,7 @@ function calculateDisbursements(enquiry) {
   const price = toNumber(enquiry.price);
   const disbursementItems = [];
 
-  if (enquiry.type === "purchase") {
+  if (enquiry.transaction_type === "purchase") {
     addItem(
       disbursementItems,
       "Search pack (local, environmental, drainage and chancel)",
@@ -266,18 +265,18 @@ function calculateDisbursements(enquiry) {
 
     const sdlt = calculateResidentialSdlt({
       price,
-      firstTimeBuyer: enquiry.firstTimeBuyer,
-      additionalProperty: enquiry.additionalProperty,
-      ukResidentForSdlt: enquiry.ukResidentForSdlt,
-      isCompany: enquiry.isCompany,
-      sharedOwnership: enquiry.sharedOwnership,
+      firstTimeBuyer: enquiry.first_time_buyer,
+      additionalProperty: enquiry.additional_property,
+      ukResidentForSdlt: enquiry.uk_resident_for_sdlt,
+      isCompany: enquiry.is_company,
+      sharedOwnership: enquiry.shared_ownership,
     });
 
     if (sdlt.manualReview) {
       disbursementItems.push({
         label: "Stamp Duty Land Tax",
         amount: 0,
-        note: "TBC pending review",
+        note: sdlt.note,
       });
     } else {
       disbursementItems.push({
@@ -287,12 +286,12 @@ function calculateDisbursements(enquiry) {
     }
   }
 
-  if (enquiry.type === "sale") {
+  if (enquiry.transaction_type === "sale") {
     addItem(disbursementItems, "Office copy entries", 12);
     addItem(disbursementItems, "ID checks", 14.4);
   }
 
-  if (enquiry.type === "remortgage") {
+  if (enquiry.transaction_type === "remortgage") {
     addItem(
       disbursementItems,
       "Land Registry registration fee",
@@ -304,13 +303,12 @@ function calculateDisbursements(enquiry) {
     addItem(disbursementItems, "AP1 submission fee", 6);
   }
 
-  if (enquiry.type === "transfer") {
+  if (enquiry.transaction_type === "transfer") {
     addItem(
       disbursementItems,
       "Land Registry registration fee",
       getLandRegistryFee(price)
     );
-
     addItem(disbursementItems, "ID checks", 14.4);
     addItem(disbursementItems, "OS1 priority search", 8.8);
     addItem(disbursementItems, "Bankruptcy search (K16)", 7.6);
@@ -390,3 +388,4 @@ export function calculateQuote(enquiry) {
     breakdownText,
   };
 }
+ what is the next step now give me exact code so i can do one step at a time how you are telling me is confusing
