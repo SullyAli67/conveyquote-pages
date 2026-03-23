@@ -78,7 +78,7 @@ function App() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const quoteAmount = "1000"; // temporary test value
+    const quoteAmount = "1000";
 
     const payload = {
       ...form,
@@ -97,14 +97,47 @@ function App() {
       const result = await response.json();
 
       if (result.success) {
-        alert("Quote email sent successfully.");
-        console.log("Email sent:", result);
+        alert("Thank you. Your enquiry has been submitted for review.");
+        console.log("Internal enquiry email sent:", result);
+
+        setForm({
+          type: "",
+          tenure: "",
+          price: "",
+          postcode: "",
+
+          mortgage: "",
+          ownershipType: "",
+          firstTimeBuyer: "",
+          newBuild: "",
+          sharedOwnership: "",
+          helpToBuy: "",
+          isCompany: "",
+          buyToLet: "",
+          giftedDeposit: "",
+
+          saleMortgage: "",
+          managementCompany: "",
+          tenanted: "",
+
+          currentLender: "",
+          newLender: "",
+          additionalBorrowing: "",
+          remortgageTransfer: "",
+
+          transferMortgage: "",
+          ownersChanging: "",
+
+          name: "",
+          email: "",
+          phone: "",
+        });
       } else {
-        alert("Email failed to send.");
+        alert("Sorry, there was a problem submitting your enquiry. Please try again.");
         console.error("Send error:", result);
       }
     } catch (error) {
-      alert("Something went wrong while sending the quote.");
+      alert("Sorry, something went wrong while submitting your enquiry.");
       console.error("Request error:", error);
     }
   };
