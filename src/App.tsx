@@ -215,7 +215,115 @@ function App() {
       console.error("Approved quote request error:", error);
     }
   };
+  
+  const buildFeeBreakdown = (quote: any) => {
+    if (!quote) return "";
 
+    const lines: string[] = [];
+
+    if (quote.legalFee) {
+      lines.push(`Base legal fee: £${quote.legalFee}`);
+    }
+
+    if (Array.isArray(quote.supplements)) {
+      quote.supplements.forEach((item: any) => {
+        lines.push(`${item.label}: £${item.amount}`);
+      });
+    }
+
+    if (quote.legalSubtotal) {
+      lines.push(`Legal fees subtotal: £${quote.legalSubtotal}`);
+    }
+
+    if (quote.vat) {
+      lines.push(`VAT: £${quote.vat}`);
+    }
+
+    if (Array.isArray(quote.disbursements)) {
+      quote.disbursements.forEach((item: any) => {
+        lines.push(`${item.label}: £${item.amount}`);
+      });
+    }
+
+    if (quote.disbursementsTotal) {
+      lines.push(`Disbursements total: £${quote.disbursementsTotal}`);
+    }
+
+    if (quote.sdlt?.amount) {
+      lines.push(`SDLT: £${quote.sdlt.amount}`);
+    } else if (quote.sdlt?.note) {
+      lines.push(`SDLT: ${quote.sdlt.note}`);
+    }
+
+    if (quote.total) {
+      lines.push(`Estimated total: £${quote.total}`);
+    }
+
+    if (Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0) {
+      lines.push("");
+      lines.push("Important notes:");
+      quote.disclaimers.forEach((item: string) => {
+        lines.push(`- ${item}`);
+      });
+    }
+
+    return lines.join("\n");
+  };
+
+    const buildFeeBreakdown = (quote: any) => {
+    if (!quote) return "";
+
+    const lines: string[] = [];
+
+    if (quote.legalFee) {
+      lines.push(`Base legal fee: £${quote.legalFee}`);
+    }
+
+    if (Array.isArray(quote.supplements)) {
+      quote.supplements.forEach((item: any) => {
+        lines.push(`${item.label}: £${item.amount}`);
+      });
+    }
+
+    if (quote.legalSubtotal) {
+      lines.push(`Legal fees subtotal: £${quote.legalSubtotal}`);
+    }
+
+    if (quote.vat) {
+      lines.push(`VAT: £${quote.vat}`);
+    }
+
+    if (Array.isArray(quote.disbursements)) {
+      quote.disbursements.forEach((item: any) => {
+        lines.push(`${item.label}: £${item.amount}`);
+      });
+    }
+
+    if (quote.disbursementsTotal) {
+      lines.push(`Disbursements total: £${quote.disbursementsTotal}`);
+    }
+
+    if (quote.sdlt?.amount) {
+      lines.push(`SDLT: £${quote.sdlt.amount}`);
+    } else if (quote.sdlt?.note) {
+      lines.push(`SDLT: ${quote.sdlt.note}`);
+    }
+
+    if (quote.total) {
+      lines.push(`Estimated total: £${quote.total}`);
+    }
+
+    if (Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0) {
+      lines.push("");
+      lines.push("Important notes:");
+      quote.disclaimers.forEach((item: string) => {
+        lines.push(`- ${item}`);
+      });
+    }
+
+    return lines.join("\n");
+  };
+  
   const loadEnquiryByReference = async (reference: string) => {
     if (!reference) return;
 
@@ -230,39 +338,31 @@ function App() {
 
       if (result.success && result.enquiry) {
         const enquiry = result.enquiry;
-        const quote = result.quote || null;
-
-        const totalEstimate =
-          quote && typeof quote.grandTotal === "number"
-            ? `£${quote.grandTotal.toFixed(2)}`
-            : "";
+        const quote = enquiry.quote || null;
 
         const defaultNextSteps =
           "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.";
 
-        const disclaimerText =
-          quote?.disclaimerLines && Array.isArray(quote.disclaimerLines)
-            ? `\n\nIMPORTANT NOTES\n${quote.disclaimerLines.join("\n")}`
-            : "";
-
         setApprovedQuote({
-          clientName: enquiry.client_name || "",
-          clientEmail: enquiry.client_email || "",
-          transactionType: enquiry.transaction_type || "",
+          clientName: enquiry.name || "",
+          clientEmail: enquiry.email || "",
+          transactionType: enquiry.type || "",
           tenure: enquiry.tenure || "",
-          propertyPrice: enquiry.price || "",
-          quoteAmount: totalEstimate,
-          quoteReference: enquiry.reference || "",
-          feeBreakdown: quote?.breakdownText
-            ? `${quote.breakdownText}${disclaimerText}`
+          propertyPrice: enquiry.price ? String(enquiry.price) : "",
+          quoteAmount: quote?.legalSubtotal
+            ? String(quote.legalSubtotal)
+            : quote?.total
+            ? String(quote.total)
             : "",
+          quoteReference: enquiry.reference || "",
+          feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
           nextSteps: defaultNextSteps,
         });
 
         setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
-        setLoadedEnquiryMessage("Could not load enquiry.");
+        setLoadedEnquiryMessage(result.error || "Could not load enquiry.");
       }
     } catch (error) {
       console.error("Load enquiry error:", error);
