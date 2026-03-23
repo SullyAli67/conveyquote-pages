@@ -844,6 +844,16 @@ function App() {
               </div>
             </div>
 
+            {(adminReference || loadedEnquiryMessage || isLoadingEnquiry) && (
+              <div style={{ marginBottom: "16px" }}>
+                {isLoadingEnquiry ? (
+                  <p className="form-note">Loading enquiry...</p>
+                ) : (
+                  <p className="form-note">{loadedEnquiryMessage}</p>
+                )}
+              </div>
+            )}
+
             <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
               <div className="form-grid">
                 <div className="field">
