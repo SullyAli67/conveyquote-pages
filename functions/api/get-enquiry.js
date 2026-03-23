@@ -1,55 +1,57 @@
 export async function onRequestGet(context) {
   try {
-    const url = new URL(context.request.url);
+    const { request, env } = context;
+    const url = new URL(request.url);
     const reference = url.searchParams.get("ref");
 
     if (!reference) {
-      return Response.json(
-        { success: false, error: "Missing reference" },
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing reference" }),
         { status: 400 }
       );
     }
 
-    const enquiry = await context.env.DB.prepare(
-      `SELECT * FROM enquiries WHERE reference = ? LIMIT 1`
+    const result = await env.DB.prepare(
+      `SELECT * FROM enquiries WHERE reference = ?`
     )
       .bind(reference)
       .first();
 
-    if (!enquiry) {
-      return Response.json(
-        { success: false, error: "Enquiry not found" },
+    if (!result) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Enquiry not found" }),
         { status: 404 }
       );
     }
 
-    let quote = null;
+    let parsedQuote = null;
 
-    if (enquiry.quote_json) {
+    if (result.quote_json) {
       try {
-        quote = JSON.parse(enquiry.quote_json);
-      } catch (error) {
-        quote = null;
+        parsedQuote = JSON.parse(result.quote_json);
+      } catch (err) {
+        console.error("Quote JSON parse error:", err);
       }
     }
 
-    return Response.json({
-      success: true,
-      enquiry: {
-        ...enquiry,
-        name: enquiry.client_name || "",
-        email: enquiry.client_email || "",
-        phone: enquiry.client_phone || "",
-        type: enquiry.transaction_type || "",
-        quote,
-      },
-    });
-  } catch (error) {
-    return Response.json(
+    return new Response(
+      JSON.stringify({
+        success: true,
+        enquiry: {
+          ...result,
+          quote: parsedQuote,
+        },
+      }),
       {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
         success: false,
-        error: error.message || "Server error",
-      },
+        error: error.message,
+      }),
       { status: 500 }
     );
   }
