@@ -315,11 +315,11 @@ function App() {
           tenure: enquiry.tenure || "",
           propertyPrice: enquiry.price ? String(enquiry.price) : "",
           quoteAmount:
-            typeof quote?.grandTotal === "number"
-              ? `£${quote.grandTotal.toFixed(2)}`
-              : typeof quote?.legalTotalInclVat === "number"
-              ? `£${quote.legalTotalInclVat.toFixed(2)}`
-              : "",
+  typeof quote?.grandTotal === "number"
+    ? quote.grandTotal.toFixed(2)
+    : typeof quote?.legalTotalInclVat === "number"
+    ? quote.legalTotalInclVat.toFixed(2)
+    : "",
           quoteReference: enquiry.reference || "",
           feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
           nextSteps: defaultNextSteps,
