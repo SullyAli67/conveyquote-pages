@@ -1105,4 +1105,4 @@ function App() {
   );
 }
 
-export default App; it also needs that holding part above i think and i need the next stage we just spoke about not to be hidden make the next step code to do both files, update them for me and everything else we just spoke about including step by step where i put what code so we get the calculations and auto fill the admin form properly with likely final quote. just do it step by step simple english
+export default App; 
