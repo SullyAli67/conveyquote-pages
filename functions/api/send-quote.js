@@ -11,6 +11,7 @@ export async function onRequestPost(context) {
       tenure,
       price,
       postcode,
+
       mortgage,
       ownershipType,
       firstTimeBuyer,
@@ -20,13 +21,18 @@ export async function onRequestPost(context) {
       isCompany,
       buyToLet,
       giftedDeposit,
+      additionalProperty,
+      ukResidentForSdlt,
+
       saleMortgage,
       managementCompany,
       tenanted,
+
       currentLender,
       newLender,
       additionalBorrowing,
       remortgageTransfer,
+
       transferMortgage,
       ownersChanging,
     } = body;
@@ -44,6 +50,88 @@ export async function onRequestPost(context) {
 
     const safe = (value) => (value ? String(value) : "Not provided");
 
+    const today = new Date();
+    const datePart = `${today.getFullYear()}${String(
+      today.getMonth() + 1
+    ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    const randomPart = Math.floor(1000 + Math.random() * 9000);
+    const reference = `CQ-${datePart}-${randomPart}`;
+
+    await env.DB.prepare(
+      `
+      INSERT INTO enquiries (
+        reference,
+        client_name,
+        client_email,
+        client_phone,
+        transaction_type,
+        tenure,
+        price,
+        postcode,
+
+        mortgage,
+        ownership_type,
+        first_time_buyer,
+        new_build,
+        shared_ownership,
+        help_to_buy,
+        is_company,
+        buy_to_let,
+        gifted_deposit,
+        additional_property,
+        uk_resident_for_sdlt,
+
+        sale_mortgage,
+        management_company,
+        tenanted,
+
+        current_lender,
+        new_lender,
+        additional_borrowing,
+        remortgage_transfer,
+
+        transfer_mortgage,
+        owners_changing
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+      .bind(
+        reference,
+        name || "",
+        email || "",
+        phone || "",
+        type || "",
+        tenure || "",
+        price || "",
+        postcode || "",
+
+        mortgage || "",
+        ownershipType || "",
+        firstTimeBuyer || "",
+        newBuild || "",
+        sharedOwnership || "",
+        helpToBuy || "",
+        isCompany || "",
+        buyToLet || "",
+        giftedDeposit || "",
+        additionalProperty || "",
+        ukResidentForSdlt || "",
+
+        saleMortgage || "",
+        managementCompany || "",
+        tenanted || "",
+
+        currentLender || "",
+        newLender || "",
+        additionalBorrowing || "",
+        remortgageTransfer || "",
+
+        transferMortgage || "",
+        ownersChanging || ""
+      )
+      .run();
+
     const row = (label, value) => `
       <tr>
         <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
@@ -54,6 +142,10 @@ export async function onRequestPost(context) {
         </td>
       </tr>
     `;
+
+    const adminUrl = `https://conveyquote.uk/admin?ref=${encodeURIComponent(
+      reference
+    )}`;
 
     const internalHtml = `
       <html>
@@ -78,10 +170,24 @@ export async function onRequestPost(context) {
                   </tr>
 
                   <tr>
-                    <td style="padding:24px 28px 8px 28px;">
-                      <div style="display:inline-block;background:#e8f1fb;color:#0f2747;padding:8px 12px;font-size:13px;font-weight:bold;">
-                        ${prettyType}
-                      </div>
+                    <td style="padding:20px 28px 0 28px;">
+                      <p style="margin:0 0 10px 0;font-size:15px;">
+                        <strong>Reference:</strong> ${reference}
+                      </p>
+                      <p style="margin:0 0 20px 0;font-size:15px;">
+                        <strong>Matter type:</strong> ${prettyType}
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:0 28px 20px 28px;">
+                      <a
+                        href="${adminUrl}"
+                        style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold;"
+                      >
+                        Review in Admin
+                      </a>
                     </td>
                   </tr>
 
@@ -118,6 +224,8 @@ export async function onRequestPost(context) {
                             ${row("Mortgage or cash", mortgage)}
                             ${row("Buyer type", ownershipType)}
                             ${row("First time buyer", firstTimeBuyer)}
+                            ${row("Additional property", additionalProperty)}
+                            ${row("UK resident for SDLT", ukResidentForSdlt)}
                             ${row("Buy to let", buyToLet)}
                             ${row("New build", newBuild)}
                             ${row("Shared ownership", sharedOwnership)}
@@ -187,7 +295,7 @@ export async function onRequestPost(context) {
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
                         <tr>
                           <td style="padding:14px 16px;font-size:14px;line-height:1.6;color:#7a4b00;">
-                            <strong>Next step:</strong> review this enquiry, calculate the quote, then use the separate approval function to send the client-facing quote.
+                            <strong>Next step:</strong> review this enquiry in admin, calculate the quote, then send the approved client-facing quote.
                           </td>
                         </tr>
                       </table>
@@ -218,7 +326,7 @@ export async function onRequestPost(context) {
         from: "ConveyQuote <quotes@conveyquote.uk>",
         to: ["liveandletlaw@outlook.com"],
         reply_to: email || "liveandletlaw@outlook.com",
-        subject: `New Conveyancing Quote Request - ${safe(name)} - ${prettyType}`,
+        subject: `New Conveyancing Quote Request - ${safe(name)} - ${prettyType} - ${reference}`,
         html: internalHtml,
       }),
     });
@@ -240,10 +348,13 @@ export async function onRequestPost(context) {
       );
     }
 
-    return new Response(JSON.stringify({ success: true, data }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, reference, data }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     return new Response(
       JSON.stringify({
