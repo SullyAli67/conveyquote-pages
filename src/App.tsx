@@ -144,11 +144,9 @@ function App() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const quoteAmount = "1000";
-
     const payload = {
       ...form,
-      quoteAmount,
+      quoteAmount: "1000",
     };
 
     try {
@@ -232,6 +230,20 @@ function App() {
 
       if (result.success && result.enquiry) {
         const enquiry = result.enquiry;
+        const quote = result.quote || null;
+
+        const totalEstimate =
+          quote && typeof quote.grandTotal === "number"
+            ? `£${quote.grandTotal.toFixed(2)}`
+            : "";
+
+        const defaultNextSteps =
+          "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.";
+
+        const disclaimerText =
+          quote?.disclaimerLines && Array.isArray(quote.disclaimerLines)
+            ? `\n\nIMPORTANT NOTES\n${quote.disclaimerLines.join("\n")}`
+            : "";
 
         setApprovedQuote({
           clientName: enquiry.client_name || "",
@@ -239,11 +251,12 @@ function App() {
           transactionType: enquiry.transaction_type || "",
           tenure: enquiry.tenure || "",
           propertyPrice: enquiry.price || "",
-          quoteAmount: "",
+          quoteAmount: totalEstimate,
           quoteReference: enquiry.reference || "",
-          feeBreakdown: "",
-          nextSteps:
-            "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.",
+          feeBreakdown: quote?.breakdownText
+            ? `${quote.breakdownText}${disclaimerText}`
+            : "",
+          nextSteps: defaultNextSteps,
         });
 
         setAdminReference(reference);
@@ -992,4 +1005,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; it also needs that holding part above i think and i need the next stage we just spoke about not to be hidden make the next step code to do both files, update them for me and everything else we just spoke about including step by step where i put what code so we get the calculations and auto fill the admin form properly with likely final quote. just do it step by step simple english
