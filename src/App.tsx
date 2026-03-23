@@ -35,39 +35,41 @@ type QuoteForm = {
   phone: string;
 };
 
+const initialFormState: QuoteForm = {
+  type: "",
+  tenure: "",
+  price: "",
+  postcode: "",
+
+  mortgage: "",
+  ownershipType: "",
+  firstTimeBuyer: "",
+  newBuild: "",
+  sharedOwnership: "",
+  helpToBuy: "",
+  isCompany: "",
+  buyToLet: "",
+  giftedDeposit: "",
+
+  saleMortgage: "",
+  managementCompany: "",
+  tenanted: "",
+
+  currentLender: "",
+  newLender: "",
+  additionalBorrowing: "",
+  remortgageTransfer: "",
+
+  transferMortgage: "",
+  ownersChanging: "",
+
+  name: "",
+  email: "",
+  phone: "",
+};
+
 function App() {
-  const [form, setForm] = useState<QuoteForm>({
-    type: "",
-    tenure: "",
-    price: "",
-    postcode: "",
-
-    mortgage: "",
-    ownershipType: "",
-    firstTimeBuyer: "",
-    newBuild: "",
-    sharedOwnership: "",
-    helpToBuy: "",
-    isCompany: "",
-    buyToLet: "",
-    giftedDeposit: "",
-
-    saleMortgage: "",
-    managementCompany: "",
-    tenanted: "",
-
-    currentLender: "",
-    newLender: "",
-    additionalBorrowing: "",
-    remortgageTransfer: "",
-
-    transferMortgage: "",
-    ownersChanging: "",
-
-    name: "",
-    email: "",
-    phone: "",
-  });
+  const [form, setForm] = useState<QuoteForm>(initialFormState);
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -99,39 +101,7 @@ function App() {
       if (result.success) {
         alert("Thank you. Your enquiry has been submitted for review.");
         console.log("Internal enquiry email sent:", result);
-
-        setForm({
-          type: "",
-          tenure: "",
-          price: "",
-          postcode: "",
-
-          mortgage: "",
-          ownershipType: "",
-          firstTimeBuyer: "",
-          newBuild: "",
-          sharedOwnership: "",
-          helpToBuy: "",
-          isCompany: "",
-          buyToLet: "",
-          giftedDeposit: "",
-
-          saleMortgage: "",
-          managementCompany: "",
-          tenanted: "",
-
-          currentLender: "",
-          newLender: "",
-          additionalBorrowing: "",
-          remortgageTransfer: "",
-
-          transferMortgage: "",
-          ownersChanging: "",
-
-          name: "",
-          email: "",
-          phone: "",
-        });
+        setForm(initialFormState);
       } else {
         alert("Sorry, there was a problem submitting your enquiry. Please try again.");
         console.error("Send error:", result);
@@ -520,7 +490,7 @@ function App() {
                 <div className="section-heading" style={{ marginTop: "10px" }}>
                   <div>
                     <h2>Your Contact Details</h2>
-                    <p>Please provide your contact details so we can send your quote.</p>
+                    <p>Please provide your contact details so we can review your enquiry and respond.</p>
                   </div>
                 </div>
 
@@ -583,7 +553,7 @@ function App() {
             <ol className="steps">
               <li>Select your transaction type.</li>
               <li>Answer only the questions relevant to your matter.</li>
-              <li>We review the details and send your quote by email.</li>
+              <li>We review the details and then issue your quote by email if appropriate.</li>
             </ol>
           </article>
 
