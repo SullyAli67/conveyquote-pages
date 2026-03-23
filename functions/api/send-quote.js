@@ -3,8 +3,8 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
 
-    console.log("Incoming form body:", body);
-    console.log("RESEND key exists:", !!env.RESEND_API_KEY);
+    console.log("Incoming body:", body);
+    console.log("Has RESEND_API_KEY:", !!env.RESEND_API_KEY);
 
     const {
       name,
@@ -12,7 +12,7 @@ export async function onRequestPost(context) {
       phone,
       type,
       price,
-      quoteAmount
+      quoteAmount,
     } = body;
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
@@ -22,9 +22,9 @@ export async function onRequestPost(context) {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "ConveyQuote <onboarding@resend.dev>",
+        from: "ConveyQuote <quotes@yourdomain.co.uk>",
         to: [email],
-        cc: ["enquiries@conveyquote.uk"],
+        cc: ["liveandletlaw@outlook.com"],
         subject: "Your Conveyancing Quote",
         html: `
           <h2>Your Conveyancing Quote</h2>
@@ -34,25 +34,28 @@ export async function onRequestPost(context) {
           <p><strong>Property price:</strong> £${price || ""}</p>
           <p><strong>Estimated quote:</strong> £${quoteAmount || ""}</p>
           <p><strong>Phone:</strong> ${phone || ""}</p>
-          <p>If you would like to proceed, please reply to this email.</p>
         `,
       }),
     });
 
     const data = await resendResponse.json();
-    console.log("Resend response status:", resendResponse.status);
-    console.log("Resend response data:", data);
+
+    console.log("Resend status:", resendResponse.status);
+    console.log("Resend data:", data);
 
     if (!resendResponse.ok) {
-      return new Response(JSON.stringify({
-        success: false,
-        step: "resend_api",
-        status: resendResponse.status,
-        data
-      }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          source: "resend",
+          status: resendResponse.status,
+          data,
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     return new Response(JSON.stringify({ success: true, data }), {
@@ -60,12 +63,12 @@ export async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Function error:", error);
+    console.error("Function crash:", error);
 
     return new Response(
       JSON.stringify({
         success: false,
-        step: "function_crash",
+        source: "function",
         error: error instanceof Error ? error.message : "Unknown error",
       }),
       {
