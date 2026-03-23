@@ -223,51 +223,66 @@ function App() {
   const buildFeeBreakdown = (quote: any) => {
     if (!quote) return "";
 
+    if (quote.breakdownText) {
+      const disclaimerText =
+        Array.isArray(quote.disclaimerLines) && quote.disclaimerLines.length > 0
+          ? `\n\nIMPORTANT NOTES\n${quote.disclaimerLines.join("\n")}`
+          : "";
+
+      return `${quote.breakdownText}${disclaimerText}`;
+    }
+
     const lines: string[] = [];
 
-    if (quote.legalFee) {
-      lines.push(`Base legal fee: £${quote.legalFee}`);
-    }
-
-    if (Array.isArray(quote.supplements)) {
-      quote.supplements.forEach((item: any) => {
-        lines.push(`${item.label}: £${item.amount}`);
+    if (Array.isArray(quote.legalFeeItems) && quote.legalFeeItems.length > 0) {
+      lines.push("LEGAL FEES");
+      quote.legalFeeItems.forEach((item: any) => {
+        lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
       });
     }
 
-    if (quote.legalSubtotal) {
-      lines.push(`Legal fees subtotal: £${quote.legalSubtotal}`);
+    if (typeof quote.legalFeeTotalExVat === "number") {
+      lines.push(`Legal fees ex VAT: £${quote.legalFeeTotalExVat.toFixed(2)}`);
     }
 
-    if (quote.vat) {
-      lines.push(`VAT: £${quote.vat}`);
+    if (typeof quote.vatAmount === "number") {
+      lines.push(`VAT: £${quote.vatAmount.toFixed(2)}`);
     }
 
-    if (Array.isArray(quote.disbursements)) {
-      quote.disbursements.forEach((item: any) => {
-        lines.push(`${item.label}: £${item.amount}`);
-      });
+    if (typeof quote.legalTotalInclVat === "number") {
+      lines.push(
+        `Total legal fees including VAT: £${quote.legalTotalInclVat.toFixed(2)}`
+      );
     }
 
-    if (quote.disbursementsTotal) {
-      lines.push(`Disbursements total: £${quote.disbursementsTotal}`);
-    }
-
-    if (quote.sdlt?.amount) {
-      lines.push(`SDLT: £${quote.sdlt.amount}`);
-    } else if (quote.sdlt?.note) {
-      lines.push(`SDLT: ${quote.sdlt.note}`);
-    }
-
-    if (quote.total) {
-      lines.push(`Estimated total: £${quote.total}`);
-    }
-
-    if (Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0) {
+    if (
+      Array.isArray(quote.disbursementItems) &&
+      quote.disbursementItems.length > 0
+    ) {
       lines.push("");
-      lines.push("Important notes:");
-      quote.disclaimers.forEach((item: string) => {
-        lines.push(`- ${item}`);
+      lines.push("DISBURSEMENTS");
+      quote.disbursementItems.forEach((item: any) => {
+        lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
+      });
+    }
+
+    if (typeof quote.disbursementTotal === "number") {
+      lines.push(`Total disbursements: £${quote.disbursementTotal.toFixed(2)}`);
+    }
+
+    if (typeof quote.grandTotal === "number") {
+      lines.push("");
+      lines.push(`TOTAL ESTIMATED COST: £${quote.grandTotal.toFixed(2)}`);
+    }
+
+    if (
+      Array.isArray(quote.disclaimerLines) &&
+      quote.disclaimerLines.length > 0
+    ) {
+      lines.push("");
+      lines.push("IMPORTANT NOTES");
+      quote.disclaimerLines.forEach((item: string) => {
+        lines.push(item);
       });
     }
 
@@ -293,17 +308,18 @@ function App() {
         const defaultNextSteps =
           "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.";
 
-        setApprovedQuote({
+          setApprovedQuote({
           clientName: enquiry.name || "",
           clientEmail: enquiry.email || "",
           transactionType: enquiry.type || "",
           tenure: enquiry.tenure || "",
           propertyPrice: enquiry.price ? String(enquiry.price) : "",
-          quoteAmount: quote?.legalSubtotal
-            ? String(quote.legalSubtotal)
-            : quote?.total
-            ? String(quote.total)
-            : "",
+          quoteAmount:
+            typeof quote?.grandTotal === "number"
+              ? `£${quote.grandTotal.toFixed(2)}`
+              : typeof quote?.legalTotalInclVat === "number"
+              ? `£${quote.legalTotalInclVat.toFixed(2)}`
+              : "",
           quoteReference: enquiry.reference || "",
           feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
           nextSteps: defaultNextSteps,
