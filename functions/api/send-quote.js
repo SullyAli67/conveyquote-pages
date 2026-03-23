@@ -1,3 +1,5 @@
+import { calculateQuote } from "../lib/calculate-quote";
+
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
@@ -57,6 +59,39 @@ export async function onRequestPost(context) {
     const randomPart = Math.floor(1000 + Math.random() * 9000);
     const reference = `CQ-${datePart}-${randomPart}`;
 
+    const quote = calculateQuote({
+      type,
+      tenure,
+      price,
+      postcode,
+
+      mortgage,
+      ownershipType,
+      firstTimeBuyer,
+      newBuild,
+      sharedOwnership,
+      helpToBuy,
+      isCompany,
+      buyToLet,
+      giftedDeposit,
+      additionalProperty,
+      ukResidentForSdlt,
+
+      saleMortgage,
+      managementCompany,
+      tenanted,
+
+      currentLender,
+      newLender,
+      additionalBorrowing,
+      remortgageTransfer,
+
+      transferMortgage,
+      ownersChanging,
+    });
+
+    const quoteJson = JSON.stringify(quote);
+
     await env.DB.prepare(
       `
       INSERT INTO enquiries (
@@ -91,9 +126,11 @@ export async function onRequestPost(context) {
         remortgage_transfer,
 
         transfer_mortgage,
-        owners_changing
+        owners_changing,
+
+        quote_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
       .bind(
@@ -128,7 +165,9 @@ export async function onRequestPost(context) {
         remortgageTransfer || "",
 
         transferMortgage || "",
-        ownersChanging || ""
+        ownersChanging || "",
+
+        quoteJson
       )
       .run();
 
@@ -146,6 +185,76 @@ export async function onRequestPost(context) {
     const adminUrl = `https://conveyquote.uk/admin?ref=${encodeURIComponent(
       reference
     )}`;
+
+    const quoteSummaryRows = `
+      ${row("Legal fee", quote.legalFee ? `£${quote.legalFee}` : "")}
+      ${row(
+        "Legal fees subtotal",
+        quote.legalSubtotal ? `£${quote.legalSubtotal}` : ""
+      )}
+      ${row("VAT", quote.vat ? `£${quote.vat}` : "")}
+      ${row(
+        "Disbursements total",
+        quote.disbursementsTotal ? `£${quote.disbursementsTotal}` : ""
+      )}
+      ${row(
+        "SDLT",
+        quote.sdlt?.amount
+          ? `£${quote.sdlt.amount}`
+          : quote.sdlt?.note || "Not applicable"
+      )}
+      ${row("Estimated total", quote.total ? `£${quote.total}` : "")}
+    `;
+
+    const supplementsHtml =
+      Array.isArray(quote.supplements) && quote.supplements.length > 0
+        ? `
+          <tr>
+            <td style="padding:0 28px 0 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Supplements</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                ${quote.supplements
+                  .map((item) => row(item.label, `£${item.amount}`))
+                  .join("")}
+              </table>
+            </td>
+          </tr>
+        `
+        : "";
+
+    const disbursementsHtml =
+      Array.isArray(quote.disbursements) && quote.disbursements.length > 0
+        ? `
+          <tr>
+            <td style="padding:0 28px 0 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Disbursements</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                ${quote.disbursements
+                  .map((item) => row(item.label, `£${item.amount}`))
+                  .join("")}
+              </table>
+            </td>
+          </tr>
+        `
+        : "";
+
+    const disclaimersHtml =
+      Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0
+        ? `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.8;color:#7a4b00;">
+                    <strong>Important notes:</strong><br />
+                    ${quote.disclaimers.map((item) => `• ${item}`).join("<br />")}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        `
+        : "";
 
     const internalHtml = `
       <html>
@@ -213,6 +322,18 @@ export async function onRequestPost(context) {
                       </table>
                     </td>
                   </tr>
+
+                  <tr>
+                    <td style="padding:0 28px 0 28px;">
+                      <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Estimated Quote Summary</h2>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                        ${quoteSummaryRows}
+                      </table>
+                    </td>
+                  </tr>
+
+                  ${supplementsHtml}
+                  ${disbursementsHtml}
 
                   ${
                     type === "purchase"
@@ -290,12 +411,14 @@ export async function onRequestPost(context) {
                       : ""
                   }
 
+                  ${disclaimersHtml}
+
                   <tr>
                     <td style="padding:0 28px 24px 28px;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
                         <tr>
                           <td style="padding:14px 16px;font-size:14px;line-height:1.6;color:#7a4b00;">
-                            <strong>Next step:</strong> review this enquiry in admin, calculate the quote, then send the approved client-facing quote.
+                            <strong>Next step:</strong> review this enquiry in admin, adjust the quote if needed, then send the approved client-facing quote.
                           </td>
                         </tr>
                       </table>
@@ -349,7 +472,12 @@ export async function onRequestPost(context) {
     }
 
     return new Response(
-      JSON.stringify({ success: true, reference, data }),
+      JSON.stringify({
+        success: true,
+        reference,
+        quote,
+        data,
+      }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
