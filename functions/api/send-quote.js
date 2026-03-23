@@ -22,9 +22,9 @@ export async function onRequestPost(context) {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "ConveyQuote <quotes@yourdomain.co.uk>",
+        from: "ConveyQuote <quotes@conveyquote.uk>",
         to: [email],
-        cc: ["your-real-email@yourdomain.co.uk"],
+        cc: ["liveandletlaw@outlook.com"],
         subject: "Your Conveyancing Quote",
         html: `
           <h2>Your Conveyancing Quote</h2>
