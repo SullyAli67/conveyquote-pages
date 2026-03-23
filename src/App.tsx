@@ -166,7 +166,9 @@ function App() {
         setForm(initialFormState);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        alert("Sorry, there was a problem submitting your enquiry. Please try again.");
+        alert(
+          "Sorry, there was a problem submitting your enquiry. Please try again."
+        );
         console.error("Send error:", result);
       }
     } catch (error) {
@@ -205,6 +207,8 @@ function App() {
         alert("Approved client quote sent successfully.");
         console.log("Approved quote email sent:", result);
         setApprovedQuote(initialApprovedQuoteState);
+        setAdminReference("");
+        setLoadedEnquiryMessage("");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         alert("Sorry, there was a problem sending the approved quote.");
@@ -215,7 +219,7 @@ function App() {
       console.error("Approved quote request error:", error);
     }
   };
-  
+
   const buildFeeBreakdown = (quote: any) => {
     if (!quote) return "";
 
@@ -270,60 +274,6 @@ function App() {
     return lines.join("\n");
   };
 
-    const buildFeeBreakdown = (quote: any) => {
-    if (!quote) return "";
-
-    const lines: string[] = [];
-
-    if (quote.legalFee) {
-      lines.push(`Base legal fee: £${quote.legalFee}`);
-    }
-
-    if (Array.isArray(quote.supplements)) {
-      quote.supplements.forEach((item: any) => {
-        lines.push(`${item.label}: £${item.amount}`);
-      });
-    }
-
-    if (quote.legalSubtotal) {
-      lines.push(`Legal fees subtotal: £${quote.legalSubtotal}`);
-    }
-
-    if (quote.vat) {
-      lines.push(`VAT: £${quote.vat}`);
-    }
-
-    if (Array.isArray(quote.disbursements)) {
-      quote.disbursements.forEach((item: any) => {
-        lines.push(`${item.label}: £${item.amount}`);
-      });
-    }
-
-    if (quote.disbursementsTotal) {
-      lines.push(`Disbursements total: £${quote.disbursementsTotal}`);
-    }
-
-    if (quote.sdlt?.amount) {
-      lines.push(`SDLT: £${quote.sdlt.amount}`);
-    } else if (quote.sdlt?.note) {
-      lines.push(`SDLT: ${quote.sdlt.note}`);
-    }
-
-    if (quote.total) {
-      lines.push(`Estimated total: £${quote.total}`);
-    }
-
-    if (Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0) {
-      lines.push("");
-      lines.push("Important notes:");
-      quote.disclaimers.forEach((item: string) => {
-        lines.push(`- ${item}`);
-      });
-    }
-
-    return lines.join("\n");
-  };
-  
   const loadEnquiryByReference = async (reference: string) => {
     if (!reference) return;
 
@@ -373,10 +323,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (isAdminPage && refFromUrl) {
+    if (isAdminPage && isAdminUnlocked && refFromUrl) {
       loadEnquiryByReference(refFromUrl);
     }
-  }, [isAdminPage, refFromUrl]);
+  }, [isAdminPage, isAdminUnlocked, refFromUrl]);
 
   const isPurchase = form.type === "purchase";
   const isSale = form.type === "sale";
@@ -402,7 +352,9 @@ function App() {
 
           <div className="hero__text">
             <span className="eyebrow">
-              {isAdminPage ? "Internal Quote Approval" : "Online Conveyancing Quotes"}
+              {isAdminPage
+                ? "Internal Quote Approval"
+                : "Online Conveyancing Quotes"}
             </span>
             <h1>
               {isAdminPage
@@ -442,7 +394,8 @@ function App() {
                 <div>
                   <h2>Get a Quote</h2>
                   <p>
-                    Start by selecting the type of transaction. We will then show only the questions relevant to your matter.
+                    Start by selecting the type of transaction. We will then
+                    show only the questions relevant to your matter.
                   </p>
                 </div>
               </div>
@@ -451,7 +404,13 @@ function App() {
                 <div className="form-grid">
                   <div className="field">
                     <label htmlFor="type">Transaction type</label>
-                    <select id="type" name="type" value={form.type} onChange={handleChange} required>
+                    <select
+                      id="type"
+                      name="type"
+                      value={form.type}
+                      onChange={handleChange}
+                      required
+                    >
                       <option value="">Please select</option>
                       <option value="purchase">Purchase</option>
                       <option value="sale">Sale</option>
@@ -463,7 +422,10 @@ function App() {
 
                 {form.type && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Matter Details</h2>
                         <p>Please complete the details below.</p>
@@ -473,7 +435,13 @@ function App() {
                     <div className="form-grid">
                       <div className="field">
                         <label htmlFor="tenure">Tenure</label>
-                        <select id="tenure" name="tenure" value={form.tenure} onChange={handleChange} required>
+                        <select
+                          id="tenure"
+                          name="tenure"
+                          value={form.tenure}
+                          onChange={handleChange}
+                          required
+                        >
                           <option value="">Please select</option>
                           <option value="freehold">Freehold</option>
                           <option value="leasehold">Leasehold</option>
@@ -482,7 +450,9 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="price">
-                          {isSale ? "Sale price (£)" : "Property price / value (£)"}
+                          {isSale
+                            ? "Sale price (£)"
+                            : "Property price / value (£)"}
                         </label>
                         <input
                           id="price"
@@ -513,17 +483,29 @@ function App() {
 
                 {isPurchase && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Purchase Details</h2>
-                        <p>These questions help us assess the likely complexity, pricing and SDLT position.</p>
+                        <p>
+                          These questions help us assess the likely complexity,
+                          pricing and SDLT position.
+                        </p>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <div className="field">
                         <label htmlFor="mortgage">Mortgage or cash</label>
-                        <select id="mortgage" name="mortgage" value={form.mortgage} onChange={handleChange} required>
+                        <select
+                          id="mortgage"
+                          name="mortgage"
+                          value={form.mortgage}
+                          onChange={handleChange}
+                          required
+                        >
                           <option value="">Please select</option>
                           <option value="mortgage">Mortgage</option>
                           <option value="cash">Cash</option>
@@ -546,7 +528,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="firstTimeBuyer">First time buyer?</label>
+                        <label htmlFor="firstTimeBuyer">
+                          First time buyer?
+                        </label>
                         <select
                           id="firstTimeBuyer"
                           name="firstTimeBuyer"
@@ -593,7 +577,12 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="buyToLet">Buy to let?</label>
-                        <select id="buyToLet" name="buyToLet" value={form.buyToLet} onChange={handleChange}>
+                        <select
+                          id="buyToLet"
+                          name="buyToLet"
+                          value={form.buyToLet}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -602,7 +591,12 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="newBuild">New build?</label>
-                        <select id="newBuild" name="newBuild" value={form.newBuild} onChange={handleChange}>
+                        <select
+                          id="newBuild"
+                          name="newBuild"
+                          value={form.newBuild}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -610,7 +604,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sharedOwnership">Shared ownership?</label>
+                        <label htmlFor="sharedOwnership">
+                          Shared ownership?
+                        </label>
                         <select
                           id="sharedOwnership"
                           name="sharedOwnership"
@@ -625,7 +621,12 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="helpToBuy">Help to Buy / scheme?</label>
-                        <select id="helpToBuy" name="helpToBuy" value={form.helpToBuy} onChange={handleChange}>
+                        <select
+                          id="helpToBuy"
+                          name="helpToBuy"
+                          value={form.helpToBuy}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -634,7 +635,12 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="isCompany">Buying via company?</label>
-                        <select id="isCompany" name="isCompany" value={form.isCompany} onChange={handleChange}>
+                        <select
+                          id="isCompany"
+                          name="isCompany"
+                          value={form.isCompany}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -642,8 +648,15 @@ function App() {
                       </div>
 
                       <div className="field field--full">
-                        <label htmlFor="giftedDeposit">Any gifted deposit?</label>
-                        <select id="giftedDeposit" name="giftedDeposit" value={form.giftedDeposit} onChange={handleChange}>
+                        <label htmlFor="giftedDeposit">
+                          Any gifted deposit?
+                        </label>
+                        <select
+                          id="giftedDeposit"
+                          name="giftedDeposit"
+                          value={form.giftedDeposit}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -663,7 +676,10 @@ function App() {
 
                     <div className="form-footer" style={{ paddingTop: "0" }}>
                       <p className="form-note">
-                        SDLT is highly fact-sensitive. Any figure produced later will be an estimate only and may change depending on buyer status, reliefs, surcharge position and the final transaction structure.
+                        SDLT is highly fact-sensitive. Any figure produced later
+                        will be an estimate only and may change depending on
+                        buyer status, reliefs, surcharge position and the final
+                        transaction structure.
                       </p>
                     </div>
                   </>
@@ -671,16 +687,24 @@ function App() {
 
                 {isSale && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Sale Details</h2>
-                        <p>These questions help us understand the likely work involved in the sale.</p>
+                        <p>
+                          These questions help us understand the likely work
+                          involved in the sale.
+                        </p>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <div className="field">
-                        <label htmlFor="saleMortgage">Existing mortgage to redeem?</label>
+                        <label htmlFor="saleMortgage">
+                          Existing mortgage to redeem?
+                        </label>
                         <select
                           id="saleMortgage"
                           name="saleMortgage"
@@ -695,7 +719,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="managementCompany">Management company / service charge?</label>
+                        <label htmlFor="managementCompany">
+                          Management company / service charge?
+                        </label>
                         <select
                           id="managementCompany"
                           name="managementCompany"
@@ -709,8 +735,15 @@ function App() {
                       </div>
 
                       <div className="field field--full">
-                        <label htmlFor="tenanted">Is the property tenanted?</label>
-                        <select id="tenanted" name="tenanted" value={form.tenanted} onChange={handleChange}>
+                        <label htmlFor="tenanted">
+                          Is the property tenanted?
+                        </label>
+                        <select
+                          id="tenanted"
+                          name="tenanted"
+                          value={form.tenanted}
+                          onChange={handleChange}
+                        >
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
@@ -722,10 +755,16 @@ function App() {
 
                 {isRemortgage && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Remortgage Details</h2>
-                        <p>These questions help us assess the remortgage work involved.</p>
+                        <p>
+                          These questions help us assess the remortgage work
+                          involved.
+                        </p>
                       </div>
                     </div>
 
@@ -743,7 +782,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="newLender">New lender (if known)</label>
+                        <label htmlFor="newLender">
+                          New lender (if known)
+                        </label>
                         <input
                           id="newLender"
                           type="text"
@@ -755,7 +796,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="additionalBorrowing">Additional borrowing?</label>
+                        <label htmlFor="additionalBorrowing">
+                          Additional borrowing?
+                        </label>
                         <select
                           id="additionalBorrowing"
                           name="additionalBorrowing"
@@ -769,7 +812,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransfer">Transfer of equity at same time?</label>
+                        <label htmlFor="remortgageTransfer">
+                          Transfer of equity at same time?
+                        </label>
                         <select
                           id="remortgageTransfer"
                           name="remortgageTransfer"
@@ -787,16 +832,24 @@ function App() {
 
                 {isTransfer && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Transfer Details</h2>
-                        <p>These questions help us understand the ownership change and whether any lender is involved.</p>
+                        <p>
+                          These questions help us understand the ownership
+                          change and whether any lender is involved.
+                        </p>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <div className="field">
-                        <label htmlFor="transferMortgage">Is there a mortgage on the property?</label>
+                        <label htmlFor="transferMortgage">
+                          Is there a mortgage on the property?
+                        </label>
                         <select
                           id="transferMortgage"
                           name="transferMortgage"
@@ -810,7 +863,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="ownersChanging">How many owners are changing?</label>
+                        <label htmlFor="ownersChanging">
+                          How many owners are changing?
+                        </label>
                         <select
                           id="ownersChanging"
                           name="ownersChanging"
@@ -829,10 +884,16 @@ function App() {
 
                 {form.type && (
                   <>
-                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
                       <div>
                         <h2>Your Contact Details</h2>
-                        <p>Please provide your contact details so we can review your enquiry and respond.</p>
+                        <p>
+                          Please provide your contact details so we can review
+                          your enquiry and respond.
+                        </p>
                       </div>
                     </div>
 
@@ -878,7 +939,9 @@ function App() {
 
                     <div className="form-footer">
                       <p className="form-note">
-                        By submitting this form, you are requesting a quote only. No solicitor-client relationship is formed at this stage.
+                        By submitting this form, you are requesting a quote
+                        only. No solicitor-client relationship is formed at this
+                        stage.
                       </p>
                       <button type="submit" className="primary-button">
                         Request My Quote
@@ -895,15 +958,19 @@ function App() {
                 <ol className="steps">
                   <li>Select your transaction type.</li>
                   <li>Answer only the questions relevant to your matter.</li>
-                  <li>We review the details and then issue your quote by email if appropriate.</li>
+                  <li>
+                    We review the details and then issue your quote by email if
+                    appropriate.
+                  </li>
                 </ol>
               </article>
 
               <article className="card">
                 <h3>About ConveyQuote</h3>
                 <p>
-                  ConveyQuote is designed to make conveyancing quotes clearer, quicker and easier to request,
-                  while still allowing legal oversight before the quote is issued.
+                  ConveyQuote is designed to make conveyancing quotes clearer,
+                  quicker and easier to request, while still allowing legal
+                  oversight before the quote is issued.
                 </p>
               </article>
             </section>
@@ -915,7 +982,9 @@ function App() {
             <div className="section-heading">
               <div>
                 <h2>Admin Access</h2>
-                <p>Enter the internal passcode to access the quote approval area.</p>
+                <p>
+                  Enter the internal passcode to access the quote approval area.
+                </p>
               </div>
             </div>
 
@@ -957,15 +1026,22 @@ function App() {
               </div>
             </div>
 
-            {(adminReference || loadedEnquiryMessage || isLoadingEnquiry) && (
-              <div style={{ marginBottom: "16px" }}>
-                {isLoadingEnquiry ? (
-                  <p className="form-note">Loading enquiry...</p>
-                ) : (
-                  <p className="form-note">{loadedEnquiryMessage}</p>
-                )}
-              </div>
-            )}
+            <div style={{ marginBottom: "16px" }}>
+              {isLoadingEnquiry && (
+                <p className="form-note">Loading enquiry from reference...</p>
+              )}
+
+              {!isLoadingEnquiry && loadedEnquiryMessage && (
+                <p className="form-note">{loadedEnquiryMessage}</p>
+              )}
+
+              {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
+                <p className="form-note">
+                  Admin page unlocked. Ready to load enquiry reference{" "}
+                  {refFromUrl}.
+                </p>
+              )}
+            </div>
 
             <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
               <div className="form-grid">
@@ -1028,7 +1104,9 @@ function App() {
                 </div>
 
                 <div className="field">
-                  <label htmlFor="propertyPrice">Property price / value (£)</label>
+                  <label htmlFor="propertyPrice">
+                    Property price / value (£)
+                  </label>
                   <input
                     id="propertyPrice"
                     type="text"
@@ -1073,7 +1151,7 @@ function App() {
                     value={approvedQuote.feeBreakdown}
                     onChange={handleApprovedQuoteChange}
                     placeholder="Example: Legal fee estimate for standard sale. Excludes additional work outside the normal scope."
-                    rows={5}
+                    rows={8}
                   />
                 </div>
 
@@ -1091,7 +1169,8 @@ function App() {
 
               <div className="form-footer">
                 <p className="form-note">
-                  Internal tool only. This sends the approved client-facing quote email.
+                  Internal tool only. This sends the approved client-facing
+                  quote email.
                 </p>
                 <button type="submit" className="primary-button">
                   Send Approved Quote
@@ -1105,4 +1184,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;
