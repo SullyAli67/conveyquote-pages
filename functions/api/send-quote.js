@@ -3,6 +3,9 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
 
+    console.log("Incoming form body:", body);
+    console.log("RESEND key exists:", !!env.RESEND_API_KEY);
+
     const {
       name,
       email,
@@ -21,7 +24,7 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         from: "ConveyQuote <onboarding@resend.dev>",
         to: [email],
-        cc: ["sa@conveyquote.uk"],
+        cc: ["YOUR-REAL-EMAIL@EXAMPLE.COM"],
         subject: "Your Conveyancing Quote",
         html: `
           <h2>Your Conveyancing Quote</h2>
@@ -37,9 +40,16 @@ export async function onRequestPost(context) {
     });
 
     const data = await resendResponse.json();
+    console.log("Resend response status:", resendResponse.status);
+    console.log("Resend response data:", data);
 
     if (!resendResponse.ok) {
-      return new Response(JSON.stringify({ success: false, data }), {
+      return new Response(JSON.stringify({
+        success: false,
+        step: "resend_api",
+        status: resendResponse.status,
+        data
+      }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
@@ -50,8 +60,14 @@ export async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.error("Function error:", error);
+
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({
+        success: false,
+        step: "function_crash",
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
