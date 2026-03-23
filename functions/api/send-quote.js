@@ -3,9 +3,6 @@ export async function onRequestPost(context) {
     const { request, env } = context;
     const body = await request.json();
 
-    console.log("Incoming body:", body);
-    console.log("Has RESEND_API_KEY:", !!env.RESEND_API_KEY);
-
     const {
       name,
       email,
@@ -14,7 +11,6 @@ export async function onRequestPost(context) {
       tenure,
       price,
       postcode,
-
       mortgage,
       ownershipType,
       firstTimeBuyer,
@@ -24,16 +20,13 @@ export async function onRequestPost(context) {
       isCompany,
       buyToLet,
       giftedDeposit,
-
       saleMortgage,
       managementCompany,
       tenanted,
-
       currentLender,
       newLender,
       additionalBorrowing,
       remortgageTransfer,
-
       transferMortgage,
       ownersChanging,
     } = body;
@@ -51,15 +44,168 @@ export async function onRequestPost(context) {
 
     const safe = (value) => (value ? String(value) : "Not provided");
 
-    const detailRow = (label, value) => `
+    const row = (label, value) => `
       <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; width:42%; font-weight:600; color:#1f2937; vertical-align:top;">
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
           ${label}
         </td>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; color:#374151;">
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;">
           ${safe(value)}
         </td>
       </tr>
+    `;
+
+    const internalHtml = `
+      <html>
+        <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#222;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f2f4f7;">
+            <tr>
+              <td align="center" style="padding:24px 12px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="760" style="max-width:760px;width:100%;background:#ffffff;border-collapse:collapse;">
+                  
+                  <tr>
+                    <td style="background:#0f2747;padding:24px 28px;color:#ffffff;">
+                      <div style="font-size:12px;letter-spacing:0.5px;text-transform:uppercase;opacity:0.85;">
+                        ConveyQuote Internal Review
+                      </div>
+                      <div style="font-size:30px;line-height:1.2;font-weight:bold;margin-top:8px;">
+                        New Quote Enquiry Received
+                      </div>
+                      <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;">
+                        This notification is for internal review only. No client-facing quote has been issued.
+                      </div>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:24px 28px 8px 28px;">
+                      <div style="display:inline-block;background:#e8f1fb;color:#0f2747;padding:8px 12px;font-size:13px;font-weight:bold;">
+                        ${prettyType}
+                      </div>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:8px 28px 0 28px;">
+                      <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Client Details</h2>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                        ${row("Client name", name)}
+                        ${row("Email address", email)}
+                        ${row("Phone number", phone)}
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:0 28px 0 28px;">
+                      <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Matter Details</h2>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                        ${row("Transaction type", prettyType)}
+                        ${row("Tenure", tenure)}
+                        ${row("Property price / value", price ? `£${price}` : "")}
+                        ${row("Postcode", postcode)}
+                      </table>
+                    </td>
+                  </tr>
+
+                  ${
+                    type === "purchase"
+                      ? `
+                      <tr>
+                        <td style="padding:0 28px 0 28px;">
+                          <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Purchase Details</h2>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                            ${row("Mortgage or cash", mortgage)}
+                            ${row("Buyer type", ownershipType)}
+                            ${row("First time buyer", firstTimeBuyer)}
+                            ${row("Buy to let", buyToLet)}
+                            ${row("New build", newBuild)}
+                            ${row("Shared ownership", sharedOwnership)}
+                            ${row("Help to Buy / scheme", helpToBuy)}
+                            ${row("Buying via company", isCompany)}
+                            ${row("Gifted deposit", giftedDeposit)}
+                          </table>
+                        </td>
+                      </tr>
+                    `
+                      : ""
+                  }
+
+                  ${
+                    type === "sale"
+                      ? `
+                      <tr>
+                        <td style="padding:0 28px 0 28px;">
+                          <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Sale Details</h2>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                            ${row("Mortgage to redeem", saleMortgage)}
+                            ${row("Management company / service charge", managementCompany)}
+                            ${row("Property tenanted", tenanted)}
+                          </table>
+                        </td>
+                      </tr>
+                    `
+                      : ""
+                  }
+
+                  ${
+                    type === "remortgage"
+                      ? `
+                      <tr>
+                        <td style="padding:0 28px 0 28px;">
+                          <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Remortgage Details</h2>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                            ${row("Current lender", currentLender)}
+                            ${row("New lender", newLender)}
+                            ${row("Additional borrowing", additionalBorrowing)}
+                            ${row("Transfer of equity at same time", remortgageTransfer)}
+                          </table>
+                        </td>
+                      </tr>
+                    `
+                      : ""
+                  }
+
+                  ${
+                    type === "transfer"
+                      ? `
+                      <tr>
+                        <td style="padding:0 28px 0 28px;">
+                          <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transfer Details</h2>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                            ${row("Mortgage on property", transferMortgage)}
+                            ${row("Owners changing", ownersChanging)}
+                          </table>
+                        </td>
+                      </tr>
+                    `
+                      : ""
+                  }
+
+                  <tr>
+                    <td style="padding:0 28px 24px 28px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+                        <tr>
+                          <td style="padding:14px 16px;font-size:14px;line-height:1.6;color:#7a4b00;">
+                            <strong>Next step:</strong> review this enquiry, calculate the quote, then use the separate approval function to send the client-facing quote.
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="padding:16px 28px 28px 28px;font-size:12px;color:#666;text-align:center;border-top:1px solid #e5e5e5;">
+                      ConveyQuote internal notification email
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
     `;
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
@@ -73,144 +219,11 @@ export async function onRequestPost(context) {
         to: ["liveandletlaw@outlook.com"],
         reply_to: email || "liveandletlaw@outlook.com",
         subject: `New Conveyancing Quote Request - ${safe(name)} - ${prettyType}`,
-        html: `
-          <div style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif; color:#111827;">
-            <div style="max-width:760px; margin:0 auto; padding:32px 16px;">
-              
-              <div style="background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); border-radius:16px 16px 0 0; padding:28px 32px;">
-                <div style="font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#bfdbfe; margin-bottom:10px;">
-                  Internal Quote Notification
-                </div>
-                <h1 style="margin:0; font-size:28px; line-height:1.2; color:#ffffff;">
-                  New Conveyancing Enquiry Received
-                </h1>
-                <p style="margin:12px 0 0 0; font-size:15px; line-height:1.6; color:#dbeafe;">
-                  A new quote request has been submitted through the ConveyQuote website. This email is for internal review only.
-                </p>
-              </div>
-
-              <div style="background:#ffffff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 16px 16px; overflow:hidden;">
-                
-                <div style="padding:24px 32px 8px 32px;">
-                  <div style="display:inline-block; background:#eff6ff; color:#1d4ed8; font-size:13px; font-weight:700; padding:8px 12px; border-radius:999px; margin-bottom:16px;">
-                    ${prettyType}
-                  </div>
-                  <p style="margin:0 0 18px 0; font-size:15px; line-height:1.7; color:#374151;">
-                    Review the details below before sending any client-facing quote or client care documentation.
-                  </p>
-                </div>
-
-                <div style="padding:0 32px 24px 32px;">
-                  <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Client Details</h2>
-                  <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                    ${detailRow("Client name", name)}
-                    ${detailRow("Email address", email)}
-                    ${detailRow("Phone number", phone)}
-                  </table>
-                </div>
-
-                <div style="padding:0 32px 24px 32px;">
-                  <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Matter Details</h2>
-                  <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                    ${detailRow("Transaction type", prettyType)}
-                    ${detailRow("Tenure", tenure)}
-                    ${detailRow("Property price / value", price ? `£${price}` : "")}
-                    ${detailRow("Postcode", postcode)}
-                  </table>
-                </div>
-
-                ${
-                  type === "purchase"
-                    ? `
-                  <div style="padding:0 32px 24px 32px;">
-                    <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Purchase Details</h2>
-                    <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                      ${detailRow("Mortgage or cash", mortgage)}
-                      ${detailRow("Buyer type", ownershipType)}
-                      ${detailRow("First time buyer", firstTimeBuyer)}
-                      ${detailRow("Buy to let", buyToLet)}
-                      ${detailRow("New build", newBuild)}
-                      ${detailRow("Shared ownership", sharedOwnership)}
-                      ${detailRow("Help to Buy / scheme", helpToBuy)}
-                      ${detailRow("Buying via company", isCompany)}
-                      ${detailRow("Gifted deposit", giftedDeposit)}
-                    </table>
-                  </div>
-                `
-                    : ""
-                }
-
-                ${
-                  type === "sale"
-                    ? `
-                  <div style="padding:0 32px 24px 32px;">
-                    <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Sale Details</h2>
-                    <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                      ${detailRow("Mortgage to redeem", saleMortgage)}
-                      ${detailRow("Management company / service charge", managementCompany)}
-                      ${detailRow("Property tenanted", tenanted)}
-                    </table>
-                  </div>
-                `
-                    : ""
-                }
-
-                ${
-                  type === "remortgage"
-                    ? `
-                  <div style="padding:0 32px 24px 32px;">
-                    <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Remortgage Details</h2>
-                    <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                      ${detailRow("Current lender", currentLender)}
-                      ${detailRow("New lender", newLender)}
-                      ${detailRow("Additional borrowing", additionalBorrowing)}
-                      ${detailRow("Transfer of equity at same time", remortgageTransfer)}
-                    </table>
-                  </div>
-                `
-                    : ""
-                }
-
-                ${
-                  type === "transfer"
-                    ? `
-                  <div style="padding:0 32px 24px 32px;">
-                    <h2 style="margin:0 0 12px 0; font-size:18px; color:#111827;">Transfer Details</h2>
-                    <table style="width:100%; border-collapse:collapse; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-                      ${detailRow("Mortgage on property", transferMortgage)}
-                      ${detailRow("Owners changing", ownersChanging)}
-                    </table>
-                  </div>
-                `
-                    : ""
-                }
-
-                <div style="padding:0 32px 32px 32px;">
-                  <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:16px 18px;">
-                    <p style="margin:0; font-size:14px; line-height:1.7; color:#92400e;">
-                      <strong>Next step:</strong> review this enquiry internally and send the approved client-facing quote separately. No automatic quote should be treated as issued to the client from this notification.
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-
-              <div style="padding:18px 8px 0 8px; text-align:center;">
-                <p style="margin:0; font-size:12px; line-height:1.6; color:#6b7280;">
-                  ConveyQuote internal notification email
-                </p>
-              </div>
-
-            </div>
-          </div>
-        `,
+        html: internalHtml,
       }),
     });
 
     const data = await resendResponse.json();
-
-    console.log("Resend status:", resendResponse.status);
-    console.log("Resend data:", data);
 
     if (!resendResponse.ok) {
       return new Response(
@@ -232,8 +245,6 @@ export async function onRequestPost(context) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Function crash:", error);
-
     return new Response(
       JSON.stringify({
         success: false,
