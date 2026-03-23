@@ -105,11 +105,16 @@ function App() {
 
   const [adminPasscode, setAdminPasscode] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminReference, setAdminReference] = useState("");
+  const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
+  const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
 
   const ADMIN_PASSCODE = "1212";
 
   const currentPath = window.location.pathname;
   const isAdminPage = currentPath === "/admin";
+  const currentUrl = new URL(window.location.href);
+  const refFromUrl = currentUrl.searchParams.get("ref") || "";
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -212,6 +217,53 @@ function App() {
       console.error("Approved quote request error:", error);
     }
   };
+
+  const loadEnquiryByReference = async (reference: string) => {
+    if (!reference) return;
+
+    setIsLoadingEnquiry(true);
+    setLoadedEnquiryMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/get-enquiry?ref=${encodeURIComponent(reference)}`
+      );
+      const result = await response.json();
+
+      if (result.success && result.enquiry) {
+        const enquiry = result.enquiry;
+
+        setApprovedQuote({
+          clientName: enquiry.client_name || "",
+          clientEmail: enquiry.client_email || "",
+          transactionType: enquiry.transaction_type || "",
+          tenure: enquiry.tenure || "",
+          propertyPrice: enquiry.price || "",
+          quoteAmount: "",
+          quoteReference: enquiry.reference || "",
+          feeBreakdown: "",
+          nextSteps:
+            "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.",
+        });
+
+        setAdminReference(reference);
+        setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
+      } else {
+        setLoadedEnquiryMessage("Could not load enquiry.");
+      }
+    } catch (error) {
+      console.error("Load enquiry error:", error);
+      setLoadedEnquiryMessage("Error loading enquiry.");
+    } finally {
+      setIsLoadingEnquiry(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdminPage && refFromUrl) {
+      loadEnquiryByReference(refFromUrl);
+    }
+  }, [isAdminPage, refFromUrl]);
 
   const isPurchase = form.type === "purchase";
   const isSale = form.type === "sale";
