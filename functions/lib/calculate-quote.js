@@ -39,7 +39,7 @@ function calculateStandardSdlt(price) {
   }
 
   if (price > 925000) {
-    tax += (Math.min(price, 1500000) - 925000) * 0.10;
+    tax += (Math.min(price, 1500000) - 925000) * 0.1;
   }
 
   if (price > 1500000) {
@@ -61,6 +61,47 @@ function calculateFirstTimeBuyerSdlt(price) {
   }
 
   return Math.max(0, tax);
+}
+
+function normaliseEnquiry(enquiry) {
+  return {
+    transaction_type: enquiry.transaction_type ?? enquiry.type ?? "",
+    tenure: enquiry.tenure ?? "",
+    price: enquiry.price ?? "",
+    postcode: enquiry.postcode ?? "",
+
+    mortgage: enquiry.mortgage ?? "",
+    ownership_type: enquiry.ownership_type ?? enquiry.ownershipType ?? "",
+    first_time_buyer:
+      enquiry.first_time_buyer ?? enquiry.firstTimeBuyer ?? "",
+    new_build: enquiry.new_build ?? enquiry.newBuild ?? "",
+    shared_ownership:
+      enquiry.shared_ownership ?? enquiry.sharedOwnership ?? "",
+    help_to_buy: enquiry.help_to_buy ?? enquiry.helpToBuy ?? "",
+    is_company: enquiry.is_company ?? enquiry.isCompany ?? "",
+    buy_to_let: enquiry.buy_to_let ?? enquiry.buyToLet ?? "",
+    gifted_deposit: enquiry.gifted_deposit ?? enquiry.giftedDeposit ?? "",
+    additional_property:
+      enquiry.additional_property ?? enquiry.additionalProperty ?? "",
+    uk_resident_for_sdlt:
+      enquiry.uk_resident_for_sdlt ?? enquiry.ukResidentForSdlt ?? "",
+
+    sale_mortgage: enquiry.sale_mortgage ?? enquiry.saleMortgage ?? "",
+    management_company:
+      enquiry.management_company ?? enquiry.managementCompany ?? "",
+    tenanted: enquiry.tenanted ?? "",
+
+    current_lender: enquiry.current_lender ?? enquiry.currentLender ?? "",
+    new_lender: enquiry.new_lender ?? enquiry.newLender ?? "",
+    additional_borrowing:
+      enquiry.additional_borrowing ?? enquiry.additionalBorrowing ?? "",
+    remortgage_transfer:
+      enquiry.remortgage_transfer ?? enquiry.remortgageTransfer ?? "",
+
+    transfer_mortgage:
+      enquiry.transfer_mortgage ?? enquiry.transferMortgage ?? "",
+    owners_changing: enquiry.owners_changing ?? enquiry.ownersChanging ?? "",
+  };
 }
 
 function calculateResidentialSdlt({
@@ -178,10 +219,22 @@ function calculateLegalFees(enquiry) {
     ]);
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
-    if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 300);
-    if (enquiry.sale_mortgage === "yes") addItem(legalFeeItems, "Mortgage redemption supplement", 50);
-    if (enquiry.management_company === "yes") addItem(legalFeeItems, "Management company / service charge supplement", 175);
-    if (enquiry.tenanted === "yes") addItem(legalFeeItems, "Tenanted property supplement", 150);
+    if (enquiry.tenure === "leasehold") {
+      addItem(legalFeeItems, "Leasehold supplement", 300);
+    }
+    if (enquiry.sale_mortgage === "yes") {
+      addItem(legalFeeItems, "Mortgage redemption supplement", 50);
+    }
+    if (enquiry.management_company === "yes") {
+      addItem(
+        legalFeeItems,
+        "Management company / service charge supplement",
+        175
+      );
+    }
+    if (enquiry.tenanted === "yes") {
+      addItem(legalFeeItems, "Tenanted property supplement", 150);
+    }
   }
 
   if (enquiry.transaction_type === "purchase") {
@@ -197,14 +250,30 @@ function calculateLegalFees(enquiry) {
     ]);
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
-    if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 350);
-    if (enquiry.mortgage === "mortgage") addItem(legalFeeItems, "Acting for lender supplement", 125);
-    if (enquiry.gifted_deposit === "yes") addItem(legalFeeItems, "Gifted deposit supplement", 95);
-    if (enquiry.new_build === "yes") addItem(legalFeeItems, "New build supplement", 250);
-    if (enquiry.shared_ownership === "yes") addItem(legalFeeItems, "Shared ownership supplement", 300);
-    if (enquiry.help_to_buy === "yes") addItem(legalFeeItems, "Help to Buy / scheme supplement", 200);
-    if (enquiry.is_company === "yes") addItem(legalFeeItems, "Company buyer supplement", 400);
-    if (enquiry.buy_to_let === "yes") addItem(legalFeeItems, "Buy to let supplement", 150);
+    if (enquiry.tenure === "leasehold") {
+      addItem(legalFeeItems, "Leasehold supplement", 350);
+    }
+    if (enquiry.mortgage === "mortgage") {
+      addItem(legalFeeItems, "Acting for lender supplement", 125);
+    }
+    if (enquiry.gifted_deposit === "yes") {
+      addItem(legalFeeItems, "Gifted deposit supplement", 95);
+    }
+    if (enquiry.new_build === "yes") {
+      addItem(legalFeeItems, "New build supplement", 250);
+    }
+    if (enquiry.shared_ownership === "yes") {
+      addItem(legalFeeItems, "Shared ownership supplement", 300);
+    }
+    if (enquiry.help_to_buy === "yes") {
+      addItem(legalFeeItems, "Help to Buy / scheme supplement", 200);
+    }
+    if (enquiry.is_company === "yes") {
+      addItem(legalFeeItems, "Company buyer supplement", 400);
+    }
+    if (enquiry.buy_to_let === "yes") {
+      addItem(legalFeeItems, "Buy to let supplement", 150);
+    }
   }
 
   if (enquiry.transaction_type === "remortgage") {
@@ -215,18 +284,31 @@ function calculateLegalFees(enquiry) {
     ]);
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
-    if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 250);
-    if (enquiry.additional_borrowing === "yes") addItem(legalFeeItems, "Additional borrowing supplement", 75);
-    if (enquiry.remortgage_transfer === "yes") addItem(legalFeeItems, "Transfer of equity supplement", 350);
+    if (enquiry.tenure === "leasehold") {
+      addItem(legalFeeItems, "Leasehold supplement", 250);
+    }
+    if (enquiry.additional_borrowing === "yes") {
+      addItem(legalFeeItems, "Additional borrowing supplement", 75);
+    }
+    if (enquiry.remortgage_transfer === "yes") {
+      addItem(legalFeeItems, "Transfer of equity supplement", 350);
+    }
   }
 
   if (enquiry.transaction_type === "transfer") {
     baseFee = 550;
     addItem(legalFeeItems, "Base legal fee", baseFee);
 
-    if (enquiry.transfer_mortgage === "yes") addItem(legalFeeItems, "Mortgage involved supplement", 150);
-    if (enquiry.tenure === "leasehold") addItem(legalFeeItems, "Leasehold supplement", 250);
-    if (enquiry.owners_changing === "two" || enquiry.owners_changing === "more") {
+    if (enquiry.transfer_mortgage === "yes") {
+      addItem(legalFeeItems, "Mortgage involved supplement", 150);
+    }
+    if (enquiry.tenure === "leasehold") {
+      addItem(legalFeeItems, "Leasehold supplement", 250);
+    }
+    if (
+      enquiry.owners_changing === "two" ||
+      enquiry.owners_changing === "more"
+    ) {
       addItem(legalFeeItems, "Multiple owners changing supplement", 150);
     }
   }
@@ -249,7 +331,6 @@ function calculateDisbursements(enquiry) {
       "Search pack (local, environmental, drainage and chancel)",
       350
     );
-
     addItem(
       disbursementItems,
       "Land Registry registration fee",
@@ -355,7 +436,9 @@ function buildBreakdownText({
   ].join("\n");
 }
 
-export function calculateQuote(enquiry) {
+export function calculateQuote(rawEnquiry) {
+  const enquiry = normaliseEnquiry(rawEnquiry);
+
   const legalFeeItems = calculateLegalFees(enquiry);
   const legalFeeTotalExVat = sumAmounts(legalFeeItems);
   const vatAmount = legalFeeTotalExVat * 0.2;
