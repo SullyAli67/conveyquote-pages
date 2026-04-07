@@ -16,14 +16,18 @@ export async function onRequestGet(context) {
       .first();
 
     if (!enquiryResult) {
-      return new Response("Quote reference not found", { status: 404 });
+      return new Response(`Quote reference not found: ${reference}`, {
+        status: 404,
+      });
     }
 
     const clientName = enquiryResult.name || "Client";
     const clientEmail = enquiryResult.email;
 
     if (!clientEmail) {
-      return new Response("Client email not found", { status: 400 });
+      return new Response(`Client email not found for reference: ${reference}`, {
+        status: 400,
+      });
     }
 
     // Update DB
@@ -96,9 +100,12 @@ export async function onRequestGet(context) {
 
     if (!clientEmailResponse.ok) {
       const errorText = await clientEmailResponse.text();
-      return new Response(`Failed to send client confirmation email: ${errorText}`, {
-        status: 500,
-      });
+      return new Response(
+        `Failed to send client confirmation email: ${errorText}`,
+        {
+          status: 500,
+        }
+      );
     }
 
     // Confirmation page
@@ -107,6 +114,8 @@ export async function onRequestGet(context) {
       <html>
         <head>
           <title>Instruction Received</title>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         </head>
         <body style="font-family:Arial,Helvetica,sans-serif;background:#f2f4f7;padding:40px;">
           <div style="max-width:700px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;">
@@ -123,6 +132,11 @@ export async function onRequestGet(context) {
       }
     );
   } catch (error) {
-    return new Response("Error accepting quote", { status: 500 });
+    return new Response(
+      `Error accepting quote: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+      { status: 500 }
+    );
   }
 }
