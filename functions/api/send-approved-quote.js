@@ -6,6 +6,11 @@ export async function onRequestPost(context) {
     });
 
   try {
+    return jsonResponse(
+      { success: false, error: "TEST BLOCK ACTIVE" },
+      500
+    );
+
     const { request, env } = context;
     const body = await request.json();
 
