@@ -13,6 +13,7 @@ export async function onRequestPost(context) {
       quoteReference,
       feeBreakdown,
       nextSteps,
+      quoteData,
     } = body;
 
     const prettyType =
@@ -26,7 +27,8 @@ export async function onRequestPost(context) {
         ? "Transfer of Equity"
         : "Conveyancing Matter";
 
-    const safe = (value) => (value === null || value === undefined ? "" : String(value));
+    const safe = (value) =>
+      value === null || value === undefined ? "" : String(value);
 
     const escapeHtml = (value) =>
       safe(value)
@@ -47,31 +49,287 @@ export async function onRequestPost(context) {
         .replace(/,/g, "")
         .trim();
 
-    const formatDisplayMoney = (value) => {
-      const cleaned = cleanMoney(value);
-      if (!cleaned) return "";
-      const number = Number(cleaned);
-      if (Number.isNaN(number)) return cleaned;
+    const formatMoney = (value) => {
+      const number = Number(value || 0);
+      if (Number.isNaN(number)) return "0.00";
       return number.toLocaleString("en-GB", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
     };
 
-    const displayQuoteAmount = formatDisplayMoney(quoteAmount);
+    const formatDisplayMoney = (value) => {
+      const cleaned = cleanMoney(value);
+      if (!cleaned) return "";
+      const number = Number(cleaned);
+      if (Number.isNaN(number)) return cleaned;
+      return formatMoney(number);
+    };
+
+    const sumItems = (items = []) =>
+      items.reduce((total, item) => total + Number(item.amount || 0), 0);
+
+    const buildRowsHtml = (items = []) => {
+      return items
+        .map((item, index) => {
+          const isLast = index === items.length - 1;
+          const isBold = Boolean(item.isTotal);
+
+          return `
+            <tr>
+              <td style="
+                padding:12px 0;
+                border-bottom:${isLast ? "0" : "1px solid #eef2f7"};
+                font-size:14px;
+                color:${isBold ? "#0f2747" : "#374151"};
+                font-weight:${isBold ? "700" : "500"};
+              ">
+                ${escapeHtml(item.label)}
+              </td>
+              <td style="
+                padding:12px 0;
+                border-bottom:${isLast ? "0" : "1px solid #eef2f7"};
+                font-size:14px;
+                color:${isBold ? "#0f2747" : "#111827"};
+                font-weight:${isBold ? "700" : "600"};
+                text-align:right;
+                white-space:nowrap;
+              ">
+                £${escapeHtml(formatMoney(item.amount || 0))}
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+    };
+
+    const parseFeeBreakdownFallback = (text) => {
+      const lines = safe(text)
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const sections = {
+        legalFees: [],
+        disbursements: [],
+        totalEstimatedCost: null,
+      };
+
+      let currentSection = "legalFees";
+
+      for (const line of lines) {
+        const upper = line.toUpperCase();
+
+        if (upper === "LEGAL FEES") {
+          currentSection = "legalFees";
+          continue;
+        }
+
+        if (upper === "DISBURSEMENTS") {
+          currentSection = "disbursements";
+          continue;
+        }
+
+        if (upper === "TOTAL ESTIMATED COST") {
+          currentSection = "total";
+          continue;
+        }
+
+        const colonIndex = line.indexOf(":");
+        if (colonIndex === -1) continue;
+
+        const label = line.slice(0, colonIndex).trim();
+        const rawValue = line.slice(colonIndex + 1).trim();
+        const amount = Number(cleanMoney(rawValue) || 0);
+
+        if (/total estimated cost/i.test(label) || currentSection === "total") {
+          sections.totalEstimatedCost = amount;
+          continue;
+        }
+
+        if (currentSection === "disbursements") {
+          sections.disbursements.push({
+            label,
+            amount,
+            isTotal: /total/i.test(label),
+          });
+        } else {
+          sections.legalFees.push({
+            label,
+            amount,
+            isTotal: /total/i.test(label),
+          });
+        }
+      }
+
+      return sections;
+    };
+
+    const defaultQuoteData = {
+      legalFees: [],
+      disbursements: [],
+      vat: 0,
+    };
+
+    let finalQuoteData = {
+      ...defaultQuoteData,
+      ...(quoteData || {}),
+    };
+
+    const hasStructuredQuoteData =
+      quoteData &&
+      (Array.isArray(quoteData.legalFees) ||
+        Array.isArray(quoteData.disbursements) ||
+        quoteData.vat !== undefined);
+
+    if (!hasStructuredQuoteData && feeBreakdown) {
+      const parsed = parseFeeBreakdownFallback(feeBreakdown);
+
+      const legalFeesWithoutVatOrTotal = parsed.legalFees.filter(
+        (item) =>
+          !/^(vat|total legal fees including vat)$/i.test(item.label || "")
+      );
+
+      const vatRow = parsed.legalFees.find((item) => /^vat$/i.test(item.label || ""));
+      const totalLegalFeesRow = parsed.legalFees.find((item) =>
+        /^total legal fees including vat$/i.test(item.label || "")
+      );
+
+      const disbursementsWithoutTotal = parsed.disbursements.filter(
+        (item) => !/^total disbursements$/i.test(item.label || "")
+      );
+
+      finalQuoteData = {
+        legalFees: legalFeesWithoutVatOrTotal,
+        disbursements: disbursementsWithoutTotal,
+        vat: vatRow ? Number(vatRow.amount || 0) : 0,
+      };
+
+      if (!quoteAmount && parsed.totalEstimatedCost !== null) {
+        body.quoteAmount = parsed.totalEstimatedCost;
+      }
+
+      if (!quoteAmount && totalLegalFeesRow) {
+        const derivedTotal =
+          Number(totalLegalFeesRow.amount || 0) + sumItems(disbursementsWithoutTotal);
+        body.quoteAmount = derivedTotal;
+      }
+    }
+
+    const legalFees = Array.isArray(finalQuoteData.legalFees)
+      ? finalQuoteData.legalFees
+      : [];
+
+    const disbursements = Array.isArray(finalQuoteData.disbursements)
+      ? finalQuoteData.disbursements
+      : [];
+
+    const vatAmount = Number(finalQuoteData.vat || 0);
+
+    const legalFeesSubtotal = sumItems(legalFees);
+    const legalFeesTotal = legalFeesSubtotal + vatAmount;
+    const disbursementTotal = sumItems(disbursements);
+    const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
+
+    const displayQuoteAmount =
+      quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
+        ? formatDisplayMoney(quoteAmount)
+        : formatMoney(calculatedGrandTotal);
+
     const displayPrice = formatDisplayMoney(price);
+
+    const legalFeeRows = [
+      ...legalFees,
+      ...(vatAmount > 0 ? [{ label: "VAT", amount: vatAmount }] : []),
+      ...(legalFees.length > 0 || vatAmount > 0
+        ? [
+            {
+              label: "Total legal fees including VAT",
+              amount: legalFeesTotal,
+              isTotal: true,
+            },
+          ]
+        : []),
+    ];
+
+    const disbursementRows = [
+      ...disbursements,
+      ...(disbursements.length > 0
+        ? [
+            {
+              label: "Total disbursements",
+              amount: disbursementTotal,
+              isTotal: true,
+            },
+          ]
+        : []),
+    ];
+
+    const totalEstimatedRows = [
+      {
+        label: "Total Estimated Cost",
+        amount: Number(cleanMoney(quoteAmount) || calculatedGrandTotal || 0),
+        isTotal: true,
+      },
+    ];
 
     const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
       safe(quoteReference)
     )}`;
 
-    const formattedBreakdown = formatMultilineHtml(feeBreakdown);
     const formattedNextSteps = formatMultilineHtml(
       nextSteps ||
         "If you would like us to proceed, please click the button below. Once we receive your instruction, we will contact you with the next steps and client care documentation."
     );
 
     const logoUrl = "https://conveyquote.uk/logo.png";
+
+    const legalFeesHtml =
+      legalFeeRows.length > 0
+        ? `
+          <div style="margin-top:24px;">
+            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Legal Fees</h2>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              ${buildRowsHtml(legalFeeRows)}
+            </table>
+          </div>
+        `
+        : "";
+
+    const disbursementsHtml =
+      disbursementRows.length > 0
+        ? `
+          <div style="margin-top:24px;">
+            <h2 style="margin:0 0 8px 0;font-size:18px;color:#0f2747;">Disbursements</h2>
+            <div style="font-size:13px;line-height:1.7;color:#6b7280;margin-bottom:12px;">
+              Third-party costs payable during the transaction.
+            </div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              ${buildRowsHtml(disbursementRows)}
+            </table>
+          </div>
+        `
+        : "";
+
+    const totalEstimatedHtml = `
+      <div style="margin-top:26px;background:#f8fbff;border:1px solid #dbe6f0;border-radius:12px;padding:18px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          ${buildRowsHtml(totalEstimatedRows)}
+        </table>
+      </div>
+    `;
+
+    const fallbackBreakdownHtml =
+      !legalFeesHtml && !disbursementsHtml && feeBreakdown
+        ? `
+          <div style="margin-top:24px;">
+            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Estimated Costs Breakdown</h2>
+            <div style="background:#fafbfc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
+              ${formatMultilineHtml(feeBreakdown)}
+            </div>
+          </div>
+        `
+        : "";
 
     const clientHtml = `
       <html>
@@ -167,10 +425,10 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:24px 32px 8px 32px;">
-                            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Estimated Costs Breakdown</h2>
-                            <div style="background:#fafbfc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
-                              ${formattedBreakdown}
-                            </div>
+                            ${legalFeesHtml}
+                            ${disbursementsHtml}
+                            ${totalEstimatedHtml}
+                            ${fallbackBreakdownHtml}
                           </td>
                         </tr>
 
