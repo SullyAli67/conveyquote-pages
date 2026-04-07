@@ -93,6 +93,17 @@ export async function onRequestPost(context) {
     const sumItems = (items = []) =>
       items.reduce((total, item) => total + Number(item.amount || 0), 0);
 
+    const row = (label, value) => `
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+          ${escapeHtml(label)}
+        </td>
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+          ${value}
+        </td>
+      </tr>
+    `;
+
     const buildRowsHtml = (items = []) =>
       items
         .map((item, index) => {
@@ -318,47 +329,65 @@ export async function onRequestPost(context) {
     const legalFeesHtml =
       legalFeeRows.length > 0
         ? `
-          <div style="margin-top:24px;">
-            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Legal Fees</h2>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-              ${buildRowsHtml(legalFeeRows)}
-            </table>
-          </div>
+          <tr>
+            <td style="padding:0 28px 0 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Legal Fees</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                ${buildRowsHtml(legalFeeRows)}
+              </table>
+            </td>
+          </tr>
         `
         : "";
 
     const disbursementsHtml =
       disbursementRows.length > 0
         ? `
-          <div style="margin-top:24px;">
-            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Disbursements</h2>
-            <div style="font-size:13px;line-height:1.7;color:#6b7280;margin-bottom:12px;">
-              Third-party costs payable during the transaction.
-            </div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-              ${buildRowsHtml(disbursementRows)}
-            </table>
-          </div>
+          <tr>
+            <td style="padding:0 28px 0 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Disbursements</h2>
+              <div style="font-size:13px;line-height:1.7;color:#6b7280;margin:0 0 12px 0;">
+                Third-party costs payable during the transaction.
+              </div>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                ${buildRowsHtml(disbursementRows)}
+              </table>
+            </td>
+          </tr>
         `
         : "";
 
     const totalEstimatedHtml = `
-      <div style="margin-top:26px;background:#f3f8fc;border:1px solid #dbe6f0;border-radius:14px;padding:18px 20px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-          ${buildRowsHtml(totalEstimatedRows)}
-        </table>
-      </div>
+      <tr>
+        <td style="padding:0 28px 24px 28px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #d9e2ec;">
+            <tr>
+              <td style="padding:18px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                  ${buildRowsHtml(totalEstimatedRows)}
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
     `;
 
     const fallbackBreakdownHtml =
       !legalFeesHtml && !disbursementsHtml && feeBreakdown
         ? `
-          <div style="margin-top:24px;">
-            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Estimated Costs Breakdown</h2>
-            <div style="background:#fafbfc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
-              ${formatMultilineHtml(feeBreakdown)}
-            </div>
-          </div>
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Estimated Costs Breakdown</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fafbfc;border:1px solid #e5e7eb;">
+                <tr>
+                  <td style="padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
+                    ${formatMultilineHtml(feeBreakdown)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
         `
         : "";
 
@@ -371,18 +400,18 @@ export async function onRequestPost(context) {
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="760" style="max-width:760px;width:100%;border-collapse:collapse;">
 
                   <tr>
-                    <td align="center" style="padding:0 0 18px 0;">
+                    <td align="center" style="padding:0 0 12px 0;">
                       <img
                         src="${logoUrl}"
                         alt="ConveyQuote"
-                        width="180"
-                        style="display:block;height:auto;border:0;"
+                        width="120"
+                        style="display:block;width:120px;max-width:120px;height:auto;border:0;margin:0 auto;"
                       />
                     </td>
                   </tr>
 
                   <tr>
-                    <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                    <td style="background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
 
                         <tr>
@@ -418,7 +447,7 @@ export async function onRequestPost(context) {
                                   <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.4px;color:#486581;margin-bottom:8px;">
                                     Estimated Total Cost
                                   </div>
-                                  <div style="font-size:36px;font-weight:bold;color:#0f2747;">
+                                  <div style="font-size:34px;font-weight:bold;color:#0f2747;">
                                     £${escapeHtml(displayQuoteAmount)}
                                   </div>
                                   <div style="font-size:14px;color:#52606d;margin-top:8px;line-height:1.8;">
@@ -437,45 +466,20 @@ export async function onRequestPost(context) {
                           <td style="padding:0 28px 0 28px;">
                             <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transaction Summary</h2>
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                              <tr>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
-                                  Type
-                                </td>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
-                                  ${escapeHtml(prettyType)}
-                                </td>
-                              </tr>
-                              <tr>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
-                                  Tenure
-                                </td>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
-                                  ${escapeHtml(displayTenure)}
-                                </td>
-                              </tr>
-                              <tr>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
-                                  Property Price / Value
-                                </td>
-                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
-                                  £${escapeHtml(displayPrice)}
-                                </td>
-                              </tr>
+                              ${row("Type", escapeHtml(prettyType))}
+                              ${row("Tenure", escapeHtml(displayTenure))}
+                              ${row("Property Price / Value", `£${escapeHtml(displayPrice)}`)}
                             </table>
                           </td>
                         </tr>
 
-                        <tr>
-                          <td style="padding:0 28px 0 28px;">
-                            ${legalFeesHtml}
-                            ${disbursementsHtml}
-                            ${totalEstimatedHtml}
-                            ${fallbackBreakdownHtml}
-                          </td>
-                        </tr>
+                        ${legalFeesHtml}
+                        ${disbursementsHtml}
+                        ${totalEstimatedHtml}
+                        ${fallbackBreakdownHtml}
 
                         <tr>
-                          <td style="padding:24px 28px 0 28px;">
+                          <td style="padding:0 28px 24px 28px;">
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
                               <tr>
                                 <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
@@ -488,7 +492,7 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td style="padding:24px 28px 0 28px;">
+                          <td style="padding:0 28px 0 28px;">
                             <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Next Steps</h2>
                             <div style="font-size:14px;line-height:1.8;color:#4b5563;">
                               ${formattedNextSteps}
