@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
 
     // First get the enquiry so we have the client details
     const enquiryResult = await env.DB.prepare(
-      `SELECT name, email FROM enquiries WHERE reference = ? LIMIT 1`
+  `SELECT client_name, client_email FROM enquiries WHERE reference = ? LIMIT 1`
     )
       .bind(reference)
       .first();
@@ -21,8 +21,8 @@ export async function onRequestGet(context) {
       });
     }
 
-    const clientName = enquiryResult.name || "Client";
-    const clientEmail = enquiryResult.email;
+    const clientName = enquiryResult.client_name || "Client";
+      const clientEmail = enquiryResult.client_email;
 
     if (!clientEmail) {
       return new Response(`Client email not found for reference: ${reference}`, {
