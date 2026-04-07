@@ -84,6 +84,9 @@ const initialFormState: QuoteForm = {
   phone: "",
 };
 
+const defaultApprovedNextSteps =
+  "If you would like to proceed, please click the Instruct Us button in this email. Once we receive your instruction, we will contact you with the next steps and client care documentation. If you have any questions in the meantime, please email info@conveyquote.uk.";
+
 const initialApprovedQuoteState: ApprovedQuoteForm = {
   clientName: "",
   clientEmail: "",
@@ -93,8 +96,7 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   quoteAmount: "",
   quoteReference: "",
   feeBreakdown: "",
-  nextSteps:
-    "If you are happy to proceed, please click the Instruct Us button below. We will then send you our client care documentation and the next steps to get your matter opened.",
+  nextSteps: defaultApprovedNextSteps,
 };
 
 function App() {
@@ -262,7 +264,11 @@ function App() {
       lines.push("");
       lines.push("DISBURSEMENTS");
       quote.disbursementItems.forEach((item: any) => {
-        lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
+        if (item.note) {
+          lines.push(`${item.label}: ${item.note}`);
+        } else {
+          lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
+        }
       });
     }
 
@@ -305,25 +311,22 @@ function App() {
         const enquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
-    const defaultNextSteps =
-  "If you would like to proceed, please click the Instruct Us button in this email. Once we receive your instruction, we will contact you with the next steps and client care documentation. If you have any questions in the meantime, please email info@conveyquote.uk.";
-
-setApprovedQuote({
-  clientName: enquiry.client_name || "",
-  clientEmail: enquiry.client_email || "",
-  transactionType: enquiry.transaction_type || "",
-  tenure: enquiry.tenure || "",
-  propertyPrice: enquiry.price ? String(enquiry.price) : "",
-  quoteAmount:
-    typeof quote?.grandTotal === "number"
-      ? quote.grandTotal.toFixed(2)
-      : typeof quote?.legalTotalInclVat === "number"
-      ? quote.legalTotalInclVat.toFixed(2)
-      : "",
-  quoteReference: enquiry.reference || "",
-  feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
-  nextSteps: defaultNextSteps,
-});
+        setApprovedQuote({
+          clientName: enquiry.client_name || "",
+          clientEmail: enquiry.client_email || "",
+          transactionType: enquiry.transaction_type || "",
+          tenure: enquiry.tenure || "",
+          propertyPrice: enquiry.price ? String(enquiry.price) : "",
+          quoteAmount:
+            typeof quote?.grandTotal === "number"
+              ? quote.grandTotal.toFixed(2)
+              : typeof quote?.legalTotalInclVat === "number"
+              ? quote.legalTotalInclVat.toFixed(2)
+              : "",
+          quoteReference: enquiry.reference || "",
+          feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
+          nextSteps: defaultApprovedNextSteps,
+        });
 
         setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
@@ -379,7 +382,7 @@ setApprovedQuote({
             </h1>
             <p className="hero__summary">
               {isAdminPage
-                ? "Use this internal page to issue an approved client-facing quote after reviewing the enquiry."
+                ? "Use this internal page to review a saved enquiry, check the prebuilt quote and issue the client-facing quote email."
                 : "Get a tailored quote for your sale, purchase, remortgage or transfer of equity. We review the details before issuing your quote so you get a clearer starting point."}
             </p>
 
@@ -387,8 +390,8 @@ setApprovedQuote({
               {isAdminPage ? (
                 <>
                   <span>Internal use only</span>
-                  <span>Client quote approval</span>
-                  <span>Email issue tool</span>
+                  <span>Auto-loaded enquiry</span>
+                  <span>Approval workflow</span>
                 </>
               ) : (
                 <>
@@ -1036,8 +1039,8 @@ setApprovedQuote({
               <div>
                 <h2>Approve and Send Client Quote</h2>
                 <p>
-                  Internal use only. Enter the approved quote details below and
-                  send the client-facing quote email.
+                  Internal use only. Review the loaded enquiry, adjust the quote
+                  if needed, and send the client-facing quote email.
                 </p>
               </div>
             </div>
@@ -1059,6 +1062,38 @@ setApprovedQuote({
               )}
             </div>
 
+            {approvedQuote.quoteReference && (
+              <div
+                className="card"
+                style={{ marginBottom: "20px", padding: "20px" }}
+              >
+                <h3 style={{ marginTop: 0, marginBottom: "12px" }}>
+                  Loaded Enquiry Snapshot
+                </h3>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Reference:</strong> {approvedQuote.quoteReference}
+                </p>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Client:</strong>{" "}
+                  {approvedQuote.clientName || "Not loaded"}
+                </p>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Email:</strong>{" "}
+                  {approvedQuote.clientEmail || "Not loaded"}
+                </p>
+                <p style={{ margin: "0 0 8px 0" }}>
+                  <strong>Transaction:</strong>{" "}
+                  {approvedQuote.transactionType || "Not loaded"}
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong>Estimate:</strong>{" "}
+                  {approvedQuote.quoteAmount
+                    ? `£${approvedQuote.quoteAmount}`
+                    : "Not loaded"}
+                </p>
+              </div>
+            )}
+
             <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
               <div className="form-grid">
                 <div className="field">
@@ -1070,6 +1105,7 @@ setApprovedQuote({
                     value={approvedQuote.clientName}
                     onChange={handleApprovedQuoteChange}
                     placeholder="Client full name"
+                    readOnly
                     required
                   />
                 </div>
@@ -1083,6 +1119,7 @@ setApprovedQuote({
                     value={approvedQuote.clientEmail}
                     onChange={handleApprovedQuoteChange}
                     placeholder="client@example.com"
+                    readOnly
                     required
                   />
                 </div>
@@ -1094,6 +1131,7 @@ setApprovedQuote({
                     name="transactionType"
                     value={approvedQuote.transactionType}
                     onChange={handleApprovedQuoteChange}
+                    disabled
                     required
                   >
                     <option value="">Please select</option>
@@ -1111,6 +1149,7 @@ setApprovedQuote({
                     name="tenure"
                     value={approvedQuote.tenure}
                     onChange={handleApprovedQuoteChange}
+                    disabled
                     required
                   >
                     <option value="">Please select</option>
@@ -1130,6 +1169,7 @@ setApprovedQuote({
                     value={approvedQuote.propertyPrice}
                     onChange={handleApprovedQuoteChange}
                     placeholder="e.g. 325000"
+                    readOnly
                     required
                   />
                 </div>
@@ -1142,7 +1182,7 @@ setApprovedQuote({
                     name="quoteAmount"
                     value={approvedQuote.quoteAmount}
                     onChange={handleApprovedQuoteChange}
-                    placeholder="e.g. 1450 + VAT"
+                    placeholder="e.g. 1450.00"
                     required
                   />
                 </div>
@@ -1156,6 +1196,7 @@ setApprovedQuote({
                     value={approvedQuote.quoteReference}
                     onChange={handleApprovedQuoteChange}
                     placeholder="e.g. CQ-1001"
+                    readOnly
                   />
                 </div>
 
@@ -1167,7 +1208,7 @@ setApprovedQuote({
                     value={approvedQuote.feeBreakdown}
                     onChange={handleApprovedQuoteChange}
                     placeholder="Example: Legal fee estimate for standard sale. Excludes additional work outside the normal scope."
-                    rows={8}
+                    rows={10}
                   />
                 </div>
 
@@ -1183,11 +1224,36 @@ setApprovedQuote({
                 </div>
               </div>
 
-              <div className="form-footer">
-                <p className="form-note">
+              <div
+                className="form-footer"
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <p className="form-note" style={{ flex: "1 1 100%" }}>
                   Internal tool only. This sends the approved client-facing
                   quote email.
                 </p>
+
+                <button
+                  type="button"
+                  className="primary-button"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, #6b7280 0%, #4b5563 100%)",
+                  }}
+                  onClick={() => {
+                    setApprovedQuote(initialApprovedQuoteState);
+                    setAdminReference("");
+                    setLoadedEnquiryMessage("");
+                  }}
+                >
+                  Clear Form
+                </button>
+
                 <button type="submit" className="primary-button">
                   Send Approved Quote
                 </button>
