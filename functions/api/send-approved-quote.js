@@ -1,4 +1,10 @@
 export async function onRequestPost(context) {
+  const jsonResponse = (payload, status = 200) =>
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+
   try {
     const { request, env } = context;
     const body = await request.json();
@@ -15,12 +21,6 @@ export async function onRequestPost(context) {
       nextSteps,
       quoteData,
     } = body;
-
-    const jsonResponse = (payload, status = 200) =>
-      new Response(JSON.stringify(payload), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      });
 
     const prettyType =
       type === "purchase"
@@ -300,7 +300,7 @@ export async function onRequestPost(context) {
       legalFeeRows.length > 0
         ? `
           <div style="margin-top:24px;">
-            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">;">Legal Fees</h2>
+            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Legal Fees</h2>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
               ${buildRowsHtml(legalFeeRows)}
             </table>
@@ -312,7 +312,7 @@ export async function onRequestPost(context) {
       disbursementRows.length > 0
         ? `
           <div style="margin-top:24px;">
-            <h2 style="margin:0 0 8px 0;font-size:18px;color:#0f2747;">Disbursements</h2>
+            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Disbursements</h2>
             <div style="font-size:13px;line-height:1.7;color:#6b7280;margin-bottom:12px;">
               Third-party costs payable during the transaction.
             </div>
@@ -324,7 +324,7 @@ export async function onRequestPost(context) {
         : "";
 
     const totalEstimatedHtml = `
-      <div style="margin-top:26px;background:#f8fbff;border:1px solid #dbe6f0;border-radius:12px;padding:18px 20px;">
+      <div style="margin-top:26px;background:#f3f8fc;border:1px solid #dbe6f0;border-radius:14px;padding:18px 20px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
           ${buildRowsHtml(totalEstimatedRows)}
         </table>
@@ -335,7 +335,7 @@ export async function onRequestPost(context) {
       !legalFeesHtml && !disbursementsHtml && feeBreakdown
         ? `
           <div style="margin-top:24px;">
-            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">;">Estimated Costs Breakdown</h2>
+            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Estimated Costs Breakdown</h2>
             <div style="background:#fafbfc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
               ${formatMultilineHtml(feeBreakdown)}
             </div>
@@ -351,40 +351,29 @@ export async function onRequestPost(context) {
               <td align="center" style="padding:32px 16px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;width:100%;">
                   
-                 <tr>
-  <td align="center" style="padding:0 0 18px 0;">
-    <img
-      src="${logoUrl}"
-      alt="ConveyQuote"
-      width="180"
-      style="display:block;height:auto;border:0;"
-    />
-  </td>
-</tr>
+                  <tr>
+                    <td align="center" style="padding:0 0 18px 0;">
+                      <img
+                        src="${logoUrl}"
+                        alt="ConveyQuote"
+                        width="180"
+                        style="display:block;height:auto;border:0;"
+                      />
+                    </td>
+                  </tr>
 
-<tr>
-  <td style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 4px 14px rgba(15,39,71,0.06);">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="background:linear-gradient(135deg, #0f2747 0%, #163760 100%);padding:30px 32px 24px 32px;color:#ffffff;">
-          <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.82;">
-            ConveyQuote
-          </div>
-          <div style="font-size:28px;line-height:1.2;font-weight:700;margin-top:8px;">
-            Your Conveyancing Estimate
-          </div>
-          <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;max-width:560px;">
-            A clear estimate prepared from the information currently available for your proposed transaction.
-          </div>
-        </td>
-      </tr>
-                            <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.85;">
+                  <tr>
+                    <td style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="background:#0f2747;padding:30px 32px 24px 32px;color:#ffffff;">
+                            <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.82;">
                               ConveyQuote
                             </div>
-                            <div style="font-size:30px;line-height:1.2;font-weight:700;margin-top:8px;">
+                            <div style="font-size:28px;line-height:1.2;font-weight:700;margin-top:8px;">
                               Your Conveyancing Estimate
                             </div>
-                            <div style="font-size:15px;line-height:1.6;margin-top:12px;opacity:0.95;">
+                            <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;max-width:560px;">
                               A clear estimate prepared from the information currently available for your proposed transaction.
                             </div>
                           </td>
@@ -403,7 +392,7 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:24px 32px 8px 32px;">
-                            <div style="background:linear-gradient(180deg, #f8fbff 0%, #f3f8fc 100%);border:1px solid #dbe6f0;border-radius:14px;padding:26px 24px;text-align:center;">
+                            <div style="background:#f3f8fc;border:1px solid #dbe6f0;border-radius:14px;padding:26px 24px;text-align:center;">
                               <div style="font-size:13px;letter-spacing:0.3px;text-transform:uppercase;color:#5b7083;">
                                 Estimated Total Cost
                               </div>
@@ -422,7 +411,7 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:24px 32px 8px 32px;">
-                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">;">Transaction Summary</h2>
+                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Transaction Summary</h2>
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                               <tr>
                                 <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#6b7280;width:38%;">Type</td>
@@ -470,7 +459,7 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:24px 32px 8px 32px;">
-                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">;">Next Steps</h2>
+                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Next Steps</h2>
                             <div style="font-size:14px;line-height:1.8;color:#4b5563;">
                               ${formattedNextSteps}
                             </div>
@@ -479,12 +468,12 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td align="center" style="padding:28px 32px 18px 32px;">
-                          <a
-  href="${acceptUrl}"
-  style="display:inline-block;background:linear-gradient(135deg, #0f2747 0%, #163760 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:15px 30px;border-radius:10px;letter-spacing:0.2px;box-shadow:0 6px 14px rgba(15,39,71,0.18);"
->
-  Instruct Us
-</a>
+                            <a
+                              href="${acceptUrl}"
+                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:15px 30px;border-radius:10px;letter-spacing:0.2px;"
+                            >
+                              Instruct Us
+                            </a>
                           </td>
                         </tr>
 
@@ -503,7 +492,6 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
                       </table>
-
                     </td>
                   </tr>
 
