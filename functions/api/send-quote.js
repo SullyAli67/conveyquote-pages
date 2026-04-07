@@ -447,8 +447,8 @@ export async function onRequestPost(context) {
       },
       body: JSON.stringify({
         from: "ConveyQuote <quotes@conveyquote.uk>",
-        to: ["liveandletlaw@outlook.com"],
-        reply_to: email || "liveandletlaw@outlook.com",
+        to: ["info@conveyquote.uk"],
+        reply_to: email || undefined,
         subject: `New Conveyancing Quote Request - ${safe(name)} - ${prettyType} - ${reference}`,
         html: internalHtml,
       }),
