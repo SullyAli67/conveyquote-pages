@@ -52,6 +52,39 @@ export async function onRequestPost(context) {
 
     const safe = (value) => (value ? String(value) : "Not provided");
 
+    const prettifyValue = (value) => {
+      if (value === null || value === undefined || value === "") {
+        return "Not provided";
+      }
+
+      const str = String(value).trim();
+
+      if (!str) {
+        return "Not provided";
+      }
+
+      if (str.toLowerCase() === "yes") return "Yes";
+      if (str.toLowerCase() === "no") return "No";
+
+      return str
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const formatMoney = (value) => {
+      if (value === null || value === undefined || value === "") {
+        return "Not provided";
+      }
+
+      const num = Number(value);
+
+      if (Number.isNaN(num)) {
+        return `£${value}`;
+      }
+
+      return `£${num.toFixed(2)}`;
+    };
+
     const today = new Date();
     const datePart = `${today.getFullYear()}${String(
       today.getMonth() + 1
@@ -186,24 +219,60 @@ export async function onRequestPost(context) {
       reference
     )}`;
 
+    const quoteSnapshotHtml = `
+      <tr>
+        <td style="padding:0 28px 20px 28px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #d9e2ec;">
+            <tr>
+              <td style="padding:18px 20px;">
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.4px;color:#486581;margin-bottom:8px;">
+                  Internal Quote Snapshot
+                </div>
+                <div style="font-size:32px;font-weight:bold;color:#0f2747;">
+                  ${quote.total ? formatMoney(quote.total) : "Estimate not available"}
+                </div>
+                <div style="font-size:14px;color:#52606d;margin-top:8px;">
+                  ${quote.legalSubtotal ? `Legal fees subtotal: ${formatMoney(quote.legalSubtotal)}` : "Legal fees subtotal: Not provided"}
+                  &nbsp;&nbsp;|&nbsp;&nbsp;
+                  ${quote.vat ? `VAT: ${formatMoney(quote.vat)}` : "VAT: Not provided"}
+                  &nbsp;&nbsp;|&nbsp;&nbsp;
+                  ${
+                    quote.disbursementsTotal
+                      ? `Disbursements: ${formatMoney(quote.disbursementsTotal)}`
+                      : "Disbursements: Not provided"
+                  }
+                  &nbsp;&nbsp;|&nbsp;&nbsp;
+                  ${
+                    quote.sdlt?.amount
+                      ? `SDLT: ${formatMoney(quote.sdlt.amount)}`
+                      : `SDLT: ${quote.sdlt?.note || "Not applicable"}`
+                  }
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    `;
+
     const quoteSummaryRows = `
-      ${row("Legal fee", quote.legalFee ? `£${quote.legalFee}` : "")}
+      ${row("Legal fee", quote.legalFee ? formatMoney(quote.legalFee) : "")}
       ${row(
         "Legal fees subtotal",
-        quote.legalSubtotal ? `£${quote.legalSubtotal}` : ""
+        quote.legalSubtotal ? formatMoney(quote.legalSubtotal) : ""
       )}
-      ${row("VAT", quote.vat ? `£${quote.vat}` : "")}
+      ${row("VAT", quote.vat ? formatMoney(quote.vat) : "")}
       ${row(
         "Disbursements total",
-        quote.disbursementsTotal ? `£${quote.disbursementsTotal}` : ""
+        quote.disbursementsTotal ? formatMoney(quote.disbursementsTotal) : ""
       )}
       ${row(
         "SDLT",
         quote.sdlt?.amount
-          ? `£${quote.sdlt.amount}`
+          ? formatMoney(quote.sdlt.amount)
           : quote.sdlt?.note || "Not applicable"
       )}
-      ${row("Estimated total", quote.total ? `£${quote.total}` : "")}
+      ${row("Estimated total", quote.total ? formatMoney(quote.total) : "")}
     `;
 
     const supplementsHtml =
@@ -214,7 +283,7 @@ export async function onRequestPost(context) {
               <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Supplements</h2>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
                 ${quote.supplements
-                  .map((item) => row(item.label, `£${item.amount}`))
+                  .map((item) => row(item.label, formatMoney(item.amount)))
                   .join("")}
               </table>
             </td>
@@ -230,7 +299,7 @@ export async function onRequestPost(context) {
               <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Disbursements</h2>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
                 ${quote.disbursements
-                  .map((item) => row(item.label, `£${item.amount}`))
+                  .map((item) => row(item.label, formatMoney(item.amount)))
                   .join("")}
               </table>
             </td>
@@ -289,6 +358,8 @@ export async function onRequestPost(context) {
                     </td>
                   </tr>
 
+                  ${quoteSnapshotHtml}
+
                   <tr>
                     <td style="padding:0 28px 20px 28px;">
                       <a
@@ -316,8 +387,8 @@ export async function onRequestPost(context) {
                       <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Matter Details</h2>
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
                         ${row("Transaction type", prettyType)}
-                        ${row("Tenure", tenure)}
-                        ${row("Property price / value", price ? `£${price}` : "")}
+                        ${row("Tenure", prettifyValue(tenure))}
+                        ${row("Property price / value", price ? formatMoney(price) : "")}
                         ${row("Postcode", postcode)}
                       </table>
                     </td>
@@ -342,17 +413,17 @@ export async function onRequestPost(context) {
                         <td style="padding:0 28px 0 28px;">
                           <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Purchase Details</h2>
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                            ${row("Mortgage or cash", mortgage)}
-                            ${row("Buyer type", ownershipType)}
-                            ${row("First time buyer", firstTimeBuyer)}
-                            ${row("Additional property", additionalProperty)}
-                            ${row("UK resident for SDLT", ukResidentForSdlt)}
-                            ${row("Buy to let", buyToLet)}
-                            ${row("New build", newBuild)}
-                            ${row("Shared ownership", sharedOwnership)}
-                            ${row("Help to Buy / scheme", helpToBuy)}
-                            ${row("Buying via company", isCompany)}
-                            ${row("Gifted deposit", giftedDeposit)}
+                            ${row("Mortgage or cash", prettifyValue(mortgage))}
+                            ${row("Buyer type", prettifyValue(ownershipType))}
+                            ${row("First time buyer", prettifyValue(firstTimeBuyer))}
+                            ${row("Additional property", prettifyValue(additionalProperty))}
+                            ${row("UK resident for SDLT", prettifyValue(ukResidentForSdlt))}
+                            ${row("Buy to let", prettifyValue(buyToLet))}
+                            ${row("New build", prettifyValue(newBuild))}
+                            ${row("Shared ownership", prettifyValue(sharedOwnership))}
+                            ${row("Help to Buy / scheme", prettifyValue(helpToBuy))}
+                            ${row("Buying via company", prettifyValue(isCompany))}
+                            ${row("Gifted deposit", prettifyValue(giftedDeposit))}
                           </table>
                         </td>
                       </tr>
@@ -367,9 +438,9 @@ export async function onRequestPost(context) {
                         <td style="padding:0 28px 0 28px;">
                           <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Sale Details</h2>
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                            ${row("Mortgage to redeem", saleMortgage)}
-                            ${row("Management company / service charge", managementCompany)}
-                            ${row("Property tenanted", tenanted)}
+                            ${row("Mortgage to redeem", prettifyValue(saleMortgage))}
+                            ${row("Management company / service charge", prettifyValue(managementCompany))}
+                            ${row("Property tenanted", prettifyValue(tenanted))}
                           </table>
                         </td>
                       </tr>
@@ -384,10 +455,10 @@ export async function onRequestPost(context) {
                         <td style="padding:0 28px 0 28px;">
                           <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Remortgage Details</h2>
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                            ${row("Current lender", currentLender)}
-                            ${row("New lender", newLender)}
-                            ${row("Additional borrowing", additionalBorrowing)}
-                            ${row("Transfer of equity at same time", remortgageTransfer)}
+                            ${row("Current lender", prettifyValue(currentLender))}
+                            ${row("New lender", prettifyValue(newLender))}
+                            ${row("Additional borrowing", prettifyValue(additionalBorrowing))}
+                            ${row("Transfer of equity at same time", prettifyValue(remortgageTransfer))}
                           </table>
                         </td>
                       </tr>
@@ -402,8 +473,8 @@ export async function onRequestPost(context) {
                         <td style="padding:0 28px 0 28px;">
                           <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transfer Details</h2>
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                            ${row("Mortgage on property", transferMortgage)}
-                            ${row("Owners changing", ownersChanging)}
+                            ${row("Mortgage on property", prettifyValue(transferMortgage))}
+                            ${row("Owners changing", prettifyValue(ownersChanging))}
                           </table>
                         </td>
                       </tr>
