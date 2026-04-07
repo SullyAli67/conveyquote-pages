@@ -49,6 +49,34 @@ type ApprovedQuoteForm = {
   nextSteps: string;
 };
 
+type QuoteLineItem = {
+  label: string;
+  amount?: number;
+  note?: string;
+};
+
+type LoadedQuote = {
+  breakdownText?: string;
+  disclaimerLines?: string[];
+  legalFeeItems?: QuoteLineItem[];
+  legalFeeTotalExVat?: number;
+  vatAmount?: number;
+  legalTotalInclVat?: number;
+  disbursementItems?: QuoteLineItem[];
+  disbursementTotal?: number;
+  grandTotal?: number;
+};
+
+type LoadedEnquiry = {
+  client_name?: string;
+  client_email?: string;
+  transaction_type?: string;
+  tenure?: string;
+  price?: string | number;
+  reference?: string;
+  quote?: LoadedQuote | null;
+};
+
 const initialFormState: QuoteForm = {
   type: "",
   tenure: "",
@@ -127,10 +155,10 @@ function App() {
   const handleApprovedQuoteChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    setApprovedQuote({
-      ...approvedQuote,
+    setApprovedQuote((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const handleAdminUnlock = (e: FormEvent<HTMLFormElement>) => {
@@ -222,7 +250,7 @@ function App() {
     }
   };
 
-  const buildFeeBreakdown = (quote: any) => {
+  const buildFeeBreakdown = (quote: LoadedQuote | null | undefined) => {
     if (!quote) return "";
 
     if (quote.breakdownText) {
@@ -238,7 +266,7 @@ function App() {
 
     if (Array.isArray(quote.legalFeeItems) && quote.legalFeeItems.length > 0) {
       lines.push("LEGAL FEES");
-      quote.legalFeeItems.forEach((item: any) => {
+      quote.legalFeeItems.forEach((item) => {
         lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
       });
     }
@@ -263,7 +291,7 @@ function App() {
     ) {
       lines.push("");
       lines.push("DISBURSEMENTS");
-      quote.disbursementItems.forEach((item: any) => {
+      quote.disbursementItems.forEach((item) => {
         if (item.note) {
           lines.push(`${item.label}: ${item.note}`);
         } else {
@@ -287,7 +315,7 @@ function App() {
     ) {
       lines.push("");
       lines.push("IMPORTANT NOTES");
-      quote.disclaimerLines.forEach((item: string) => {
+      quote.disclaimerLines.forEach((item) => {
         lines.push(item);
       });
     }
@@ -308,7 +336,7 @@ function App() {
       const result = await response.json();
 
       if (result.success && result.enquiry) {
-        const enquiry = result.enquiry;
+        const enquiry: LoadedEnquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
         setApprovedQuote({
@@ -324,7 +352,7 @@ function App() {
               ? quote.legalTotalInclVat.toFixed(2)
               : "",
           quoteReference: enquiry.reference || "",
-          feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
+          feeBreakdown: buildFeeBreakdown(quote),
           nextSteps: defaultApprovedNextSteps,
         });
 
