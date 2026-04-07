@@ -8,9 +8,8 @@ export async function onRequestGet(context) {
       return new Response("Missing reference", { status: 400 });
     }
 
-    // First get the enquiry so we have the client details
     const enquiryResult = await env.DB.prepare(
-  `SELECT client_name, client_email FROM enquiries WHERE reference = ? LIMIT 1`
+      `SELECT client_name, client_email FROM enquiries WHERE reference = ? LIMIT 1`
     )
       .bind(reference)
       .first();
@@ -22,7 +21,7 @@ export async function onRequestGet(context) {
     }
 
     const clientName = enquiryResult.client_name || "Client";
-      const clientEmail = enquiryResult.client_email;
+    const clientEmail = enquiryResult.client_email;
 
     if (!clientEmail) {
       return new Response(`Client email not found for reference: ${reference}`, {
@@ -30,14 +29,12 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Update DB
     await env.DB.prepare(
       `UPDATE enquiries SET status = 'accepted' WHERE reference = ?`
     )
       .bind(reference)
       .run();
 
-    // Email to you
     const internalEmailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -73,7 +70,6 @@ export async function onRequestGet(context) {
       });
     }
 
-    // Email to client
     const clientEmailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -102,13 +98,10 @@ export async function onRequestGet(context) {
       const errorText = await clientEmailResponse.text();
       return new Response(
         `Failed to send client confirmation email: ${errorText}`,
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
-    // Confirmation page
     return new Response(
       `
       <html>
