@@ -570,7 +570,14 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    return jsonResponse({ success: true, data });
+    return jsonResponse({
+  success: true,
+  data,
+  debugMarker: "SEND-APPROVED-QUOTE-LIVE-001",
+  debugSubject: `TEST VERSION 123 - ${safe(quoteReference)}`,
+  debugTenure: displayTenure,
+  debugLogoUrl: logoUrl,
+});
   } catch (error) {
     return jsonResponse(
       {
