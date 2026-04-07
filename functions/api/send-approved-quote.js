@@ -16,6 +16,12 @@ export async function onRequestPost(context) {
       quoteData,
     } = body;
 
+    const jsonResponse = (payload, status = 200) =>
+      new Response(JSON.stringify(payload), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+
     const prettyType =
       type === "purchase"
         ? "Purchase"
@@ -69,8 +75,8 @@ export async function onRequestPost(context) {
     const sumItems = (items = []) =>
       items.reduce((total, item) => total + Number(item.amount || 0), 0);
 
-    const buildRowsHtml = (items = []) => {
-      return items
+    const buildRowsHtml = (items = []) =>
+      items
         .map((item, index) => {
           const isLast = index === items.length - 1;
           const isBold = Boolean(item.isTotal);
@@ -101,7 +107,6 @@ export async function onRequestPost(context) {
           `;
         })
         .join("");
-    };
 
     const parseFeeBreakdownFallback = (text) => {
       const lines = safe(text)
@@ -176,6 +181,8 @@ export async function onRequestPost(context) {
       ...(quoteData || {}),
     };
 
+    let derivedQuoteAmount = quoteAmount;
+
     const hasStructuredQuoteData =
       quoteData &&
       (Array.isArray(quoteData.legalFees) ||
@@ -190,7 +197,10 @@ export async function onRequestPost(context) {
           !/^(vat|total legal fees including vat)$/i.test(item.label || "")
       );
 
-      const vatRow = parsed.legalFees.find((item) => /^vat$/i.test(item.label || ""));
+      const vatRow = parsed.legalFees.find((item) =>
+        /^vat$/i.test(item.label || "")
+      );
+
       const totalLegalFeesRow = parsed.legalFees.find((item) =>
         /^total legal fees including vat$/i.test(item.label || "")
       );
@@ -205,14 +215,15 @@ export async function onRequestPost(context) {
         vat: vatRow ? Number(vatRow.amount || 0) : 0,
       };
 
-      if (!quoteAmount && parsed.totalEstimatedCost !== null) {
-        body.quoteAmount = parsed.totalEstimatedCost;
+      if (!derivedQuoteAmount && parsed.totalEstimatedCost !== null) {
+        derivedQuoteAmount = String(parsed.totalEstimatedCost);
       }
 
-      if (!quoteAmount && totalLegalFeesRow) {
+      if (!derivedQuoteAmount && totalLegalFeesRow) {
         const derivedTotal =
-          Number(totalLegalFeesRow.amount || 0) + sumItems(disbursementsWithoutTotal);
-        body.quoteAmount = derivedTotal;
+          Number(totalLegalFeesRow.amount || 0) +
+          sumItems(disbursementsWithoutTotal);
+        derivedQuoteAmount = String(derivedTotal);
       }
     }
 
@@ -231,11 +242,12 @@ export async function onRequestPost(context) {
     const disbursementTotal = sumItems(disbursements);
     const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
 
-    const displayQuoteAmount =
-      quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
-        ? formatDisplayMoney(quoteAmount)
-        : formatMoney(calculatedGrandTotal);
+    const finalQuoteAmountValue =
+      derivedQuoteAmount && !Number.isNaN(Number(cleanMoney(derivedQuoteAmount)))
+        ? Number(cleanMoney(derivedQuoteAmount))
+        : calculatedGrandTotal;
 
+    const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
     const displayPrice = formatDisplayMoney(price);
 
     const legalFeeRows = [
@@ -268,7 +280,7 @@ export async function onRequestPost(context) {
     const totalEstimatedRows = [
       {
         label: "Total Estimated Cost",
-        amount: Number(cleanMoney(quoteAmount) || calculatedGrandTotal || 0),
+        amount: finalQuoteAmountValue,
         isTotal: true,
       },
     ];
@@ -517,10 +529,7 @@ export async function onRequestPost(context) {
     const data = await resendResponse.json();
 
     if (!resendResponse.ok) {
-      return new Response(JSON.stringify({ success: false, data }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: false, data }, 500);
     }
 
     if (quoteReference) {
@@ -531,20 +540,14 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    return new Response(JSON.stringify({ success: true, data }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: true, data });
   } catch (error) {
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      },
+      500
     );
   }
 }
