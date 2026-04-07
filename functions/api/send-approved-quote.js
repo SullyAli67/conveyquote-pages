@@ -6,11 +6,6 @@ export async function onRequestPost(context) {
     });
 
   try {
-    return jsonResponse(
-      { success: false, error: "TEST BLOCK ACTIVE" },
-      500
-    );
-
     const { request, env } = context;
     const body = await request.json();
 
@@ -50,12 +45,8 @@ export async function onRequestPost(context) {
         .replace(/'/g, "&#39;");
 
     const prettifyValue = (value) => {
-      if (value === null || value === undefined || value === "") {
-        return "";
-      }
-
+      if (value === null || value === undefined || value === "") return "";
       const str = String(value).trim();
-
       if (!str) return "";
       if (str.toLowerCase() === "yes") return "Yes";
       if (str.toLowerCase() === "no") return "No";
