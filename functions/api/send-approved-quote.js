@@ -44,6 +44,24 @@ export async function onRequestPost(context) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
+    const prettifyValue = (value) => {
+      if (value === null || value === undefined || value === "") {
+        return "";
+      }
+
+      const str = String(value).trim();
+
+      if (!str) return "";
+      if (str.toLowerCase() === "yes") return "Yes";
+      if (str.toLowerCase() === "no") return "No";
+      if (str.toLowerCase() === "mortgage") return "Mortgage";
+      if (str.toLowerCase() === "cash") return "Cash";
+
+      return str
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
     const formatMultilineHtml = (value) =>
       escapeHtml(value)
         .replace(/\n/g, "<br />")
@@ -249,6 +267,7 @@ export async function onRequestPost(context) {
 
     const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
     const displayPrice = formatDisplayMoney(price);
+    const displayTenure = prettifyValue(tenure);
 
     const legalFeeRows = [
       ...legalFees,
@@ -345,12 +364,12 @@ export async function onRequestPost(context) {
 
     const clientHtml = `
       <html>
-        <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;margin:0;padding:0;">
+        <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#222;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f2f4f7;">
             <tr>
-              <td align="center" style="padding:32px 16px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;width:100%;">
-                  
+              <td align="center" style="padding:24px 12px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="760" style="max-width:760px;width:100%;border-collapse:collapse;">
+
                   <tr>
                     <td align="center" style="padding:0 0 18px 0;">
                       <img
@@ -363,25 +382,26 @@ export async function onRequestPost(context) {
                   </tr>
 
                   <tr>
-                    <td style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
-                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+
                         <tr>
-                          <td style="background:#0f2747;padding:30px 32px 24px 32px;color:#ffffff;">
-                            <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.82;">
+                          <td style="background:#0f2747;padding:24px 28px;color:#ffffff;">
+                            <div style="font-size:12px;letter-spacing:0.5px;text-transform:uppercase;opacity:0.85;">
                               ConveyQuote
                             </div>
-                            <div style="font-size:28px;line-height:1.2;font-weight:700;margin-top:8px;">
+                            <div style="font-size:30px;line-height:1.2;font-weight:bold;margin-top:8px;">
                               Your Conveyancing Estimate
                             </div>
-                            <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;max-width:560px;">
+                            <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;">
                               A clear estimate prepared from the information currently available for your proposed transaction.
                             </div>
                           </td>
                         </tr>
 
                         <tr>
-                          <td style="padding:32px 32px 8px 32px;">
-                            <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1f2937;">
+                          <td style="padding:28px;">
+                            <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#222;">
                               Dear ${escapeHtml(name)},
                             </p>
                             <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
@@ -391,52 +411,62 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td style="padding:24px 32px 8px 32px;">
-                            <div style="background:#f3f8fc;border:1px solid #dbe6f0;border-radius:14px;padding:26px 24px;text-align:center;">
-                              <div style="font-size:13px;letter-spacing:0.3px;text-transform:uppercase;color:#5b7083;">
-                                Estimated Total Cost
-                              </div>
-                              <div style="font-size:38px;line-height:1.15;font-weight:700;color:#0f2747;margin-top:8px;">
-                                £${escapeHtml(displayQuoteAmount)}
-                              </div>
-                              <div style="font-size:14px;line-height:1.6;color:#6b7280;margin-top:8px;">
-                                Including VAT and disbursements
-                              </div>
-                              <div style="font-size:14px;line-height:1.6;color:#374151;margin-top:10px;">
-                                Reference: <strong>${escapeHtml(quoteReference)}</strong>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td style="padding:24px 32px 8px 32px;">
-                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Transaction Summary</h2>
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                          <td style="padding:0 28px 20px 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #d9e2ec;">
                               <tr>
-                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#6b7280;width:38%;">Type</td>
-                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#111827;font-weight:600;">${escapeHtml(
-                                  prettyType
-                                )}</td>
-                              </tr>
-                              <tr>
-                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#6b7280;">Tenure</td>
-                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#111827;font-weight:600;">${escapeHtml(
-                                  tenure
-                                )}</td>
-                              </tr>
-                              <tr>
-                                <td style="padding:10px 0;font-size:14px;color:#6b7280;">Property Price / Value</td>
-                                <td style="padding:10px 0;font-size:14px;color:#111827;font-weight:600;">£${escapeHtml(
-                                  displayPrice
-                                )}</td>
+                                <td style="padding:18px 20px;text-align:center;">
+                                  <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.4px;color:#486581;margin-bottom:8px;">
+                                    Estimated Total Cost
+                                  </div>
+                                  <div style="font-size:36px;font-weight:bold;color:#0f2747;">
+                                    £${escapeHtml(displayQuoteAmount)}
+                                  </div>
+                                  <div style="font-size:14px;color:#52606d;margin-top:8px;line-height:1.8;">
+                                    Including VAT and disbursements
+                                  </div>
+                                  <div style="font-size:14px;color:#52606d;margin-top:6px;line-height:1.8;">
+                                    Reference: <strong>${escapeHtml(quoteReference)}</strong>
+                                  </div>
+                                </td>
                               </tr>
                             </table>
                           </td>
                         </tr>
 
                         <tr>
-                          <td style="padding:24px 32px 8px 32px;">
+                          <td style="padding:0 28px 0 28px;">
+                            <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transaction Summary</h2>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
+                              <tr>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+                                  Type
+                                </td>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+                                  ${escapeHtml(prettyType)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+                                  Tenure
+                                </td>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+                                  ${escapeHtml(displayTenure)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+                                  Property Price / Value
+                                </td>
+                                <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+                                  £${escapeHtml(displayPrice)}
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:0 28px 0 28px;">
                             ${legalFeesHtml}
                             ${disbursementsHtml}
                             ${totalEstimatedHtml}
@@ -445,21 +475,21 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td style="padding:24px 32px 8px 32px;">
-                            <div style="background:#fffaf0;border:1px solid #ead8a6;border-radius:12px;padding:18px 20px;">
-                              <div style="font-size:16px;font-weight:700;color:#0f2747;margin-bottom:8px;">
-                                Important Information
-                              </div>
-                              <div style="font-size:14px;line-height:1.7;color:#4b5563;">
-                                This estimate is based on the information currently available. If further information comes to light or the matter involves additional complexity, we will discuss any change to costs with you before proceeding with that work.
-                              </div>
-                            </div>
+                          <td style="padding:24px 28px 0 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+                              <tr>
+                                <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
+                                  <strong>Important Information</strong><br />
+                                  This estimate is based on the information currently available. If further information comes to light or the matter involves additional complexity, we will discuss any change to costs with you before proceeding with that work.
+                                </td>
+                              </tr>
+                            </table>
                           </td>
                         </tr>
 
                         <tr>
-                          <td style="padding:24px 32px 8px 32px;">
-                            <h2 style="margin:0 0 14px 0;font-size:19px;color:#0f2747;letter-spacing:0.2px;">Next Steps</h2>
+                          <td style="padding:24px 28px 0 28px;">
+                            <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Next Steps</h2>
                             <div style="font-size:14px;line-height:1.8;color:#4b5563;">
                               ${formattedNextSteps}
                             </div>
@@ -467,10 +497,10 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td align="center" style="padding:28px 32px 18px 32px;">
+                          <td align="center" style="padding:28px;">
                             <a
                               href="${acceptUrl}"
-                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:15px 30px;border-radius:10px;letter-spacing:0.2px;"
+                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;"
                             >
                               Instruct Us
                             </a>
@@ -478,7 +508,7 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td style="padding:0 32px 28px 32px;">
+                          <td style="padding:0 28px 28px 28px;">
                             <div style="font-size:14px;line-height:1.8;color:#4b5563;text-align:center;">
                               If you have any questions, please contact us at
                               <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">info@conveyquote.uk</a>.
@@ -487,10 +517,11 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td style="padding:18px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
+                          <td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
                             This estimate is provided for information only and does not create a solicitor-client retainer until you are formally onboarded and we confirm instructions.
                           </td>
                         </tr>
+
                       </table>
                     </td>
                   </tr>
