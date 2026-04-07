@@ -17,16 +17,21 @@ export async function onRequestPost(context) {
       price,
       quoteAmount,
       quoteReference,
+      feeBreakdown,
       nextSteps,
       quoteData,
     } = body;
 
-    if (!email || !quoteReference) {
-      return jsonResponse(
-        { success: false, error: "Missing required quote data." },
-        400
-      );
-    }
+    const prettyType =
+      type === "purchase"
+        ? "Purchase"
+        : type === "sale"
+        ? "Sale"
+        : type === "remortgage"
+        ? "Remortgage"
+        : type === "transfer"
+        ? "Transfer of Equity"
+        : "Conveyancing Matter";
 
     const safe = (value) =>
       value === null || value === undefined ? "" : String(value);
@@ -40,11 +45,13 @@ export async function onRequestPost(context) {
         .replace(/'/g, "&#39;");
 
     const prettifyValue = (value) => {
-      if (value === null || value === undefined || value === "") return "";
+      if (value === null || value === undefined || value === "") {
+        return "";
+      }
 
       const str = String(value).trim();
-      if (!str) return "";
 
+      if (!str) return "";
       if (str.toLowerCase() === "yes") return "Yes";
       if (str.toLowerCase() === "no") return "No";
       if (str.toLowerCase() === "mortgage") return "Mortgage";
@@ -55,6 +62,11 @@ export async function onRequestPost(context) {
         .replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
+    const formatMultilineHtml = (value) =>
+      escapeHtml(value)
+        .replace(/\n/g, "<br />")
+        .replace(/  /g, "&nbsp;&nbsp;");
+
     const cleanMoney = (value) =>
       safe(value)
         .replace(/£/g, "")
@@ -64,7 +76,6 @@ export async function onRequestPost(context) {
     const formatMoney = (value) => {
       const number = Number(value || 0);
       if (Number.isNaN(number)) return "0.00";
-
       return number.toLocaleString("en-GB", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -78,11 +89,6 @@ export async function onRequestPost(context) {
       if (Number.isNaN(number)) return cleaned;
       return formatMoney(number);
     };
-
-    const formatMultilineHtml = (value) =>
-      escapeHtml(value)
-        .replace(/\n/g, "<br />")
-        .replace(/  /g, "&nbsp;&nbsp;");
 
     const sumItems = (items = []) =>
       items.reduce((total, item) => total + Number(item.amount || 0), 0);
@@ -98,11 +104,11 @@ export async function onRequestPost(context) {
       </tr>
     `;
 
-    const buildAmountRowsHtml = (items = []) =>
+    const buildRowsHtml = (items = []) =>
       items
         .map((item, index) => {
           const isLast = index === items.length - 1;
-          const isTotal = Boolean(item.isTotal);
+          const isBold = Boolean(item.isTotal);
 
           return `
             <tr>
@@ -110,8 +116,8 @@ export async function onRequestPost(context) {
                 padding:12px 0;
                 border-bottom:${isLast ? "0" : "1px solid #eef2f7"};
                 font-size:14px;
-                color:${isTotal ? "#0f2747" : "#374151"};
-                font-weight:${isTotal ? "700" : "500"};
+                color:${isBold ? "#0f2747" : "#374151"};
+                font-weight:${isBold ? "700" : "500"};
               ">
                 ${escapeHtml(item.label)}
               </td>
@@ -119,8 +125,8 @@ export async function onRequestPost(context) {
                 padding:12px 0;
                 border-bottom:${isLast ? "0" : "1px solid #eef2f7"};
                 font-size:14px;
-                color:${isTotal ? "#0f2747" : "#111827"};
-                font-weight:${isTotal ? "700" : "600"};
+                color:${isBold ? "#0f2747" : "#111827"};
+                font-weight:${isBold ? "700" : "600"};
                 text-align:right;
                 white-space:nowrap;
               ">
@@ -131,34 +137,148 @@ export async function onRequestPost(context) {
         })
         .join("");
 
-    const prettyType =
-      type === "purchase"
-        ? "Purchase"
-        : type === "sale"
-        ? "Sale"
-        : type === "remortgage"
-        ? "Remortgage"
-        : type === "transfer"
-        ? "Transfer of Equity"
-        : prettifyValue(type) || "Conveyancing Matter";
+    const parseFeeBreakdownFallback = (text) => {
+      const lines = safe(text)
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
 
-    const displayTenure = prettifyValue(tenure);
-    const displayPrice = formatDisplayMoney(price);
-    const displayQuoteAmount = formatDisplayMoney(quoteAmount);
+      const sections = {
+        legalFees: [],
+        disbursements: [],
+        totalEstimatedCost: null,
+      };
 
-    const legalFees = Array.isArray(quoteData?.legalFees)
-      ? quoteData.legalFees
+      let currentSection = "legalFees";
+
+      for (const line of lines) {
+        const upper = line.toUpperCase();
+
+        if (upper === "LEGAL FEES") {
+          currentSection = "legalFees";
+          continue;
+        }
+
+        if (upper === "DISBURSEMENTS") {
+          currentSection = "disbursements";
+          continue;
+        }
+
+        if (upper === "TOTAL ESTIMATED COST") {
+          currentSection = "total";
+          continue;
+        }
+
+        const colonIndex = line.indexOf(":");
+        if (colonIndex === -1) continue;
+
+        const label = line.slice(0, colonIndex).trim();
+        const rawValue = line.slice(colonIndex + 1).trim();
+        const amount = Number(cleanMoney(rawValue) || 0);
+
+        if (/total estimated cost/i.test(label) || currentSection === "total") {
+          sections.totalEstimatedCost = amount;
+          continue;
+        }
+
+        if (currentSection === "disbursements") {
+          sections.disbursements.push({
+            label,
+            amount,
+            isTotal: /total/i.test(label),
+          });
+        } else {
+          sections.legalFees.push({
+            label,
+            amount,
+            isTotal: /total/i.test(label),
+          });
+        }
+      }
+
+      return sections;
+    };
+
+    const defaultQuoteData = {
+      legalFees: [],
+      disbursements: [],
+      vat: 0,
+    };
+
+    let finalQuoteData = {
+      ...defaultQuoteData,
+      ...(quoteData || {}),
+    };
+
+    let derivedQuoteAmount = quoteAmount;
+
+    const hasStructuredQuoteData =
+      quoteData &&
+      (Array.isArray(quoteData.legalFees) ||
+        Array.isArray(quoteData.disbursements) ||
+        quoteData.vat !== undefined);
+
+    if (!hasStructuredQuoteData && feeBreakdown) {
+      const parsed = parseFeeBreakdownFallback(feeBreakdown);
+
+      const legalFeesWithoutVatOrTotal = parsed.legalFees.filter(
+        (item) =>
+          !/^(vat|total legal fees including vat)$/i.test(item.label || "")
+      );
+
+      const vatRow = parsed.legalFees.find((item) =>
+        /^vat$/i.test(item.label || "")
+      );
+
+      const totalLegalFeesRow = parsed.legalFees.find((item) =>
+        /^total legal fees including vat$/i.test(item.label || "")
+      );
+
+      const disbursementsWithoutTotal = parsed.disbursements.filter(
+        (item) => !/^total disbursements$/i.test(item.label || "")
+      );
+
+      finalQuoteData = {
+        legalFees: legalFeesWithoutVatOrTotal,
+        disbursements: disbursementsWithoutTotal,
+        vat: vatRow ? Number(vatRow.amount || 0) : 0,
+      };
+
+      if (!derivedQuoteAmount && parsed.totalEstimatedCost !== null) {
+        derivedQuoteAmount = String(parsed.totalEstimatedCost);
+      }
+
+      if (!derivedQuoteAmount && totalLegalFeesRow) {
+        const derivedTotal =
+          Number(totalLegalFeesRow.amount || 0) +
+          sumItems(disbursementsWithoutTotal);
+        derivedQuoteAmount = String(derivedTotal);
+      }
+    }
+
+    const legalFees = Array.isArray(finalQuoteData.legalFees)
+      ? finalQuoteData.legalFees
       : [];
 
-    const disbursements = Array.isArray(quoteData?.disbursements)
-      ? quoteData.disbursements
+    const disbursements = Array.isArray(finalQuoteData.disbursements)
+      ? finalQuoteData.disbursements
       : [];
 
-    const vatAmount = Number(quoteData?.vat || 0);
+    const vatAmount = Number(finalQuoteData.vat || 0);
 
     const legalFeesSubtotal = sumItems(legalFees);
     const legalFeesTotal = legalFeesSubtotal + vatAmount;
     const disbursementTotal = sumItems(disbursements);
+    const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
+
+    const finalQuoteAmountValue =
+      derivedQuoteAmount && !Number.isNaN(Number(cleanMoney(derivedQuoteAmount)))
+        ? Number(cleanMoney(derivedQuoteAmount))
+        : calculatedGrandTotal;
+
+    const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
+    const displayPrice = formatDisplayMoney(price);
+    const displayTenure = prettifyValue(tenure);
 
     const legalFeeRows = [
       ...legalFees,
@@ -166,7 +286,7 @@ export async function onRequestPost(context) {
       ...(legalFees.length > 0 || vatAmount > 0
         ? [
             {
-              label: "Total Legal Fees Including VAT",
+              label: "Total legal fees including VAT",
               amount: legalFeesTotal,
               isTotal: true,
             },
@@ -179,7 +299,7 @@ export async function onRequestPost(context) {
       ...(disbursements.length > 0
         ? [
             {
-              label: "Total Disbursements",
+              label: "Total disbursements",
               amount: disbursementTotal,
               isTotal: true,
             },
@@ -187,29 +307,40 @@ export async function onRequestPost(context) {
         : []),
     ];
 
-    const totalRows = [
+    const totalEstimatedRows = [
       {
         label: "Total Estimated Cost",
-        amount: Number(cleanMoney(quoteAmount) || 0),
+        amount: finalQuoteAmountValue,
         isTotal: true,
       },
     ];
 
-    const legalFeesSection =
+    const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
+      safe(quoteReference)
+    )}`;
+
+    const formattedNextSteps = formatMultilineHtml(
+      nextSteps ||
+        "If you would like us to proceed, please click the button below. Once we receive your instruction, we will contact you with the next steps and client care documentation."
+    );
+
+    const logoUrl = "https://conveyquote.uk/logo.png";
+
+    const legalFeesHtml =
       legalFeeRows.length > 0
         ? `
           <tr>
             <td style="padding:0 28px 0 28px;">
               <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Legal Fees</h2>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                ${buildAmountRowsHtml(legalFeeRows)}
+                ${buildRowsHtml(legalFeeRows)}
               </table>
             </td>
           </tr>
         `
         : "";
 
-    const disbursementsSection =
+    const disbursementsHtml =
       disbursementRows.length > 0
         ? `
           <tr>
@@ -219,21 +350,21 @@ export async function onRequestPost(context) {
                 Third-party costs payable during the transaction.
               </div>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                ${buildAmountRowsHtml(disbursementRows)}
+                ${buildRowsHtml(disbursementRows)}
               </table>
             </td>
           </tr>
         `
         : "";
 
-    const totalSection = `
+    const totalEstimatedHtml = `
       <tr>
         <td style="padding:0 28px 24px 28px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #d9e2ec;">
             <tr>
               <td style="padding:18px 20px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                  ${buildAmountRowsHtml(totalRows)}
+                  ${buildRowsHtml(totalEstimatedRows)}
                 </table>
               </td>
             </tr>
@@ -242,16 +373,23 @@ export async function onRequestPost(context) {
       </tr>
     `;
 
-    const formattedNextSteps = formatMultilineHtml(
-      nextSteps ||
-        "If you would like to proceed, please click the Instruct Us button below. Once we receive your instruction, we will contact you with the next steps and client care documentation."
-    );
-
-    const logoUrl = "https://conveyquote.uk/logo.png";
-
-    const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
-      safe(quoteReference)
-    )}`;
+    const fallbackBreakdownHtml =
+      !legalFeesHtml && !disbursementsHtml && feeBreakdown
+        ? `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Estimated Costs Breakdown</h2>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fafbfc;border:1px solid #e5e7eb;">
+                <tr>
+                  <td style="padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
+                    ${formatMultilineHtml(feeBreakdown)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        `
+        : "";
 
     const clientHtml = `
       <html>
@@ -335,9 +473,10 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
 
-                        ${legalFeesSection}
-                        ${disbursementsSection}
-                        ${totalSection}
+                        ${legalFeesHtml}
+                        ${disbursementsHtml}
+                        ${totalEstimatedHtml}
+                        ${fallbackBreakdownHtml}
 
                         <tr>
                           <td style="padding:0 28px 24px 28px;">
@@ -416,7 +555,7 @@ export async function onRequestPost(context) {
         to: [email],
         cc: ["info@conveyquote.uk"],
         reply_to: "info@conveyquote.uk",
-        subject: `TEST VERSION 123 - ${safe(quoteReference)}`,
+        subject: `Your Conveyancing Quote - ${safe(quoteReference)}`,
         html: clientHtml,
       }),
     });
@@ -435,14 +574,7 @@ export async function onRequestPost(context) {
         .run();
     }
 
-    return jsonResponse({
-      success: true,
-      data,
-      debugMarker: "SEND-APPROVED-QUOTE-LIVE-001",
-      debugSubject: `TEST VERSION 123 - ${safe(quoteReference)}`,
-      debugTenure: displayTenure,
-      debugLogoUrl: logoUrl,
-    });
+    return jsonResponse({ success: true, data });
   } catch (error) {
     return jsonResponse(
       {
