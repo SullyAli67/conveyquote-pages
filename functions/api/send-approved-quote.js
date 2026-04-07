@@ -404,8 +404,8 @@ export async function onRequestPost(context) {
                       <img
                         src="${logoUrl}"
                         alt="ConveyQuote"
-                        width="120"
-                        style="display:block;width:120px;max-width:120px;height:auto;border:0;margin:0 auto;"
+                        width="40"
+                        style="display:block;width:40px;max-width:40px;height:auto;border:0;margin:0 auto;"
                       />
                     </td>
                   </tr>
@@ -467,7 +467,7 @@ export async function onRequestPost(context) {
                             <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transaction Summary</h2>
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
                               ${row("Type", escapeHtml(prettyType))}
-                              ${row("Tenure", escapeHtml(displayTenure))}
+                              ${row("Tenure TEST", escapeHtml(displayTenure))}
                               ${row("Property Price / Value", `£${escapeHtml(displayPrice)}`)}
                             </table>
                           </td>
@@ -555,7 +555,7 @@ export async function onRequestPost(context) {
         to: [email],
         cc: ["info@conveyquote.uk"],
         reply_to: "info@conveyquote.uk",
-        subject: `Your Conveyancing Quote - ${safe(quoteReference)}`,
+        subject: `TEST VERSION 123 - ${safe(quoteReference)}`,
         html: clientHtml,
       }),
     });
