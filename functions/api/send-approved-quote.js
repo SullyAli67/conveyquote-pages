@@ -187,7 +187,7 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         from: "ConveyQuote <quotes@conveyquote.uk>",
         to: [email],
-        cc: ["liveandletlaw@outlook.com"],
+        cc: ["info@conveyquote.uk"],
         subject: `Your Conveyancing Quote - ${safe(quoteReference)}`,
         html: clientHtml,
       }),
