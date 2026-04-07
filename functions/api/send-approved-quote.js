@@ -36,8 +36,8 @@ export async function onRequestPost(context) {
       .replace(/£/g, "")
       .trim();
 
-    const acceptUrl = `https://conveyquote.uk/accept-quote?ref=${encodeURIComponent(
-      quoteReference || ""
+    const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
+  quoteReference || ""
     )}`;
 
     const formattedBreakdown = safe(feeBreakdown)
