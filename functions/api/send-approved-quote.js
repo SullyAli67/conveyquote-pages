@@ -1,4 +1,5 @@
 export async function onRequestPost(context) {
+  throw new Error("THIS IS THE LIVE FILE CHECK");
   const jsonResponse = (payload, status = 200) =>
     new Response(JSON.stringify(payload), {
       status,
