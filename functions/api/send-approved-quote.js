@@ -26,124 +26,209 @@ export async function onRequestPost(context) {
         ? "Transfer of Equity"
         : "Conveyancing Matter";
 
-    const safe = (value) => (value ? String(value) : "");
+    const safe = (value) => (value === null || value === undefined ? "" : String(value));
 
-    const cleanQuoteAmount = String(quoteAmount || "")
-      .replace(/£/g, "")
-      .trim();
+    const escapeHtml = (value) =>
+      safe(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
-    const cleanPrice = String(price || "")
-      .replace(/£/g, "")
-      .trim();
+    const formatMultilineHtml = (value) =>
+      escapeHtml(value)
+        .replace(/\n/g, "<br />")
+        .replace(/  /g, "&nbsp;&nbsp;");
+
+    const cleanMoney = (value) =>
+      safe(value)
+        .replace(/£/g, "")
+        .replace(/,/g, "")
+        .trim();
+
+    const formatDisplayMoney = (value) => {
+      const cleaned = cleanMoney(value);
+      if (!cleaned) return "";
+      const number = Number(cleaned);
+      if (Number.isNaN(number)) return cleaned;
+      return number.toLocaleString("en-GB", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    };
+
+    const displayQuoteAmount = formatDisplayMoney(quoteAmount);
+    const displayPrice = formatDisplayMoney(price);
 
     const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
-  quoteReference || ""
+      safe(quoteReference)
     )}`;
 
-    const formattedBreakdown = safe(feeBreakdown)
-      .replace(/\n/g, "<br />")
-      .replace(/  /g, "&nbsp;&nbsp;");
+    const formattedBreakdown = formatMultilineHtml(feeBreakdown);
+    const formattedNextSteps = formatMultilineHtml(
+      nextSteps ||
+        "If you would like us to proceed, please click the button below. Once we receive your instruction, we will contact you with the next steps and client care documentation."
+    );
+
+    const logoUrl = "https://conveyquote.uk/logo.png";
 
     const clientHtml = `
       <html>
-        <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#222;">
-          <table width="100%" style="background:#f2f4f7;">
+        <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;margin:0;padding:0;">
             <tr>
-              <td align="center" style="padding:24px 12px;">
-                <table width="760" style="max-width:760px;width:100%;background:#ffffff;">
-
+              <td align="center" style="padding:32px 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;width:100%;">
+                  
                   <tr>
-                    <td style="background:#0f2747;padding:24px 28px;color:#ffffff;">
-                      <div style="font-size:12px;text-transform:uppercase;opacity:0.85;">
-                        ConveyQuote
-                      </div>
-                      <div style="font-size:30px;font-weight:bold;margin-top:8px;">
-                        Your Conveyancing Quote
-                      </div>
-                      <div style="font-size:15px;margin-top:10px;">
-                        Thank you for your enquiry. We have reviewed the information provided and set out our estimate below.
-                      </div>
+                    <td align="center" style="padding:0 0 20px 0;">
+                      <img
+                        src="${logoUrl}"
+                        alt="ConveyQuote"
+                        style="max-height:56px;width:auto;display:block;border:0;"
+                      />
                     </td>
                   </tr>
 
                   <tr>
-                    <td style="padding:28px;">
-                      <p>Dear ${safe(name)},</p>
-                      <p>
-                        Thank you for your conveyancing enquiry. Based on the information currently available, our estimated costs are set out below.
-                      </p>
+                    <td style="background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+                      
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="background:#0f2747;padding:32px 32px 26px 32px;color:#ffffff;">
+                            <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.85;">
+                              ConveyQuote
+                            </div>
+                            <div style="font-size:30px;line-height:1.2;font-weight:700;margin-top:8px;">
+                              Your Conveyancing Estimate
+                            </div>
+                            <div style="font-size:15px;line-height:1.6;margin-top:12px;opacity:0.95;">
+                              A clear estimate prepared from the information currently available for your proposed transaction.
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:32px 32px 8px 32px;">
+                            <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#1f2937;">
+                              Dear ${escapeHtml(name)},
+                            </p>
+                            <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
+                              Thank you for your enquiry. We have reviewed the information provided and set out our current estimate below in a clear and straightforward format.
+                            </p>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 32px 8px 32px;">
+                            <div style="background:#f8fbff;border:1px solid #dbe6f0;border-radius:12px;padding:24px;text-align:center;">
+                              <div style="font-size:13px;letter-spacing:0.3px;text-transform:uppercase;color:#5b7083;">
+                                Estimated Total Cost
+                              </div>
+                              <div style="font-size:34px;line-height:1.2;font-weight:700;color:#0f2747;margin-top:8px;">
+                                £${escapeHtml(displayQuoteAmount)}
+                              </div>
+                              <div style="font-size:14px;line-height:1.6;color:#6b7280;margin-top:8px;">
+                                Including VAT and disbursements
+                              </div>
+                              <div style="font-size:14px;line-height:1.6;color:#374151;margin-top:10px;">
+                                Reference: <strong>${escapeHtml(quoteReference)}</strong>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 32px 8px 32px;">
+                            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Transaction Summary</h2>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                              <tr>
+                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#6b7280;width:38%;">Type</td>
+                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#111827;font-weight:600;">${escapeHtml(
+                                  prettyType
+                                )}</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#6b7280;">Tenure</td>
+                                <td style="padding:10px 0;border-bottom:1px solid #eef2f7;font-size:14px;color:#111827;font-weight:600;">${escapeHtml(
+                                  tenure
+                                )}</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:10px 0;font-size:14px;color:#6b7280;">Property Price / Value</td>
+                                <td style="padding:10px 0;font-size:14px;color:#111827;font-weight:600;">£${escapeHtml(
+                                  displayPrice
+                                )}</td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 32px 8px 32px;">
+                            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Estimated Costs Breakdown</h2>
+                            <div style="background:#fafbfc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;font-size:14px;line-height:1.8;color:#374151;">
+                              ${formattedBreakdown}
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 32px 8px 32px;">
+                            <div style="background:#fffaf0;border:1px solid #ead8a6;border-radius:12px;padding:18px 20px;">
+                              <div style="font-size:16px;font-weight:700;color:#0f2747;margin-bottom:8px;">
+                                Important Information
+                              </div>
+                              <div style="font-size:14px;line-height:1.7;color:#4b5563;">
+                                This estimate is based on the information currently available. If further information comes to light or the matter involves additional complexity, we will discuss any change to costs with you before proceeding with that work.
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 32px 8px 32px;">
+                            <h2 style="margin:0 0 14px 0;font-size:18px;color:#0f2747;">Next Steps</h2>
+                            <div style="font-size:14px;line-height:1.8;color:#4b5563;">
+                              ${formattedNextSteps}
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td align="center" style="padding:28px 32px 18px 32px;">
+                            <a
+                              href="${acceptUrl}"
+                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 28px;border-radius:8px;"
+                            >
+                              Instruct Us
+                            </a>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:0 32px 28px 32px;">
+                            <div style="font-size:14px;line-height:1.8;color:#4b5563;text-align:center;">
+                              If you have any questions, please contact us at
+                              <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">info@conveyquote.uk</a>.
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:18px 32px;background:#fafbfc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
+                            This estimate is provided for information only and does not create a solicitor-client retainer until you are formally onboarded and we confirm instructions.
+                          </td>
+                        </tr>
+                      </table>
+
                     </td>
                   </tr>
 
                   <tr>
-                    <td style="padding:0 28px;">
-                      <div style="background:#f8fafc;border:1px solid #d9e2ec;padding:18px;">
-                        <div style="font-size:13px;color:#486581;">Total Estimated Cost</div>
-                        <div style="font-size:32px;font-weight:bold;color:#0f2747;">
-                          £${cleanQuoteAmount}
-                        </div>
-                        <div style="font-size:14px;margin-top:6px;">
-                          Reference: ${safe(quoteReference)}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:28px;">
-                      <h3>Matter Summary</h3>
-                      <p><strong>Type:</strong> ${safe(prettyType)}</p>
-                      <p><strong>Tenure:</strong> ${safe(tenure)}</p>
-                      <p><strong>Price:</strong> £${cleanPrice}</p>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:0 28px;">
-                      <h3>Estimated Costs Breakdown</h3>
-                      <div style="background:#fafafa;border:1px solid #e5e7eb;padding:16px;">
-                        ${formattedBreakdown}
-                      </div>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:28px;">
-                      <div style="background:#fff8e6;border:1px solid #e2c275;padding:12px;">
-                        <strong>Important:</strong><br />
-                        This quote is an estimate and may change if further information comes to light.
-                      </div>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:0 28px 20px 28px;">
-                      <h3>Next Steps</h3>
-                      <p>${safe(nextSteps)}</p>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:0 28px 28px 28px;">
-                      <a href="${acceptUrl}" style="background:#0f2747;color:#fff;padding:14px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">
-                        Instruct Us
-                      </a>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:0 28px 28px;">
-                      <p>Kind regards,<br/>ConveyQuote</p>
-                      <p style="font-size:13px;color:#666;">
-                        If you have any questions, please contact us at 
-                        <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>
-                      </p>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:16px;text-align:center;font-size:12px;color:#666;border-top:1px solid #e5e5e5;">
-                      This email contains an estimate only and does not create a solicitor-client retainer.
+                    <td style="padding:18px 10px 0 10px;text-align:center;font-size:12px;line-height:1.7;color:#6b7280;">
+                      ConveyQuote · <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;">info@conveyquote.uk</a>
                     </td>
                   </tr>
 
@@ -165,10 +250,7 @@ export async function onRequestPost(context) {
         from: "ConveyQuote <quotes@conveyquote.uk>",
         to: [email],
         cc: ["info@conveyquote.uk"],
-
-        // ✅ FIXED HERE
         reply_to: "info@conveyquote.uk",
-
         subject: `Your Conveyancing Quote - ${safe(quoteReference)}`,
         html: clientHtml,
       }),
@@ -179,6 +261,7 @@ export async function onRequestPost(context) {
     if (!resendResponse.ok) {
       return new Response(JSON.stringify({ success: false, data }), {
         status: 500,
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -192,11 +275,18 @@ export async function onRequestPost(context) {
 
     return new Response(JSON.stringify({ success: true, data }), {
       status: 200,
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500 }
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 }
