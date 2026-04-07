@@ -71,19 +71,22 @@ export async function onRequestPost(context) {
         .replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
-    const formatMoney = (value) => {
-      if (value === null || value === undefined || value === "") {
-        return "Not provided";
-      }
+ const formatMoney = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return "Not provided";
+  }
 
-      const num = Number(value);
+  const num = Number(value);
 
-      if (Number.isNaN(num)) {
-        return `£${value}`;
-      }
+  if (Number.isNaN(num)) {
+    return `£${value}`;
+  }
 
-      return `£${num.toFixed(2)}`;
-    };
+  return `£${num.toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
     const today = new Date();
     const datePart = `${today.getFullYear()}${String(
