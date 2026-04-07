@@ -65,28 +65,41 @@ export async function onRequestPost(context) {
 
       if (str.toLowerCase() === "yes") return "Yes";
       if (str.toLowerCase() === "no") return "No";
+      if (str.toLowerCase() === "mortgage") return "Mortgage";
+      if (str.toLowerCase() === "cash") return "Cash";
 
       return str
         .replace(/_/g, " ")
         .replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
- const formatMoney = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "Not provided";
-  }
+    const formatMoney = (value) => {
+      if (value === null || value === undefined || value === "") {
+        return "Not provided";
+      }
 
-  const num = Number(value);
+      const num = Number(value);
 
-  if (Number.isNaN(num)) {
-    return `£${value}`;
-  }
+      if (Number.isNaN(num)) {
+        return `£${value}`;
+      }
 
-  return `£${num.toLocaleString("en-GB", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
+      return `£${num.toLocaleString("en-GB", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    };
+
+    const row = (label, value) => `
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+          ${label}
+        </td>
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+          ${safe(value)}
+        </td>
+      </tr>
+    `;
 
     const today = new Date();
     const datePart = `${today.getFullYear()}${String(
@@ -207,20 +220,21 @@ export async function onRequestPost(context) {
       )
       .run();
 
-    const row = (label, value) => `
-      <tr>
-        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
-          ${label}
-        </td>
-        <td style="padding:10px 12px;border:1px solid #d9d9d9;">
-          ${safe(value)}
-        </td>
-      </tr>
-    `;
-
     const adminUrl = `https://conveyquote.uk/admin?ref=${encodeURIComponent(
       reference
     )}`;
+
+    const sdltItem = Array.isArray(quote.disbursementItems)
+      ? quote.disbursementItems.find(
+          (item) => item.label === "Stamp Duty Land Tax"
+        )
+      : null;
+
+    const sdltDisplay = (() => {
+      if (!sdltItem) return "Not applicable";
+      if (sdltItem.note) return sdltItem.note;
+      return formatMoney(sdltItem.amount);
+    })();
 
     const quoteSnapshotHtml = `
       <tr>
@@ -232,24 +246,28 @@ export async function onRequestPost(context) {
                   Internal Quote Snapshot
                 </div>
                 <div style="font-size:32px;font-weight:bold;color:#0f2747;">
-                  ${quote.total ? formatMoney(quote.total) : "Estimate not available"}
+                  ${quote.grandTotal ? formatMoney(quote.grandTotal) : "Estimate not available"}
                 </div>
-                <div style="font-size:14px;color:#52606d;margin-top:8px;">
-                  ${quote.legalSubtotal ? `Legal fees subtotal: ${formatMoney(quote.legalSubtotal)}` : "Legal fees subtotal: Not provided"}
-                  &nbsp;&nbsp;|&nbsp;&nbsp;
-                  ${quote.vat ? `VAT: ${formatMoney(quote.vat)}` : "VAT: Not provided"}
+                <div style="font-size:14px;color:#52606d;margin-top:8px;line-height:1.8;">
+                  ${
+                    quote.legalTotalInclVat
+                      ? `Legal fees (inc VAT): ${formatMoney(quote.legalTotalInclVat)}`
+                      : "Legal fees (inc VAT): Not provided"
+                  }
                   &nbsp;&nbsp;|&nbsp;&nbsp;
                   ${
-                    quote.disbursementsTotal
-                      ? `Disbursements: ${formatMoney(quote.disbursementsTotal)}`
+                    quote.vatAmount
+                      ? `VAT: ${formatMoney(quote.vatAmount)}`
+                      : "VAT: Not provided"
+                  }
+                  &nbsp;&nbsp;|&nbsp;&nbsp;
+                  ${
+                    quote.disbursementTotal
+                      ? `Disbursements: ${formatMoney(quote.disbursementTotal)}`
                       : "Disbursements: Not provided"
                   }
                   &nbsp;&nbsp;|&nbsp;&nbsp;
-                  ${
-                    quote.sdlt?.amount
-                      ? `SDLT: ${formatMoney(quote.sdlt.amount)}`
-                      : `SDLT: ${quote.sdlt?.note || "Not applicable"}`
-                  }
+                  SDLT: ${sdltDisplay}
                 </div>
               </td>
             </tr>
@@ -259,33 +277,35 @@ export async function onRequestPost(context) {
     `;
 
     const quoteSummaryRows = `
-      ${row("Legal fee", quote.legalFee ? formatMoney(quote.legalFee) : "")}
       ${row(
-        "Legal fees subtotal",
-        quote.legalSubtotal ? formatMoney(quote.legalSubtotal) : ""
+        "Legal fees (excl VAT)",
+        quote.legalFeeTotalExVat ? formatMoney(quote.legalFeeTotalExVat) : ""
       )}
-      ${row("VAT", quote.vat ? formatMoney(quote.vat) : "")}
+      ${row("VAT", quote.vatAmount ? formatMoney(quote.vatAmount) : "")}
+      ${row(
+        "Legal fees (incl VAT)",
+        quote.legalTotalInclVat ? formatMoney(quote.legalTotalInclVat) : ""
+      )}
       ${row(
         "Disbursements total",
-        quote.disbursementsTotal ? formatMoney(quote.disbursementsTotal) : ""
+        quote.disbursementTotal ? formatMoney(quote.disbursementTotal) : ""
       )}
-      ${row(
-        "SDLT",
-        quote.sdlt?.amount
-          ? formatMoney(quote.sdlt.amount)
-          : quote.sdlt?.note || "Not applicable"
-      )}
-      ${row("Estimated total", quote.total ? formatMoney(quote.total) : "")}
+      ${row("SDLT", sdltDisplay)}
+      ${row("Estimated total", quote.grandTotal ? formatMoney(quote.grandTotal) : "")}
     `;
 
+    const supplementItems = Array.isArray(quote.legalFeeItems)
+      ? quote.legalFeeItems.filter((item) => item.label !== "Base legal fee")
+      : [];
+
     const supplementsHtml =
-      Array.isArray(quote.supplements) && quote.supplements.length > 0
+      supplementItems.length > 0
         ? `
           <tr>
             <td style="padding:0 28px 0 28px;">
               <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Supplements</h2>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                ${quote.supplements
+                ${supplementItems
                   .map((item) => row(item.label, formatMoney(item.amount)))
                   .join("")}
               </table>
@@ -295,14 +315,19 @@ export async function onRequestPost(context) {
         : "";
 
     const disbursementsHtml =
-      Array.isArray(quote.disbursements) && quote.disbursements.length > 0
+      Array.isArray(quote.disbursementItems) && quote.disbursementItems.length > 0
         ? `
           <tr>
             <td style="padding:0 28px 0 28px;">
               <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Disbursements</h2>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                ${quote.disbursements
-                  .map((item) => row(item.label, formatMoney(item.amount)))
+                ${quote.disbursementItems
+                  .map((item) =>
+                    row(
+                      item.label,
+                      item.note ? item.note : formatMoney(item.amount)
+                    )
+                  )
                   .join("")}
               </table>
             </td>
@@ -311,7 +336,7 @@ export async function onRequestPost(context) {
         : "";
 
     const disclaimersHtml =
-      Array.isArray(quote.disclaimers) && quote.disclaimers.length > 0
+      Array.isArray(quote.disclaimerLines) && quote.disclaimerLines.length > 0
         ? `
           <tr>
             <td style="padding:0 28px 24px 28px;">
@@ -319,7 +344,7 @@ export async function onRequestPost(context) {
                 <tr>
                   <td style="padding:14px 16px;font-size:14px;line-height:1.8;color:#7a4b00;">
                     <strong>Important notes:</strong><br />
-                    ${quote.disclaimers.map((item) => `• ${item}`).join("<br />")}
+                    ${quote.disclaimerLines.map((item) => `• ${item}`).join("<br />")}
                   </td>
                 </tr>
               </table>
