@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
+import { buildQuoteData } from "./buildQuoteData";
 
 type QuoteForm = {
   type: string;
@@ -47,6 +48,11 @@ type ApprovedQuoteForm = {
   quoteReference: string;
   feeBreakdown: string;
   nextSteps: string;
+  quoteData: {
+    legalFees: { label: string; amount: number; note?: string }[];
+    disbursements: { label: string; amount: number; note?: string }[];
+    vat: number;
+  };
 };
 
 type QuoteLineItem = {
@@ -125,6 +131,11 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   quoteReference: "",
   feeBreakdown: "",
   nextSteps: defaultApprovedNextSteps,
+  quoteData: {
+    legalFees: [],
+    disbursements: [],
+    vat: 0,
+  },
 };
 
 function App() {
@@ -207,10 +218,48 @@ function App() {
     }
   };
 
+    const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
+    const built = buildQuoteData({
+      type: enquiry.transaction_type || "",
+      tenure: enquiry.tenure || "",
+      mortgage: (enquiry as any).mortgage || "",
+      giftedDeposit: (enquiry as any).gifted_deposit || "",
+      newBuild: (enquiry as any).new_build || "",
+      sharedOwnership: (enquiry as any).shared_ownership || "",
+      helpToBuy: (enquiry as any).help_to_buy || "",
+      isCompany: (enquiry as any).is_company || "",
+      buyToLet: (enquiry as any).buy_to_let || "",
+      saleMortgage: (enquiry as any).sale_mortgage || "",
+      managementCompany: (enquiry as any).management_company || "",
+      tenanted: (enquiry as any).tenanted || "",
+      additionalBorrowing: (enquiry as any).additional_borrowing || "",
+      remortgageTransfer: (enquiry as any).remortgage_transfer || "",
+      transferMortgage: (enquiry as any).transfer_mortgage || "",
+      ownersChanging: (enquiry as any).owners_changing || "",
+    });
+
+    return {
+      clientName: enquiry.client_name || "",
+      clientEmail: enquiry.client_email || "",
+      transactionType: enquiry.transaction_type || "",
+      tenure: enquiry.tenure || "",
+      propertyPrice: enquiry.price ? String(enquiry.price) : "",
+      quoteAmount: built.grandTotal.toFixed(2),
+      quoteReference: enquiry.reference || "",
+      feeBreakdown: built.feeBreakdown,
+      nextSteps: defaultApprovedNextSteps,
+      quoteData: {
+        legalFees: built.legalFees,
+        disbursements: built.disbursements,
+        vat: built.vat,
+      },
+    };
+  };
+  
   const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const payload = {
+        const payload = {
       name: approvedQuote.clientName,
       email: approvedQuote.clientEmail,
       type: approvedQuote.transactionType,
@@ -220,8 +269,8 @@ function App() {
       quoteReference: approvedQuote.quoteReference,
       feeBreakdown: approvedQuote.feeBreakdown,
       nextSteps: approvedQuote.nextSteps,
+      quoteData: approvedQuote.quoteData,
     };
-
     try {
       const response = await fetch("/api/send-approved-quote", {
         method: "POST",
@@ -339,22 +388,45 @@ function App() {
         const enquiry: LoadedEnquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
-        setApprovedQuote({
-          clientName: enquiry.client_name || "",
-          clientEmail: enquiry.client_email || "",
-          transactionType: enquiry.transaction_type || "",
-          tenure: enquiry.tenure || "",
-          propertyPrice: enquiry.price ? String(enquiry.price) : "",
-          quoteAmount:
-            typeof quote?.grandTotal === "number"
-              ? quote.grandTotal.toFixed(2)
-              : typeof quote?.legalTotalInclVat === "number"
-              ? quote.legalTotalInclVat.toFixed(2)
-              : "",
-          quoteReference: enquiry.reference || "",
-          feeBreakdown: buildFeeBreakdown(quote),
-          nextSteps: defaultApprovedNextSteps,
-        });
+            if (quote) {
+          setApprovedQuote({
+            clientName: enquiry.client_name || "",
+            clientEmail: enquiry.client_email || "",
+            transactionType: enquiry.transaction_type || "",
+            tenure: enquiry.tenure || "",
+            propertyPrice: enquiry.price ? String(enquiry.price) : "",
+            quoteAmount:
+              typeof quote?.grandTotal === "number"
+                ? quote.grandTotal.toFixed(2)
+                : typeof quote?.legalTotalInclVat === "number"
+                ? quote.legalTotalInclVat.toFixed(2)
+                : "",
+            quoteReference: enquiry.reference || "",
+            feeBreakdown: buildFeeBreakdown(quote),
+            nextSteps: defaultApprovedNextSteps,
+            quoteData: {
+              legalFees: Array.isArray(quote.legalFeeItems)
+                ? quote.legalFeeItems.map((item) => ({
+                    label: item.label,
+                    amount: Number(item.amount || 0),
+                    note: item.note,
+                  }))
+                : [],
+              disbursements: Array.isArray(quote.disbursementItems)
+                ? quote.disbursementItems
+                    .filter((item) => typeof item.amount === "number")
+                    .map((item) => ({
+                      label: item.label,
+                      amount: Number(item.amount || 0),
+                      note: item.note,
+                    }))
+                : [],
+              vat: typeof quote.vatAmount === "number" ? quote.vatAmount : 0,
+            },
+          });
+        } else {
+          setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
+        }
 
         setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
