@@ -305,25 +305,25 @@ function App() {
         const enquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
-        const defaultNextSteps =
-          "If you would like to proceed, please reply to this email and we will advise you on the next stage of the instruction process.";
+    const defaultNextSteps =
+  "If you would like to proceed, please click the Instruct Us button in this email. Once we receive your instruction, we will contact you with the next steps and client care documentation. If you have any questions in the meantime, please email info@conveyquote.uk.";
 
-          setApprovedQuote({
-          clientName: enquiry.name || "",
-          clientEmail: enquiry.email || "",
-          transactionType: enquiry.type || "",
-          tenure: enquiry.tenure || "",
-          propertyPrice: enquiry.price ? String(enquiry.price) : "",
-          quoteAmount:
-  typeof quote?.grandTotal === "number"
-    ? quote.grandTotal.toFixed(2)
-    : typeof quote?.legalTotalInclVat === "number"
-    ? quote.legalTotalInclVat.toFixed(2)
-    : "",
-          quoteReference: enquiry.reference || "",
-          feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
-          nextSteps: defaultNextSteps,
-        });
+setApprovedQuote({
+  clientName: enquiry.client_name || "",
+  clientEmail: enquiry.client_email || "",
+  transactionType: enquiry.transaction_type || "",
+  tenure: enquiry.tenure || "",
+  propertyPrice: enquiry.price ? String(enquiry.price) : "",
+  quoteAmount:
+    typeof quote?.grandTotal === "number"
+      ? quote.grandTotal.toFixed(2)
+      : typeof quote?.legalTotalInclVat === "number"
+      ? quote.legalTotalInclVat.toFixed(2)
+      : "",
+  quoteReference: enquiry.reference || "",
+  feeBreakdown: quote ? buildFeeBreakdown(quote) : "",
+  nextSteps: defaultNextSteps,
+});
 
         setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
