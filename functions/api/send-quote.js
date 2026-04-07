@@ -39,6 +39,12 @@ export async function onRequestPost(context) {
       ownersChanging,
     } = body;
 
+    const jsonResponse = (payload, status = 200) =>
+      new Response(JSON.stringify(payload), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+
     const prettyType =
       type === "purchase"
         ? "Purchase"
@@ -59,10 +65,7 @@ export async function onRequestPost(context) {
 
       const str = String(value).trim();
 
-      if (!str) {
-        return "Not provided";
-      }
-
+      if (!str) return "Not provided";
       if (str.toLowerCase() === "yes") return "Yes";
       if (str.toLowerCase() === "no") return "No";
       if (str.toLowerCase() === "mortgage") return "Mortgage";
@@ -101,10 +104,11 @@ export async function onRequestPost(context) {
       </tr>
     `;
 
-    const today = new Date();
-    const datePart = `${today.getFullYear()}${String(
-      today.getMonth() + 1
-    ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}${String(now.getDate()).padStart(2, "0")}`;
     const randomPart = Math.floor(1000 + Math.random() * 9000);
     const reference = `CQ-${datePart}-${randomPart}`;
 
@@ -291,7 +295,10 @@ export async function onRequestPost(context) {
         quote.disbursementTotal ? formatMoney(quote.disbursementTotal) : ""
       )}
       ${row("SDLT", sdltDisplay)}
-      ${row("Estimated total", quote.grandTotal ? formatMoney(quote.grandTotal) : "")}
+      ${row(
+        "Estimated total",
+        quote.grandTotal ? formatMoney(quote.grandTotal) : ""
+      )}
     `;
 
     const supplementItems = Array.isArray(quote.legalFeeItems)
@@ -556,43 +563,31 @@ export async function onRequestPost(context) {
     const data = await resendResponse.json();
 
     if (!resendResponse.ok) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           success: false,
           source: "resend",
           status: resendResponse.status,
           data,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
+        },
+        500
       );
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        reference,
-        quote,
-        data,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      reference,
+      quote,
+      data,
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         success: false,
         source: "function",
         error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      },
+      500
     );
   }
 }
