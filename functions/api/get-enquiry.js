@@ -4,55 +4,59 @@ export async function onRequestGet(context) {
     const url = new URL(request.url);
     const reference = url.searchParams.get("ref");
 
+    const jsonResponse = (body, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+
     if (!reference) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing reference" }),
-        { status: 400 }
+      return jsonResponse(
+        { success: false, error: "Missing reference" },
+        400
       );
     }
 
-    const result = await env.DB.prepare(
+    const enquiry = await env.DB.prepare(
       `SELECT * FROM enquiries WHERE reference = ?`
     )
       .bind(reference)
       .first();
 
-    if (!result) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Enquiry not found" }),
-        { status: 404 }
+    if (!enquiry) {
+      return jsonResponse(
+        { success: false, error: "Enquiry not found" },
+        404
       );
     }
 
     let parsedQuote = null;
 
-    if (result.quote_json) {
+    if (enquiry.quote_json) {
       try {
-        parsedQuote = JSON.parse(result.quote_json);
+        parsedQuote = JSON.parse(enquiry.quote_json);
       } catch (err) {
         console.error("Quote JSON parse error:", err);
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        enquiry: {
-          ...result,
-          quote: parsedQuote,
-        },
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      enquiry: {
+        ...enquiry,
+        quote: parsedQuote,
+      },
+    });
   } catch (error) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       }),
-      { status: 500 }
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 }
