@@ -8,12 +8,35 @@ export async function onRequestGet(context) {
       return new Response("Missing reference", { status: 400 });
     }
 
+    // Update DB
     await env.DB.prepare(
       `UPDATE enquiries SET status = 'accepted' WHERE reference = ?`
     )
       .bind(reference)
       .run();
 
+    // Send notification email to YOU
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "ConveyQuote <info@conveyquote.uk>",
+        to: ["info@conveyquote.uk"],
+        subject: `Quote Accepted - ${reference}`,
+        html: `
+          <h2>Quote Accepted</h2>
+          <p>A client has accepted a conveyancing quote.</p>
+          <p><strong>Reference:</strong> ${reference}</p>
+          <p>Log into the admin panel to proceed.</p>
+          <p><a href="https://conveyquote.uk/admin?ref=${reference}">Open Admin</a></p>
+        `,
+      }),
+    });
+
+    // Response page
     return new Response(
       `
       <html>
