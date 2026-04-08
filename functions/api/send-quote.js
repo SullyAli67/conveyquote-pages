@@ -1,4 +1,4 @@
-import { buildQuoteData } from "../src/buildQuoteData";
+import { buildQuoteData } from "../../src/buildQuoteData";
 
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
