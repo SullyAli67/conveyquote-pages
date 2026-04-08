@@ -10,8 +10,43 @@ import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
 
+type QuoteDataItem = {
+  label: string;
+  amount: number;
+  note?: string;
+};
+
+type QuoteLineItem = {
+  label: string;
+  amount?: number;
+  note?: string;
+};
+
+type LoadedQuote = {
+  breakdownText?: string;
+  disclaimerLines?: string[];
+  legalFeeItems?: QuoteLineItem[];
+  legalFeeTotalExVat?: number;
+  vatAmount?: number;
+  legalTotalInclVat?: number;
+  disbursementItems?: QuoteLineItem[];
+  disbursementTotal?: number;
+  grandTotal?: number;
+};
+
+type SummaryRow = {
+  label: string;
+  value: string;
+};
+
 type QuoteForm = {
   type: string;
+
+  name: string;
+  email: string;
+  phone: string;
+  consentToPanel: boolean;
+
   tenure: string;
   price: string;
   postcode: string;
@@ -41,16 +76,37 @@ type QuoteForm = {
   transferMortgage: string;
   ownersChanging: string;
 
-  name: string;
-  email: string;
-  phone: string;
-  consentToPanel: boolean;
-};
+  saleTenure: string;
+  salePrice: string;
+  salePostcode: string;
+  saleMortgageCombined: string;
+  managementCompanyCombined: string;
+  tenantedCombined: string;
+  numberOfSellersCombined: string;
 
-type QuoteDataItem = {
-  label: string;
-  amount: number;
-  note?: string;
+  purchaseTenure: string;
+  purchasePrice: string;
+  purchasePostcode: string;
+  purchaseMortgage: string;
+  purchaseOwnershipType: string;
+  purchaseFirstTimeBuyer: string;
+  purchaseNewBuild: string;
+  purchaseSharedOwnership: string;
+  purchaseHelpToBuy: string;
+  purchaseIsCompany: string;
+  purchaseBuyToLet: string;
+  purchaseGiftedDeposit: string;
+  purchaseAdditionalProperty: string;
+  purchaseUkResidentForSdlt: string;
+
+  remortgageTransferTenure: string;
+  remortgageTransferPrice: string;
+  remortgageTransferPostcode: string;
+  remortgageTransferCurrentLender: string;
+  remortgageTransferNewLender: string;
+  remortgageTransferAdditionalBorrowing: string;
+  remortgageTransferHasMortgage: string;
+  remortgageTransferOwnersChanging: string;
 };
 
 type ApprovedQuoteForm = {
@@ -70,33 +126,17 @@ type ApprovedQuoteForm = {
   };
 };
 
-type QuoteLineItem = {
-  label: string;
-  amount?: number;
-  note?: string;
-};
-
-type LoadedQuote = {
-  breakdownText?: string;
-  disclaimerLines?: string[];
-  legalFeeItems?: QuoteLineItem[];
-  legalFeeTotalExVat?: number;
-  vatAmount?: number;
-  legalTotalInclVat?: number;
-  disbursementItems?: QuoteLineItem[];
-  disbursementTotal?: number;
-  grandTotal?: number;
-};
-
 type LoadedEnquiry = {
   client_name?: string;
   client_email?: string;
   client_phone?: string;
   transaction_type?: string;
+  reference?: string;
+  consent_to_panel?: string;
+
   tenure?: string;
   price?: string | number;
   postcode?: string;
-  reference?: string;
 
   mortgage?: string;
   ownership_type?: string;
@@ -123,17 +163,49 @@ type LoadedEnquiry = {
   transfer_mortgage?: string;
   owners_changing?: string;
 
-  consent_to_panel?: string;
-  quote?: LoadedQuote | null;
-};
+  sale_tenure?: string;
+  sale_price?: string | number;
+  sale_postcode?: string;
+  sale_mortgage_combined?: string;
+  management_company_combined?: string;
+  tenanted_combined?: string;
+  number_of_sellers_combined?: string;
 
-type SummaryRow = {
-  label: string;
-  value: string;
+  purchase_tenure?: string;
+  purchase_price?: string | number;
+  purchase_postcode?: string;
+  purchase_mortgage?: string;
+  purchase_ownership_type?: string;
+  purchase_first_time_buyer?: string;
+  purchase_new_build?: string;
+  purchase_shared_ownership?: string;
+  purchase_help_to_buy?: string;
+  purchase_is_company?: string;
+  purchase_buy_to_let?: string;
+  purchase_gifted_deposit?: string;
+  purchase_additional_property?: string;
+  purchase_uk_resident_for_sdlt?: string;
+
+  remortgage_transfer_tenure?: string;
+  remortgage_transfer_price?: string | number;
+  remortgage_transfer_postcode?: string;
+  remortgage_transfer_current_lender?: string;
+  remortgage_transfer_new_lender?: string;
+  remortgage_transfer_additional_borrowing?: string;
+  remortgage_transfer_has_mortgage?: string;
+  remortgage_transfer_owners_changing?: string;
+
+  quote?: LoadedQuote | null;
 };
 
 const initialFormState: QuoteForm = {
   type: "",
+
+  name: "",
+  email: "",
+  phone: "",
+  consentToPanel: false,
+
   tenure: "",
   price: "",
   postcode: "",
@@ -163,10 +235,37 @@ const initialFormState: QuoteForm = {
   transferMortgage: "",
   ownersChanging: "",
 
-  name: "",
-  email: "",
-  phone: "",
-  consentToPanel: false,
+  saleTenure: "",
+  salePrice: "",
+  salePostcode: "",
+  saleMortgageCombined: "",
+  managementCompanyCombined: "",
+  tenantedCombined: "",
+  numberOfSellersCombined: "",
+
+  purchaseTenure: "",
+  purchasePrice: "",
+  purchasePostcode: "",
+  purchaseMortgage: "",
+  purchaseOwnershipType: "",
+  purchaseFirstTimeBuyer: "",
+  purchaseNewBuild: "",
+  purchaseSharedOwnership: "",
+  purchaseHelpToBuy: "",
+  purchaseIsCompany: "",
+  purchaseBuyToLet: "",
+  purchaseGiftedDeposit: "",
+  purchaseAdditionalProperty: "",
+  purchaseUkResidentForSdlt: "",
+
+  remortgageTransferTenure: "",
+  remortgageTransferPrice: "",
+  remortgageTransferPostcode: "",
+  remortgageTransferCurrentLender: "",
+  remortgageTransferNewLender: "",
+  remortgageTransferAdditionalBorrowing: "",
+  remortgageTransferHasMortgage: "",
+  remortgageTransferOwnersChanging: "",
 };
 
 const defaultApprovedNextSteps =
@@ -236,8 +335,12 @@ function prettifyValue(value: string | number | boolean | undefined | null) {
 function getTransactionLabel(type: string | undefined) {
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
+  if (type === "sale_purchase") return "Sale and Purchase";
   if (type === "remortgage") return "Remortgage";
   if (type === "transfer") return "Transfer of Equity";
+  if (type === "remortgage_transfer") {
+    return "Remortgage and Transfer of Equity";
+  }
   return "Not provided";
 }
 
@@ -470,8 +573,40 @@ function App() {
   };
 
   const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
+    const type = enquiry.transaction_type || "";
+
+    if (type === "sale_purchase" || type === "remortgage_transfer") {
+      return {
+        clientName: enquiry.client_name || "",
+        clientEmail: enquiry.client_email || "",
+        transactionType: type,
+        tenure:
+          type === "sale_purchase"
+            ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
+                enquiry.purchase_tenure
+              )}`
+            : prettifyValue(enquiry.remortgage_transfer_tenure),
+        propertyPrice:
+          type === "sale_purchase"
+            ? `Sale ${formatMoney(enquiry.sale_price)} | Purchase ${formatMoney(
+                enquiry.purchase_price
+              )}`
+            : formatMoney(enquiry.remortgage_transfer_price),
+        quoteAmount: "",
+        quoteReference: enquiry.reference || "",
+        feeBreakdown:
+          "Combined matter loaded. Pricing for combined matters will be populated once the pricing engine and email templates are updated.",
+        nextSteps: defaultApprovedNextSteps,
+        quoteData: {
+          legalFees: [],
+          disbursements: [],
+          vat: 0,
+        },
+      };
+    }
+
     const built = buildQuoteData({
-      type: enquiry.transaction_type || "",
+      type,
       tenure: enquiry.tenure || "",
       mortgage: enquiry.mortgage || "",
       giftedDeposit: enquiry.gifted_deposit || "",
@@ -493,7 +628,7 @@ function App() {
     return {
       clientName: enquiry.client_name || "",
       clientEmail: enquiry.client_email || "",
-      transactionType: enquiry.transaction_type || "",
+      transactionType: type,
       tenure: enquiry.tenure || "",
       propertyPrice: enquiry.price ? String(enquiry.price) : "",
       quoteAmount: built.grandTotal.toFixed(2),
@@ -740,8 +875,24 @@ function App() {
             clientName: enquiry.client_name || "",
             clientEmail: enquiry.client_email || "",
             transactionType: enquiry.transaction_type || "",
-            tenure: enquiry.tenure || "",
-            propertyPrice: enquiry.price ? String(enquiry.price) : "",
+            tenure:
+              enquiry.transaction_type === "sale_purchase"
+                ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
+                    enquiry.purchase_tenure
+                  )}`
+                : enquiry.transaction_type === "remortgage_transfer"
+                ? prettifyValue(enquiry.remortgage_transfer_tenure)
+                : enquiry.tenure || "",
+            propertyPrice:
+              enquiry.transaction_type === "sale_purchase"
+                ? `Sale ${formatMoney(
+                    enquiry.sale_price
+                  )} | Purchase ${formatMoney(enquiry.purchase_price)}`
+                : enquiry.transaction_type === "remortgage_transfer"
+                ? formatMoney(enquiry.remortgage_transfer_price)
+                : enquiry.price
+                ? String(enquiry.price)
+                : "",
             quoteAmount:
               typeof quote.grandTotal === "number"
                 ? quote.grandTotal.toFixed(2)
@@ -777,12 +928,42 @@ function App() {
           setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
         }
 
-        setSdltPrice(enquiry.price ? String(enquiry.price) : "");
-        setSdltFirstTimeBuyer(enquiry.first_time_buyer || "no");
-        setSdltAdditionalProperty(enquiry.additional_property || "no");
-        setSdltUkResident(enquiry.uk_resident_for_sdlt || "yes");
-        setSdltIsCompany(enquiry.is_company || "no");
-        setSdltSharedOwnership(enquiry.shared_ownership || "no");
+        const purchasePriceForSdlt =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_price
+            : enquiry.price;
+
+        const purchaseFirstTimeBuyer =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_first_time_buyer
+            : enquiry.first_time_buyer;
+
+        const purchaseAdditionalProperty =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_additional_property
+            : enquiry.additional_property;
+
+        const purchaseUkResident =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_uk_resident_for_sdlt
+            : enquiry.uk_resident_for_sdlt;
+
+        const purchaseIsCompany =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_is_company
+            : enquiry.is_company;
+
+        const purchaseSharedOwnership =
+          enquiry.transaction_type === "sale_purchase"
+            ? enquiry.purchase_shared_ownership
+            : enquiry.shared_ownership;
+
+        setSdltPrice(purchasePriceForSdlt ? String(purchasePriceForSdlt) : "");
+        setSdltFirstTimeBuyer(purchaseFirstTimeBuyer || "no");
+        setSdltAdditionalProperty(purchaseAdditionalProperty || "no");
+        setSdltUkResident(purchaseUkResident || "yes");
+        setSdltIsCompany(purchaseIsCompany || "no");
+        setSdltSharedOwnership(purchaseSharedOwnership || "no");
 
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
@@ -804,15 +985,29 @@ function App() {
 
   const isPurchase = form.type === "purchase";
   const isSale = form.type === "sale";
+  const isSalePurchase = form.type === "sale_purchase";
   const isRemortgage = form.type === "remortgage";
   const isTransfer = form.type === "transfer";
+  const isRemortgageTransfer = form.type === "remortgage_transfer";
 
-  const sdltHint =
+  const usesSingleMatterDetails =
+    isPurchase || isSale || isRemortgage || isTransfer;
+
+  const singleSdltHint =
     form.ukResidentForSdlt === "no"
       ? "Non-UK resident surcharge may apply"
       : form.additionalProperty === "yes"
       ? "Higher rates of SDLT may apply"
       : form.firstTimeBuyer === "yes"
+      ? "First-time buyer relief may apply"
+      : "Standard residential SDLT likely";
+
+  const combinedPurchaseSdltHint =
+    form.purchaseUkResidentForSdlt === "no"
+      ? "Non-UK resident surcharge may apply"
+      : form.purchaseAdditionalProperty === "yes"
+      ? "Higher rates of SDLT may apply"
+      : form.purchaseFirstTimeBuyer === "yes"
       ? "First-time buyer relief may apply"
       : "Standard residential SDLT likely";
 
@@ -881,18 +1076,6 @@ function App() {
           value: getTransactionLabel(loadedEnquiry.transaction_type),
         },
         {
-          label: "Tenure",
-          value: prettifyValue(loadedEnquiry.tenure),
-        },
-        {
-          label: "Price / value",
-          value: formatMoney(loadedEnquiry.price),
-        },
-        {
-          label: "Postcode",
-          value: prettifyValue(loadedEnquiry.postcode),
-        },
-        {
           label: "Consent to panel",
           value: prettifyValue(loadedEnquiry.consent_to_panel),
         },
@@ -908,6 +1091,9 @@ function App() {
       );
 
       return [
+        { label: "Tenure", value: prettifyValue(loadedEnquiry.tenure) },
+        { label: "Price", value: formatMoney(loadedEnquiry.price) },
+        { label: "Postcode", value: prettifyValue(loadedEnquiry.postcode) },
         {
           label: "Buyer type",
           value: prettifyValue(loadedEnquiry.ownership_type),
@@ -960,6 +1146,9 @@ function App() {
       const sellerCount = getSellerCount(loadedEnquiry.number_of_sellers);
 
       return [
+        { label: "Tenure", value: prettifyValue(loadedEnquiry.tenure) },
+        { label: "Price", value: formatMoney(loadedEnquiry.price) },
+        { label: "Postcode", value: prettifyValue(loadedEnquiry.postcode) },
         {
           label: "Number of sellers",
           value: sellerCount === 3 ? "3 or more" : String(sellerCount),
@@ -979,8 +1168,102 @@ function App() {
       ];
     }
 
+    if (loadedEnquiry.transaction_type === "sale_purchase") {
+      const sellerCount = getSellerCount(
+        loadedEnquiry.number_of_sellers_combined
+      );
+      const buyerCount = getBuyerCountFromOwnershipType(
+        loadedEnquiry.purchase_ownership_type
+      );
+
+      return [
+        { label: "Sale tenure", value: prettifyValue(loadedEnquiry.sale_tenure) },
+        { label: "Sale price", value: formatMoney(loadedEnquiry.sale_price) },
+        {
+          label: "Sale postcode",
+          value: prettifyValue(loadedEnquiry.sale_postcode),
+        },
+        {
+          label: "Sale mortgage to redeem",
+          value: prettifyValue(loadedEnquiry.sale_mortgage_combined),
+        },
+        {
+          label: "Sale management company / service charge",
+          value: prettifyValue(loadedEnquiry.management_company_combined),
+        },
+        {
+          label: "Sale tenanted",
+          value: prettifyValue(loadedEnquiry.tenanted_combined),
+        },
+        {
+          label: "Number of sellers",
+          value: sellerCount === 3 ? "3 or more" : String(sellerCount),
+        },
+        {
+          label: "Purchase tenure",
+          value: prettifyValue(loadedEnquiry.purchase_tenure),
+        },
+        {
+          label: "Purchase price",
+          value: formatMoney(loadedEnquiry.purchase_price),
+        },
+        {
+          label: "Purchase postcode",
+          value: prettifyValue(loadedEnquiry.purchase_postcode),
+        },
+        {
+          label: "Mortgage or cash",
+          value: prettifyValue(loadedEnquiry.purchase_mortgage),
+        },
+        {
+          label: "Buyer type",
+          value: prettifyValue(loadedEnquiry.purchase_ownership_type),
+        },
+        { label: "Number of buyers", value: String(buyerCount) },
+        {
+          label: "First time buyer",
+          value: prettifyValue(loadedEnquiry.purchase_first_time_buyer),
+        },
+        {
+          label: "Additional property",
+          value: prettifyValue(loadedEnquiry.purchase_additional_property),
+        },
+        {
+          label: "UK resident for SDLT",
+          value: prettifyValue(loadedEnquiry.purchase_uk_resident_for_sdlt),
+        },
+        {
+          label: "Buy to let",
+          value: prettifyValue(loadedEnquiry.purchase_buy_to_let),
+        },
+        {
+          label: "New build",
+          value: prettifyValue(loadedEnquiry.purchase_new_build),
+        },
+        {
+          label: "Shared ownership",
+          value: prettifyValue(loadedEnquiry.purchase_shared_ownership),
+        },
+        {
+          label: "Help to Buy / scheme",
+          value: prettifyValue(loadedEnquiry.purchase_help_to_buy),
+        },
+        {
+          label: "Buying via company",
+          value: prettifyValue(loadedEnquiry.purchase_is_company),
+        },
+        {
+          label: "Gifted deposit",
+          value: prettifyValue(loadedEnquiry.purchase_gifted_deposit),
+        },
+      ];
+    }
+
     if (loadedEnquiry.transaction_type === "remortgage") {
       return [
+        { label: "Tenure", value: prettifyValue(loadedEnquiry.tenure) },
+        { label: "Value", value: formatMoney(loadedEnquiry.price) },
+        { label: "Postcode", value: prettifyValue(loadedEnquiry.postcode) },
         {
           label: "Current lender",
           value: prettifyValue(loadedEnquiry.current_lender),
@@ -1002,6 +1285,9 @@ function App() {
 
     if (loadedEnquiry.transaction_type === "transfer") {
       return [
+        { label: "Tenure", value: prettifyValue(loadedEnquiry.tenure) },
+        { label: "Value", value: formatMoney(loadedEnquiry.price) },
+        { label: "Postcode", value: prettifyValue(loadedEnquiry.postcode) },
         {
           label: "Mortgage on property",
           value: prettifyValue(loadedEnquiry.transfer_mortgage),
@@ -1009,6 +1295,51 @@ function App() {
         {
           label: "Owners changing",
           value: prettifyValue(loadedEnquiry.owners_changing),
+        },
+      ];
+    }
+
+    if (loadedEnquiry.transaction_type === "remortgage_transfer") {
+      return [
+        {
+          label: "Tenure",
+          value: prettifyValue(loadedEnquiry.remortgage_transfer_tenure),
+        },
+        {
+          label: "Value",
+          value: formatMoney(loadedEnquiry.remortgage_transfer_price),
+        },
+        {
+          label: "Postcode",
+          value: prettifyValue(loadedEnquiry.remortgage_transfer_postcode),
+        },
+        {
+          label: "Current lender",
+          value: prettifyValue(
+            loadedEnquiry.remortgage_transfer_current_lender
+          ),
+        },
+        {
+          label: "New lender",
+          value: prettifyValue(loadedEnquiry.remortgage_transfer_new_lender),
+        },
+        {
+          label: "Additional borrowing",
+          value: prettifyValue(
+            loadedEnquiry.remortgage_transfer_additional_borrowing
+          ),
+        },
+        {
+          label: "Mortgage on property",
+          value: prettifyValue(
+            loadedEnquiry.remortgage_transfer_has_mortgage
+          ),
+        },
+        {
+          label: "Owners changing",
+          value: prettifyValue(
+            loadedEnquiry.remortgage_transfer_owners_changing
+          ),
         },
       ];
     }
@@ -1061,7 +1392,7 @@ function App() {
             <p className="hero__summary">
               {isAdminPage
                 ? "Use this internal page to review a saved enquiry, check the prebuilt quote and issue the client-facing quote email."
-                : "Get a tailored quote for your sale, purchase, remortgage or transfer of equity. We review the details before issuing your quote so you get a clearer starting point."}
+                : "Get a tailored quote for your sale, purchase, sale and purchase, remortgage, transfer of equity, or remortgage with transfer of equity. We review the details before issuing your quote so you get a clearer starting point."}
             </p>
 
             <div className="hero__points">
@@ -1111,13 +1442,17 @@ function App() {
                       <option value="">Please select</option>
                       <option value="purchase">Purchase</option>
                       <option value="sale">Sale</option>
+                      <option value="sale_purchase">Sale and Purchase</option>
                       <option value="remortgage">Remortgage</option>
                       <option value="transfer">Transfer of Equity</option>
+                      <option value="remortgage_transfer">
+                        Remortgage and Transfer of Equity
+                      </option>
                     </select>
                   </div>
                 </div>
 
-                {form.type && (
+                {usesSingleMatterDetails && (
                   <>
                     <div
                       className="section-heading"
@@ -1147,9 +1482,7 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="price">
-                          {isSale
-                            ? "Sale price (£)"
-                            : "Property price / value (£)"}
+                          {isSale ? "Sale price (£)" : "Property price / value (£)"}
                         </label>
                         <input
                           id="price"
@@ -1225,9 +1558,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="firstTimeBuyer">
-                          First time buyer?
-                        </label>
+                        <label htmlFor="firstTimeBuyer">First time buyer?</label>
                         <select
                           id="firstTimeBuyer"
                           name="firstTimeBuyer"
@@ -1365,7 +1696,7 @@ function App() {
                         <input
                           id="sdltHint"
                           type="text"
-                          value={sdltHint}
+                          value={singleSdltHint}
                           readOnly
                         />
                       </div>
@@ -1464,6 +1795,379 @@ function App() {
                           <option value="no">No</option>
                         </select>
                       </div>
+                    </div>
+                  </>
+                )}
+
+                {isSalePurchase && (
+                  <>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
+                      <div>
+                        <h2>Sale Details</h2>
+                        <p>
+                          Complete the details for the property you are selling.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="saleTenure">Sale tenure</label>
+                        <select
+                          id="saleTenure"
+                          name="saleTenure"
+                          value={form.saleTenure}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="freehold">Freehold</option>
+                          <option value="leasehold">Leasehold</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="salePrice">Sale price (£)</label>
+                        <input
+                          id="salePrice"
+                          type="number"
+                          name="salePrice"
+                          placeholder="e.g. 325000"
+                          value={form.salePrice}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="salePostcode">Sale postcode</label>
+                        <input
+                          id="salePostcode"
+                          type="text"
+                          name="salePostcode"
+                          placeholder="e.g. B15 1AA"
+                          value={form.salePostcode}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="saleMortgageCombined">
+                          Existing mortgage to redeem?
+                        </label>
+                        <select
+                          id="saleMortgageCombined"
+                          name="saleMortgageCombined"
+                          value={form.saleMortgageCombined}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="managementCompanyCombined">
+                          Management company / service charge?
+                        </label>
+                        <select
+                          id="managementCompanyCombined"
+                          name="managementCompanyCombined"
+                          value={form.managementCompanyCombined}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="numberOfSellersCombined">
+                          How many sellers?
+                        </label>
+                        <select
+                          id="numberOfSellersCombined"
+                          name="numberOfSellersCombined"
+                          value={form.numberOfSellersCombined}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="1">1 seller</option>
+                          <option value="2">2 sellers</option>
+                          <option value="3">3 or more sellers</option>
+                        </select>
+                      </div>
+
+                      <div className="field field--full">
+                        <label htmlFor="tenantedCombined">
+                          Is the sale property tenanted?
+                        </label>
+                        <select
+                          id="tenantedCombined"
+                          name="tenantedCombined"
+                          value={form.tenantedCombined}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "18px" }}
+                    >
+                      <div>
+                        <h2>Purchase Details</h2>
+                        <p>
+                          Complete the details for the property you are buying.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="purchaseTenure">Purchase tenure</label>
+                        <select
+                          id="purchaseTenure"
+                          name="purchaseTenure"
+                          value={form.purchaseTenure}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="freehold">Freehold</option>
+                          <option value="leasehold">Leasehold</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchasePrice">Purchase price (£)</label>
+                        <input
+                          id="purchasePrice"
+                          type="number"
+                          name="purchasePrice"
+                          placeholder="e.g. 425000"
+                          value={form.purchasePrice}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchasePostcode">Purchase postcode</label>
+                        <input
+                          id="purchasePostcode"
+                          type="text"
+                          name="purchasePostcode"
+                          placeholder="e.g. B91 1AA"
+                          value={form.purchasePostcode}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseMortgage">
+                          Mortgage or cash
+                        </label>
+                        <select
+                          id="purchaseMortgage"
+                          name="purchaseMortgage"
+                          value={form.purchaseMortgage}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="mortgage">Mortgage</option>
+                          <option value="cash">Cash</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseOwnershipType">Buyer type</label>
+                        <select
+                          id="purchaseOwnershipType"
+                          name="purchaseOwnershipType"
+                          value={form.purchaseOwnershipType}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="individual">Individual</option>
+                          <option value="joint">Joint buyers</option>
+                          <option value="company">Company</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseFirstTimeBuyer">
+                          First time buyer?
+                        </label>
+                        <select
+                          id="purchaseFirstTimeBuyer"
+                          name="purchaseFirstTimeBuyer"
+                          value={form.purchaseFirstTimeBuyer}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseAdditionalProperty">
+                          Will you own another property after completion?
+                        </label>
+                        <select
+                          id="purchaseAdditionalProperty"
+                          name="purchaseAdditionalProperty"
+                          value={form.purchaseAdditionalProperty}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseUkResidentForSdlt">
+                          UK resident for SDLT purposes?
+                        </label>
+                        <select
+                          id="purchaseUkResidentForSdlt"
+                          name="purchaseUkResidentForSdlt"
+                          value={form.purchaseUkResidentForSdlt}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseBuyToLet">Buy to let?</label>
+                        <select
+                          id="purchaseBuyToLet"
+                          name="purchaseBuyToLet"
+                          value={form.purchaseBuyToLet}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseNewBuild">New build?</label>
+                        <select
+                          id="purchaseNewBuild"
+                          name="purchaseNewBuild"
+                          value={form.purchaseNewBuild}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseSharedOwnership">
+                          Shared ownership?
+                        </label>
+                        <select
+                          id="purchaseSharedOwnership"
+                          name="purchaseSharedOwnership"
+                          value={form.purchaseSharedOwnership}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseHelpToBuy">
+                          Help to Buy / scheme?
+                        </label>
+                        <select
+                          id="purchaseHelpToBuy"
+                          name="purchaseHelpToBuy"
+                          value={form.purchaseHelpToBuy}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseIsCompany">
+                          Buying via company?
+                        </label>
+                        <select
+                          id="purchaseIsCompany"
+                          name="purchaseIsCompany"
+                          value={form.purchaseIsCompany}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field field--full">
+                        <label htmlFor="purchaseGiftedDeposit">
+                          Any gifted deposit?
+                        </label>
+                        <select
+                          id="purchaseGiftedDeposit"
+                          name="purchaseGiftedDeposit"
+                          value={form.purchaseGiftedDeposit}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field field--full">
+                        <label htmlFor="combinedPurchaseSdltHint">
+                          SDLT guidance for purchase
+                        </label>
+                        <input
+                          id="combinedPurchaseSdltHint"
+                          type="text"
+                          value={combinedPurchaseSdltHint}
+                          readOnly
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-footer" style={{ paddingTop: "0" }}>
+                      <p className="form-note">
+                        For combined sale and purchase matters, SDLT only applies
+                        to the purchase side. Any figure produced later will be
+                        an estimate only and may still need solicitor review.
+                      </p>
                     </div>
                   </>
                 )}
@@ -1585,6 +2289,175 @@ function App() {
                           id="ownersChanging"
                           name="ownersChanging"
                           value={form.ownersChanging}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="one">One owner</option>
+                          <option value="two">Two owners</option>
+                          <option value="more">More than two</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {isRemortgageTransfer && (
+                  <>
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "10px" }}
+                    >
+                      <div>
+                        <h2>Property Details</h2>
+                        <p>
+                          These details apply to the property being remortgaged
+                          and transferred.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="remortgageTransferTenure">Tenure</label>
+                        <select
+                          id="remortgageTransferTenure"
+                          name="remortgageTransferTenure"
+                          value={form.remortgageTransferTenure}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="freehold">Freehold</option>
+                          <option value="leasehold">Leasehold</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferPrice">
+                          Property value (£)
+                        </label>
+                        <input
+                          id="remortgageTransferPrice"
+                          type="number"
+                          name="remortgageTransferPrice"
+                          placeholder="e.g. 325000"
+                          value={form.remortgageTransferPrice}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferPostcode">
+                          Property postcode
+                        </label>
+                        <input
+                          id="remortgageTransferPostcode"
+                          type="text"
+                          name="remortgageTransferPostcode"
+                          placeholder="e.g. B15 1AA"
+                          value={form.remortgageTransferPostcode}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "18px" }}
+                    >
+                      <div>
+                        <h2>Remortgage Details</h2>
+                        <p>
+                          These questions help us assess the remortgage element.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="remortgageTransferCurrentLender">
+                          Current lender
+                        </label>
+                        <input
+                          id="remortgageTransferCurrentLender"
+                          type="text"
+                          name="remortgageTransferCurrentLender"
+                          placeholder="e.g. Halifax"
+                          value={form.remortgageTransferCurrentLender}
+                          onChange={handleChange}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferNewLender">
+                          New lender
+                        </label>
+                        <input
+                          id="remortgageTransferNewLender"
+                          type="text"
+                          name="remortgageTransferNewLender"
+                          placeholder="e.g. Nationwide"
+                          value={form.remortgageTransferNewLender}
+                          onChange={handleChange}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferAdditionalBorrowing">
+                          Additional borrowing?
+                        </label>
+                        <select
+                          id="remortgageTransferAdditionalBorrowing"
+                          name="remortgageTransferAdditionalBorrowing"
+                          value={form.remortgageTransferAdditionalBorrowing}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div
+                      className="section-heading"
+                      style={{ marginTop: "18px" }}
+                    >
+                      <div>
+                        <h2>Transfer of Equity Details</h2>
+                        <p>
+                          These questions help us assess the transfer element.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="remortgageTransferHasMortgage">
+                          Is there a mortgage on the property?
+                        </label>
+                        <select
+                          id="remortgageTransferHasMortgage"
+                          name="remortgageTransferHasMortgage"
+                          value={form.remortgageTransferHasMortgage}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferOwnersChanging">
+                          How many owners are changing?
+                        </label>
+                        <select
+                          id="remortgageTransferOwnersChanging"
+                          name="remortgageTransferOwnersChanging"
+                          value={form.remortgageTransferOwnersChanging}
                           onChange={handleChange}
                         >
                           <option value="">Please select</option>
@@ -1969,25 +2842,26 @@ function App() {
                       <option value="">Please select</option>
                       <option value="purchase">Purchase</option>
                       <option value="sale">Sale</option>
+                      <option value="sale_purchase">Sale and Purchase</option>
                       <option value="remortgage">Remortgage</option>
                       <option value="transfer">Transfer of Equity</option>
+                      <option value="remortgage_transfer">
+                        Remortgage and Transfer of Equity
+                      </option>
                     </select>
                   </div>
 
                   <div className="field">
-                    <label htmlFor="approvedTenure">Tenure</label>
-                    <select
+                    <label htmlFor="approvedTenure">Tenure / summary</label>
+                    <input
                       id="approvedTenure"
+                      type="text"
                       name="tenure"
                       value={approvedQuote.tenure}
                       onChange={handleApprovedQuoteChange}
-                      disabled
+                      readOnly
                       required
-                    >
-                      <option value="">Please select</option>
-                      <option value="freehold">Freehold</option>
-                      <option value="leasehold">Leasehold</option>
-                    </select>
+                    />
                   </div>
 
                   <div className="field">
@@ -2054,6 +2928,16 @@ function App() {
                           </div>
                         </div>
                       ))}
+                      {approvedQuote.quoteData.legalFees.length === 0 && (
+                        <div className="detail-row">
+                          <div className="detail-row__label">
+                            No fee items loaded yet
+                          </div>
+                          <div className="detail-row__value">
+                            Update pricing engine next
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2089,6 +2973,16 @@ function App() {
                             </div>
                           </div>
                         )
+                      )}
+                      {approvedQuote.quoteData.disbursements.length === 0 && (
+                        <div className="detail-row">
+                          <div className="detail-row__label">
+                            No disbursements loaded yet
+                          </div>
+                          <div className="detail-row__value">
+                            Update pricing engine next
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
