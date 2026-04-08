@@ -15,6 +15,7 @@ type QuoteFormLike = {
   saleMortgage?: string;
   managementCompany?: string;
   tenanted?: string;
+  numberOfSellers?: string;
   additionalBorrowing?: string;
   remortgageTransfer?: string;
   transferMortgage?: string;
@@ -51,6 +52,12 @@ const addItem = (items: QuoteItem[], label: string, amount: number) => {
 const sumItems = (items: QuoteItem[]) =>
   items.reduce((total, item) => total + item.amount, 0);
 
+const getSellerCount = (value?: string) => {
+  if (value === "2") return 2;
+  if (value === "3") return 3;
+  return 1;
+};
+
 export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   const type = form.type as TransactionType;
   const tenure = form.tenure;
@@ -60,6 +67,8 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "sale") {
     const config = PRICE_CONFIG.sale;
+    const sellerCount = getSellerCount(form.numberOfSellers);
+    const idCheckAmount = config.disbursements.idChecks * sellerCount;
 
     addItem(legalFees, "Base legal fee", config.legalFees.baseLegalFee);
 
@@ -100,7 +109,12 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       "Office copy entries",
       config.disbursements.officeCopyEntries
     );
-    addItem(disbursements, "ID checks", config.disbursements.idChecks);
+
+    addItem(
+      disbursements,
+      `ID checks (${sellerCount} seller${sellerCount > 1 ? "s" : ""})`,
+      idCheckAmount
+    );
   }
 
   if (type === "purchase") {
