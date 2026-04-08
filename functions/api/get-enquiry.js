@@ -1,14 +1,14 @@
+const jsonResponse = (body, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
 export async function onRequestGet(context) {
   try {
     const { request, env } = context;
     const url = new URL(request.url);
     const reference = url.searchParams.get("ref");
-
-    const jsonResponse = (body, status = 200) =>
-      new Response(JSON.stringify(body), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      });
 
     if (!reference) {
       return jsonResponse(
@@ -35,8 +35,8 @@ export async function onRequestGet(context) {
     if (enquiry.quote_json) {
       try {
         parsedQuote = JSON.parse(enquiry.quote_json);
-      } catch (err) {
-        console.error("Quote JSON parse error:", err);
+      } catch (error) {
+        console.error("Quote JSON parse error:", error);
       }
     }
 
@@ -48,15 +48,12 @@ export async function onRequestGet(context) {
       },
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      },
+      500
     );
   }
 }
