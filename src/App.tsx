@@ -37,6 +37,7 @@ type QuoteForm = {
   name: string;
   email: string;
   phone: string;
+  consentToPanel: boolean;
 };
 
 type ApprovedQuoteForm = {
@@ -118,6 +119,7 @@ const initialFormState: QuoteForm = {
   name: "",
   email: "",
   phone: "",
+  consentToPanel: false,
 };
 
 const defaultApprovedNextSteps =
@@ -162,7 +164,20 @@ function App() {
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, type, value } = e.target;
+
+    if (type === "checkbox" && e.target instanceof HTMLInputElement) {
+      setForm((prev) => ({
+        ...prev,
+        [name]: e.target.checked,
+      }));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleApprovedQuoteChange = (
@@ -234,6 +249,7 @@ function App() {
       saleMortgage: (enquiry as any).sale_mortgage || "",
       managementCompany: (enquiry as any).management_company || "",
       tenanted: (enquiry as any).tenanted || "",
+      numberOfSellers: (enquiry as any).number_of_sellers || "",
       additionalBorrowing: (enquiry as any).additional_borrowing || "",
       remortgageTransfer: (enquiry as any).remortgage_transfer || "",
       transferMortgage: (enquiry as any).transfer_mortgage || "",
@@ -1078,11 +1094,41 @@ function App() {
                     </div>
 
                     <div className="form-footer">
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "10px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <input
+                          id="consentToPanel"
+                          type="checkbox"
+                          name="consentToPanel"
+                          checked={form.consentToPanel}
+                          onChange={handleChange}
+                          required
+                          style={{ marginTop: "4px" }}
+                        />
+                        <label
+                          htmlFor="consentToPanel"
+                          style={{ margin: 0, fontWeight: 400 }}
+                        >
+                          I agree that the information I provide may be used to
+                          prepare my quote, contact me about my enquiry, and be
+                          passed to one or more selected panel solicitor firms
+                          for the purpose of progressing my conveyancing matter.
+                        </label>
+                      </div>
+
                       <p className="form-note">
                         By submitting this form, you are requesting a quote
                         only. No solicitor-client relationship is formed at this
-                        stage.
+                        stage. Your details may be shared with an appropriate
+                        panel solicitor firm in order to progress your enquiry.
                       </p>
+
                       <button type="submit" className="primary-button">
                         Request My Quote
                       </button>
