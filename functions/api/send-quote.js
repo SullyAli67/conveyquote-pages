@@ -1,5 +1,11 @@
 import { calculateQuote } from "../lib/calculate-quote";
 
+const jsonResponse = (payload, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
@@ -29,6 +35,7 @@ export async function onRequestPost(context) {
       saleMortgage,
       managementCompany,
       tenanted,
+      numberOfSellers,
 
       currentLender,
       newLender,
@@ -37,13 +44,9 @@ export async function onRequestPost(context) {
 
       transferMortgage,
       ownersChanging,
-    } = body;
 
-    const jsonResponse = (payload, status = 200) =>
-      new Response(JSON.stringify(payload), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      });
+      consentToPanel,
+    } = body;
 
     const prettyType =
       type === "purchase"
@@ -70,6 +73,11 @@ export async function onRequestPost(context) {
       if (str.toLowerCase() === "no") return "No";
       if (str.toLowerCase() === "mortgage") return "Mortgage";
       if (str.toLowerCase() === "cash") return "Cash";
+      if (str === "1") return "1 seller";
+      if (str === "2") return "2 sellers";
+      if (str === "3") return "3 or more sellers";
+      if (str.toLowerCase() === "true") return "Yes";
+      if (str.toLowerCase() === "false") return "No";
 
       return str
         .replace(/_/g, " ")
@@ -133,6 +141,7 @@ export async function onRequestPost(context) {
       saleMortgage,
       managementCompany,
       tenanted,
+      numberOfSellers,
 
       currentLender,
       newLender,
@@ -172,6 +181,7 @@ export async function onRequestPost(context) {
         sale_mortgage,
         management_company,
         tenanted,
+        number_of_sellers,
 
         current_lender,
         new_lender,
@@ -180,10 +190,11 @@ export async function onRequestPost(context) {
 
         transfer_mortgage,
         owners_changing,
+        consent_to_panel,
 
         quote_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
       .bind(
@@ -211,6 +222,7 @@ export async function onRequestPost(context) {
         saleMortgage || "",
         managementCompany || "",
         tenanted || "",
+        numberOfSellers || "",
 
         currentLender || "",
         newLender || "",
@@ -219,6 +231,7 @@ export async function onRequestPost(context) {
 
         transferMortgage || "",
         ownersChanging || "",
+        consentToPanel ? "yes" : "no",
 
         quoteJson
       )
@@ -413,6 +426,10 @@ export async function onRequestPost(context) {
                         ${row("Client name", name)}
                         ${row("Email address", email)}
                         ${row("Phone number", phone)}
+                        ${row(
+                          "Consent to panel referral",
+                          consentToPanel ? "Yes" : "No"
+                        )}
                       </table>
                     </td>
                   </tr>
@@ -475,6 +492,7 @@ export async function onRequestPost(context) {
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
                             ${row("Mortgage to redeem", prettifyValue(saleMortgage))}
                             ${row("Management company / service charge", prettifyValue(managementCompany))}
+                            ${row("Number of sellers", prettifyValue(numberOfSellers))}
                             ${row("Property tenanted", prettifyValue(tenanted))}
                           </table>
                         </td>
