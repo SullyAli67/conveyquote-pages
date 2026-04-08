@@ -629,7 +629,7 @@ function App() {
       clientName: enquiry.client_name || "",
       clientEmail: enquiry.client_email || "",
       transactionType: type,
-      tenure: enquiry.tenure || "",
+      tenure: prettifyValue(enquiry.tenure),
       propertyPrice: enquiry.price ? String(enquiry.price) : "",
       quoteAmount: built.grandTotal.toFixed(2),
       quoteReference: enquiry.reference || "",
@@ -657,21 +657,20 @@ function App() {
 
     const lines: string[] = [];
 
-    if (Array.isArray(quote.legalFeeItems) && quote.legalFeeItems.length > 0) {
-      lines.push("LEGAL FEES");
-      quote.legalFeeItems.forEach((item) => {
-        lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
-      });
-    }
+   if (Array.isArray(quote.legalFees) && quote.legalFees.length > 0) {
+  lines.push("LEGAL FEES");
+  quote.legalFees.forEach((item) => {
+    lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
+  });
+}
 
-    if (typeof quote.legalFeeTotalExVat === "number") {
-      lines.push(`Legal fees ex VAT: £${quote.legalFeeTotalExVat.toFixed(2)}`);
-    }
+if (typeof quote.legalFeesExVat === "number") {
+  lines.push(`Legal fees ex VAT: £${quote.legalFeesExVat.toFixed(2)}`);
+}
 
-    if (typeof quote.vatAmount === "number") {
-      lines.push(`VAT: £${quote.vatAmount.toFixed(2)}`);
-    }
-
+if (typeof quote.vat === "number") {
+  lines.push(`VAT: £${quote.vat.toFixed(2)}`);
+}
     if (typeof quote.legalTotalInclVat === "number") {
       lines.push(
         `Total legal fees including VAT: £${quote.legalTotalInclVat.toFixed(2)}`
@@ -679,12 +678,12 @@ function App() {
     }
 
     if (
-      Array.isArray(quote.disbursementItems) &&
-      quote.disbursementItems.length > 0
-    ) {
-      lines.push("");
-      lines.push("DISBURSEMENTS");
-      quote.disbursementItems.forEach((item) => {
+  Array.isArray(quote.disbursements) &&
+  quote.disbursements.length > 0
+) {
+  lines.push("");
+  lines.push("DISBURSEMENTS");
+  quote.disbursements.forEach((item) => {
         if (item.note) {
           lines.push(`${item.label}: ${item.note}`);
         } else {
@@ -894,36 +893,34 @@ function App() {
                 ? String(enquiry.price)
                 : "",
             quoteAmount:
-              typeof quote.grandTotal === "number"
-                ? quote.grandTotal.toFixed(2)
-                : typeof quote.legalTotalInclVat === "number"
-                ? quote.legalTotalInclVat.toFixed(2)
-                : "",
+  typeof quote.grandTotal === "number"
+    ? quote.grandTotal.toFixed(2)
+    : "",
             quoteReference: enquiry.reference || "",
             feeBreakdown: buildFeeBreakdown(quote),
             nextSteps: defaultApprovedNextSteps,
             quoteData: {
-              legalFees: Array.isArray(quote.legalFeeItems)
-                ? quote.legalFeeItems.map((item) => ({
-                    label: item.label,
-                    amount: Number(item.amount || 0),
-                    note: item.note,
-                  }))
-                : [],
-              disbursements: Array.isArray(quote.disbursementItems)
-                ? quote.disbursementItems.map((item) => ({
-                    label: item.label,
-                    amount: Number(item.amount || 0),
-                    note: item.note,
-                  }))
-                : [],
-              vat: typeof quote.vatAmount === "number" ? quote.vatAmount : 0,
-            },
+  legalFees: Array.isArray(quote.legalFees)
+    ? quote.legalFees.map((item) => ({
+        label: item.label,
+        amount: Number(item.amount || 0),
+        note: item.note,
+      }))
+    : [],
+  disbursements: Array.isArray(quote.disbursements)
+    ? quote.disbursements.map((item) => ({
+        label: item.label,
+        amount: Number(item.amount || 0),
+        note: item.note,
+      }))
+    : [],
+  vat: typeof quote.vat === "number" ? quote.vat : 0,
+},
           });
 
-          if (typeof quote.legalFeeTotalExVat === "number") {
-            setVatCalculatorNet(quote.legalFeeTotalExVat.toFixed(2));
-          }
+          if (typeof quote.legalFeesExVat === "number") {
+  setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
+}
         } else {
           setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
         }
