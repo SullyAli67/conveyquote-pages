@@ -31,8 +31,8 @@ export async function onRequestPost(context) {
         ? "Sale & Purchase"
         : type === "remortgage"
         ? "Remortgage"
-        : type === "remortgage_purchase"
-        ? "Remortgage & Purchase"
+        : type === "remortgage_transfer"
+        ? "Remortgage & Transfer of Equity"
         : type === "transfer"
         ? "Transfer of Equity"
         : "Conveyancing Matter";
@@ -99,13 +99,24 @@ export async function onRequestPost(context) {
 
     const row = (label, value) => `
       <tr>
-        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;vertical-align:top;">
           ${escapeHtml(label)}
         </td>
-        <td style="padding:10px 12px;border:1px solid #d9d9d9;">
+        <td style="padding:10px 12px;border:1px solid #d9d9d9;vertical-align:top;">
           ${value}
         </td>
       </tr>
+    `;
+
+    const sectionTable = (title, rows) => `
+      <div style="margin-bottom:24px;">
+        <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">${escapeHtml(
+          title
+        )}</h2>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+          ${rows.join("")}
+        </table>
+      </div>
     `;
 
     const buildRowsHtml = (items = []) =>
@@ -276,6 +287,36 @@ export async function onRequestPost(context) {
         `
         : "";
 
+    let transactionSummaryHtml = "";
+
+    if (type === "sale_purchase") {
+      const parts = safe(price).split("|").map((part) => part.trim());
+      const salePart = parts[0] || "";
+      const purchasePart = parts[1] || "";
+
+      transactionSummaryHtml = sectionTable("Transaction Summary", [
+        row("Type", escapeHtml(prettyType)),
+        row("Sale summary", escapeHtml(salePart || "Not provided")),
+        row("Purchase summary", escapeHtml(purchasePart || "Not provided")),
+        row("Tenure summary", escapeHtml(displayTenure || "Not provided")),
+      ]);
+    } else if (type === "remortgage_transfer") {
+      transactionSummaryHtml = sectionTable("Transaction Summary", [
+        row("Type", escapeHtml(prettyType)),
+        row("Property / value", `£${escapeHtml(displayPrice || "0.00")}`),
+        row("Tenure", escapeHtml(displayTenure || "Not provided")),
+      ]);
+    } else {
+      transactionSummaryHtml = sectionTable("Transaction Summary", [
+        row("Type", escapeHtml(prettyType)),
+        row("Tenure", escapeHtml(displayTenure || "Not provided")),
+        row(
+          "Property Price / Value",
+          `£${escapeHtml(displayPrice || "0.00")}`
+        ),
+      ]);
+    }
+
     const clientHtml = `
       <html>
         <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#222;">
@@ -349,12 +390,7 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:0 28px 0 28px;">
-                            <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Transaction Summary</h2>
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-bottom:24px;">
-                              ${row("Type", escapeHtml(prettyType))}
-                              ${row("Tenure", escapeHtml(displayTenure))}
-                              ${row("Property Price / Value", `£${escapeHtml(displayPrice)}`)}
-                            </table>
+                            ${transactionSummaryHtml}
                           </td>
                         </tr>
 
