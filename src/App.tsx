@@ -24,6 +24,7 @@ type QuoteForm = {
   saleMortgage: string;
   managementCompany: string;
   tenanted: string;
+  numberOfSellers: string;
 
   currentLender: string;
   newLender: string;
@@ -104,6 +105,7 @@ const initialFormState: QuoteForm = {
   saleMortgage: "",
   managementCompany: "",
   tenanted: "",
+  numberOfSellers: "",
 
   currentLender: "",
   newLender: "",
@@ -218,7 +220,7 @@ function App() {
     }
   };
 
-    const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
+  const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
     const built = buildQuoteData({
       type: enquiry.transaction_type || "",
       tenure: enquiry.tenure || "",
@@ -255,11 +257,11 @@ function App() {
       },
     };
   };
-  
+
   const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-        const payload = {
+    const payload = {
       name: approvedQuote.clientName,
       email: approvedQuote.clientEmail,
       type: approvedQuote.transactionType,
@@ -271,6 +273,7 @@ function App() {
       nextSteps: approvedQuote.nextSteps,
       quoteData: approvedQuote.quoteData,
     };
+
     try {
       const response = await fetch("/api/send-approved-quote", {
         method: "POST",
@@ -388,7 +391,7 @@ function App() {
         const enquiry: LoadedEnquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
-            if (quote) {
+        if (quote) {
           setApprovedQuote({
             clientName: enquiry.client_name || "",
             clientEmail: enquiry.client_email || "",
@@ -850,6 +853,24 @@ function App() {
                           <option value="">Please select</option>
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="numberOfSellers">
+                          How many sellers?
+                        </label>
+                        <select
+                          id="numberOfSellers"
+                          name="numberOfSellers"
+                          value={form.numberOfSellers}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="1">1 seller</option>
+                          <option value="2">2 sellers</option>
+                          <option value="3">3 or more sellers</option>
                         </select>
                       </div>
 
