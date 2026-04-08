@@ -25,13 +25,14 @@ type QuoteLineItem = {
 type LoadedQuote = {
   breakdownText?: string;
   disclaimerLines?: string[];
-  legalFeeItems?: QuoteLineItem[];
-  legalFeeTotalExVat?: number;
-  vatAmount?: number;
+  legalFees?: QuoteLineItem[];
+  legalFeesExVat?: number;
+  vat?: number;
   legalTotalInclVat?: number;
-  disbursementItems?: QuoteLineItem[];
+  disbursements?: QuoteLineItem[];
   disbursementTotal?: number;
   grandTotal?: number;
+  feeBreakdown?: string;
 };
 
 type SummaryRow = {
@@ -875,23 +876,23 @@ if (typeof quote.vat === "number") {
             clientEmail: enquiry.client_email || "",
             transactionType: enquiry.transaction_type || "",
             tenure:
-              enquiry.transaction_type === "sale_purchase"
-                ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
-                    enquiry.purchase_tenure
-                  )}`
-                : enquiry.transaction_type === "remortgage_transfer"
-                ? prettifyValue(enquiry.remortgage_transfer_tenure)
-                : enquiry.tenure || "",
+  enquiry.transaction_type === "sale_purchase"
+    ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
+        enquiry.purchase_tenure
+      )}`
+    : enquiry.transaction_type === "remortgage_transfer"
+    ? prettifyValue(enquiry.remortgage_transfer_tenure)
+    : prettifyValue(enquiry.tenure),
             propertyPrice:
-              enquiry.transaction_type === "sale_purchase"
-                ? `Sale ${formatMoney(
-                    enquiry.sale_price
-                  )} | Purchase ${formatMoney(enquiry.purchase_price)}`
-                : enquiry.transaction_type === "remortgage_transfer"
-                ? formatMoney(enquiry.remortgage_transfer_price)
-                : enquiry.price
-                ? String(enquiry.price)
-                : "",
+  enquiry.transaction_type === "sale_purchase"
+    ? `Sale ${formatMoney(
+        enquiry.sale_price
+      )} | Purchase ${formatMoney(enquiry.purchase_price)}`
+    : enquiry.transaction_type === "remortgage_transfer"
+    ? formatMoney(enquiry.remortgage_transfer_price)
+    : enquiry.price
+    ? formatMoney(enquiry.price)
+    : "",
             quoteAmount:
   typeof quote.grandTotal === "number"
     ? quote.grandTotal.toFixed(2)
