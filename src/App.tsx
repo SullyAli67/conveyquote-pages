@@ -4,6 +4,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
@@ -324,77 +325,36 @@ function SummaryCard({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="card" style={{ padding: "20px" }}>
+    <div className="card admin-card-tight">
       <h3 style={{ marginTop: 0, marginBottom: "14px" }}>{title}</h3>
       {children}
     </div>
   );
 }
 
-function SummaryGrid({
-  rows,
-}: {
-  rows: SummaryRow[];
-}) {
+function SummaryGrid({ rows }: { rows: SummaryRow[] }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-        gap: "12px",
-      }}
-    >
+    <div className="summary-grid">
       {rows.map((row) => (
-        <div
-          key={`${row.label}-${row.value}`}
-          style={{
-            border: "1px solid #d9e2ec",
-            borderRadius: "12px",
-            padding: "12px 14px",
-            background: "#f8fafc",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "12px",
-              textTransform: "uppercase",
-              letterSpacing: "0.4px",
-              color: "#6b7280",
-              marginBottom: "6px",
-            }}
-          >
-            {row.label}
-          </div>
-          <div style={{ fontWeight: 700, color: "#0f2747" }}>{row.value}</div>
+        <div key={`${row.label}-${row.value}`} className="summary-stat">
+          <div className="summary-stat__label">{row.label}</div>
+          <div className="summary-stat__value">{row.value}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function DetailTable({
-  rows,
-}: {
-  rows: SummaryRow[];
-}) {
+function DetailTable({ rows }: { rows: SummaryRow[] }) {
   return (
-    <div style={{ display: "grid", gap: "10px" }}>
+    <div className="detail-table">
       {rows.map((row) => (
-        <div
-          key={`${row.label}-${row.value}`}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "220px 1fr",
-            gap: "12px",
-            paddingBottom: "10px",
-            borderBottom: "1px solid #eef2f7",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "#0f2747" }}>{row.label}</div>
-          <div style={{ color: "#334155" }}>{row.value}</div>
+        <div key={`${row.label}-${row.value}`} className="detail-row">
+          <div className="detail-row__label">{row.label}</div>
+          <div className="detail-row__value">{row.value}</div>
         </div>
       ))}
     </div>
@@ -409,7 +369,6 @@ function App() {
 
   const [adminPasscode, setAdminPasscode] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [adminReference, setAdminReference] = useState("");
   const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
@@ -573,7 +532,6 @@ function App() {
       if (result.success) {
         alert("Approved client quote sent successfully.");
         setApprovedQuote(initialApprovedQuoteState);
-        setAdminReference("");
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -727,7 +685,6 @@ function App() {
         setSdltIsCompany(enquiry.is_company || "no");
         setSdltSharedOwnership(enquiry.shared_ownership || "no");
 
-        setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
         setLoadedEnquiryMessage(result.error || "Could not load enquiry.");
@@ -852,9 +809,15 @@ function App() {
       );
 
       return [
-        { label: "Buyer type", value: prettifyValue(loadedEnquiry.ownership_type) },
+        {
+          label: "Buyer type",
+          value: prettifyValue(loadedEnquiry.ownership_type),
+        },
         { label: "Number of buyers", value: String(buyerCount) },
-        { label: "Mortgage or cash", value: prettifyValue(loadedEnquiry.mortgage) },
+        {
+          label: "Mortgage or cash",
+          value: prettifyValue(loadedEnquiry.mortgage),
+        },
         {
           label: "First time buyer",
           value: prettifyValue(loadedEnquiry.first_time_buyer),
@@ -867,8 +830,14 @@ function App() {
           label: "UK resident for SDLT",
           value: prettifyValue(loadedEnquiry.uk_resident_for_sdlt),
         },
-        { label: "Buy to let", value: prettifyValue(loadedEnquiry.buy_to_let) },
-        { label: "New build", value: prettifyValue(loadedEnquiry.new_build) },
+        {
+          label: "Buy to let",
+          value: prettifyValue(loadedEnquiry.buy_to_let),
+        },
+        {
+          label: "New build",
+          value: prettifyValue(loadedEnquiry.new_build),
+        },
         {
           label: "Shared ownership",
           value: prettifyValue(loadedEnquiry.shared_ownership),
@@ -1585,14 +1554,7 @@ function App() {
                     </div>
 
                     <div className="form-footer">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: "10px",
-                          marginBottom: "14px",
-                        }}
-                      >
+                      <div className="inline-checkbox">
                         <input
                           id="consentToPanel"
                           type="checkbox"
@@ -1600,12 +1562,8 @@ function App() {
                           checked={form.consentToPanel}
                           onChange={handleChange}
                           required
-                          style={{ marginTop: "4px" }}
                         />
-                        <label
-                          htmlFor="consentToPanel"
-                          style={{ margin: 0, fontWeight: 400 }}
-                        >
+                        <label htmlFor="consentToPanel">
                           I agree that the information I provide may be used to
                           prepare my quote, contact me about my enquiry, and be
                           passed to one or more selected panel solicitor firms
@@ -1723,7 +1681,7 @@ function App() {
               </div>
 
               {loadedEnquiry && (
-                <div style={{ display: "grid", gap: "20px", marginBottom: "20px" }}>
+                <div className="admin-stack" style={{ marginBottom: "20px" }}>
                   <SummaryCard title="Loaded Enquiry Snapshot">
                     <SummaryGrid rows={enquirySummaryRows} />
                   </SummaryCard>
@@ -1738,13 +1696,7 @@ function App() {
                     <SummaryGrid rows={quoteSummaryRows} />
                   </SummaryCard>
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                      gap: "20px",
-                    }}
-                  >
+                  <div className="admin-two-col">
                     <SummaryCard title="VAT Calculator">
                       <div className="form-grid">
                         <div className="field field--full">
@@ -1786,11 +1738,15 @@ function App() {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltFirstTimeBuyer">First time buyer?</label>
+                          <label htmlFor="sdltFirstTimeBuyer">
+                            First time buyer?
+                          </label>
                           <select
                             id="sdltFirstTimeBuyer"
                             value={sdltFirstTimeBuyer}
-                            onChange={(e) => setSdltFirstTimeBuyer(e.target.value)}
+                            onChange={(e) =>
+                              setSdltFirstTimeBuyer(e.target.value)
+                            }
                           >
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
@@ -1826,7 +1782,9 @@ function App() {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltIsCompany">Buying via company?</label>
+                          <label htmlFor="sdltIsCompany">
+                            Buying via company?
+                          </label>
                           <select
                             id="sdltIsCompany"
                             value={sdltIsCompany}
@@ -1844,7 +1802,9 @@ function App() {
                           <select
                             id="sdltSharedOwnership"
                             value={sdltSharedOwnership}
-                            onChange={(e) => setSdltSharedOwnership(e.target.value)}
+                            onChange={(e) =>
+                              setSdltSharedOwnership(e.target.value)
+                            }
                           >
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
@@ -1993,30 +1953,17 @@ function App() {
                   </div>
                 </div>
 
-                <div
-                  className="form-footer"
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <p className="form-note" style={{ flex: "1 1 100%" }}>
+                <div className="form-footer action-row">
+                  <p className="form-note">
                     Internal tool only. This sends the approved client-facing
                     quote email.
                   </p>
 
                   <button
                     type="button"
-                    className="primary-button"
-                    style={{
-                      background:
-                        "linear-gradient(90deg, #6b7280 0%, #4b5563 100%)",
-                    }}
+                    className="primary-button muted-button"
                     onClick={() => {
                       setApprovedQuote(initialApprovedQuoteState);
-                      setAdminReference("");
                       setLoadedEnquiryMessage("");
                       setLoadedEnquiry(null);
                     }}
