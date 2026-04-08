@@ -27,8 +27,12 @@ export async function onRequestPost(context) {
         ? "Purchase"
         : type === "sale"
         ? "Sale"
+        : type === "sale_purchase"
+        ? "Sale & Purchase"
         : type === "remortgage"
         ? "Remortgage"
+        : type === "remortgage_purchase"
+        ? "Remortgage & Purchase"
         : type === "transfer"
         ? "Transfer of Equity"
         : "Conveyancing Matter";
@@ -137,134 +141,15 @@ export async function onRequestPost(context) {
         })
         .join("");
 
-    const parseFeeBreakdownFallback = (text) => {
-      const lines = safe(text)
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      const sections = {
-        legalFees: [],
-        disbursements: [],
-        totalEstimatedCost: null,
-      };
-
-      let currentSection = "legalFees";
-
-      for (const line of lines) {
-        const upper = line.toUpperCase();
-
-        if (upper === "LEGAL FEES") {
-          currentSection = "legalFees";
-          continue;
-        }
-
-        if (upper === "DISBURSEMENTS") {
-          currentSection = "disbursements";
-          continue;
-        }
-
-        if (upper === "TOTAL ESTIMATED COST") {
-          currentSection = "total";
-          continue;
-        }
-
-        const colonIndex = line.indexOf(":");
-        if (colonIndex === -1) continue;
-
-        const label = line.slice(0, colonIndex).trim();
-        const rawValue = line.slice(colonIndex + 1).trim();
-        const amount = Number(cleanMoney(rawValue) || 0);
-
-        if (/total estimated cost/i.test(label) || currentSection === "total") {
-          sections.totalEstimatedCost = amount;
-          continue;
-        }
-
-        if (currentSection === "disbursements") {
-          sections.disbursements.push({
-            label,
-            amount,
-            isTotal: /total/i.test(label),
-          });
-        } else {
-          sections.legalFees.push({
-            label,
-            amount,
-            isTotal: /total/i.test(label),
-          });
-        }
-      }
-
-      return sections;
-    };
-
-    const defaultQuoteData = {
-      legalFees: [],
-      disbursements: [],
-      vat: 0,
-    };
-
-    let finalQuoteData = {
-      ...defaultQuoteData,
-      ...(quoteData || {}),
-    };
-
-    let derivedQuoteAmount = quoteAmount;
-
-    const hasStructuredQuoteData =
-      quoteData &&
-      (Array.isArray(quoteData.legalFees) ||
-        Array.isArray(quoteData.disbursements) ||
-        quoteData.vat !== undefined);
-
-    if (!hasStructuredQuoteData && feeBreakdown) {
-      const parsed = parseFeeBreakdownFallback(feeBreakdown);
-
-      const legalFeesWithoutVatOrTotal = parsed.legalFees.filter(
-        (item) =>
-          !/^(vat|total legal fees including vat)$/i.test(item.label || "")
-      );
-
-      const vatRow = parsed.legalFees.find((item) =>
-        /^vat$/i.test(item.label || "")
-      );
-
-      const totalLegalFeesRow = parsed.legalFees.find((item) =>
-        /^total legal fees including vat$/i.test(item.label || "")
-      );
-
-      const disbursementsWithoutTotal = parsed.disbursements.filter(
-        (item) => !/^total disbursements$/i.test(item.label || "")
-      );
-
-      finalQuoteData = {
-        legalFees: legalFeesWithoutVatOrTotal,
-        disbursements: disbursementsWithoutTotal,
-        vat: vatRow ? Number(vatRow.amount || 0) : 0,
-      };
-
-      if (!derivedQuoteAmount && parsed.totalEstimatedCost !== null) {
-        derivedQuoteAmount = String(parsed.totalEstimatedCost);
-      }
-
-      if (!derivedQuoteAmount && totalLegalFeesRow) {
-        const derivedTotal =
-          Number(totalLegalFeesRow.amount || 0) +
-          sumItems(disbursementsWithoutTotal);
-        derivedQuoteAmount = String(derivedTotal);
-      }
-    }
-
-    const legalFees = Array.isArray(finalQuoteData.legalFees)
-      ? finalQuoteData.legalFees
+    const legalFees = Array.isArray(quoteData?.legalFees)
+      ? quoteData.legalFees
       : [];
 
-    const disbursements = Array.isArray(finalQuoteData.disbursements)
-      ? finalQuoteData.disbursements
+    const disbursements = Array.isArray(quoteData?.disbursements)
+      ? quoteData.disbursements
       : [];
 
-    const vatAmount = Number(finalQuoteData.vat || 0);
+    const vatAmount = Number(quoteData?.vat || 0);
 
     const legalFeesSubtotal = sumItems(legalFees);
     const legalFeesTotal = legalFeesSubtotal + vatAmount;
@@ -272,8 +157,8 @@ export async function onRequestPost(context) {
     const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
 
     const finalQuoteAmountValue =
-      derivedQuoteAmount && !Number.isNaN(Number(cleanMoney(derivedQuoteAmount)))
-        ? Number(cleanMoney(derivedQuoteAmount))
+      quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
+        ? Number(cleanMoney(quoteAmount))
         : calculatedGrandTotal;
 
     const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
