@@ -90,6 +90,8 @@ function normaliseEnquiry(enquiry) {
     management_company:
       enquiry.management_company ?? enquiry.managementCompany ?? "",
     tenanted: enquiry.tenanted ?? "",
+    number_of_sellers:
+      enquiry.number_of_sellers ?? enquiry.numberOfSellers ?? "",
 
     current_lender: enquiry.current_lender ?? enquiry.currentLender ?? "",
     new_lender: enquiry.new_lender ?? enquiry.newLender ?? "",
@@ -321,6 +323,12 @@ function getBuyerCount(enquiry) {
   return 1;
 }
 
+function getSellerCount(enquiry) {
+  if (enquiry.number_of_sellers === "2") return 2;
+  if (enquiry.number_of_sellers === "3") return 3;
+  return 1;
+}
+
 function calculateDisbursements(enquiry) {
   const price = toNumber(enquiry.price);
   const disbursementItems = [];
@@ -338,9 +346,17 @@ function calculateDisbursements(enquiry) {
     );
 
     const buyerCount = getBuyerCount(enquiry);
-    addItem(disbursementItems, "ID checks", 14.4 * buyerCount);
+    addItem(
+      disbursementItems,
+      `ID checks (${buyerCount} buyer${buyerCount > 1 ? "s" : ""})`,
+      14.4 * buyerCount
+    );
     addItem(disbursementItems, "OS1 priority search", 8.8);
-    addItem(disbursementItems, "Bankruptcy searches (K16)", 7.6 * buyerCount);
+    addItem(
+      disbursementItems,
+      `Bankruptcy searches (K16) (${buyerCount} name${buyerCount > 1 ? "s" : ""})`,
+      7.6 * buyerCount
+    );
     addItem(disbursementItems, "SDLT submission fee", 6);
     addItem(disbursementItems, "AP1 submission fee", 6);
 
@@ -368,8 +384,14 @@ function calculateDisbursements(enquiry) {
   }
 
   if (enquiry.transaction_type === "sale") {
+    const sellerCount = getSellerCount(enquiry);
+
     addItem(disbursementItems, "Office copy entries", 12);
-    addItem(disbursementItems, "ID checks", 14.4);
+    addItem(
+      disbursementItems,
+      `ID checks (${sellerCount} seller${sellerCount > 1 ? "s" : ""})`,
+      14.4 * sellerCount
+    );
   }
 
   if (enquiry.transaction_type === "remortgage") {
