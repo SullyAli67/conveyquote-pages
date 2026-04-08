@@ -64,8 +64,46 @@ const getSellerCount = (value?: string) => {
   return 1;
 };
 
+function buildFeeBreakdownFromItems(
+  legalFees: QuoteItem[],
+  disbursements: QuoteItem[],
+  vat: number,
+  legalTotalInclVat: number,
+  disbursementTotal: number,
+  grandTotal: number,
+  heading?: string
+) {
+  const lines: string[] = [];
+
+  if (heading) {
+    lines.push(heading);
+    lines.push("");
+  }
+
+  lines.push("LEGAL FEES");
+  legalFees.forEach((item) => {
+    lines.push(`${item.label}: £${formatMoney(item.amount)}`);
+  });
+  lines.push(`VAT: £${formatMoney(vat)}`);
+  lines.push(
+    `Total legal fees including VAT: £${formatMoney(legalTotalInclVat)}`
+  );
+
+  lines.push("");
+  lines.push("DISBURSEMENTS");
+  disbursements.forEach((item) => {
+    lines.push(`${item.label}: £${formatMoney(item.amount)}`);
+  });
+  lines.push(`Total disbursements: £${formatMoney(disbursementTotal)}`);
+
+  lines.push("");
+  lines.push(`TOTAL ESTIMATED COST: £${formatMoney(grandTotal)}`);
+
+  return lines.join("\n");
+}
+
 /**
- * 🔹 CORE SINGLE TRANSACTION BUILDER
+ * SINGLE TRANSACTION BUILDER
  */
 function buildSingleQuote(
   form: QuoteFormLike,
@@ -77,7 +115,6 @@ function buildSingleQuote(
   const legalFees: QuoteItem[] = [];
   const disbursements: QuoteItem[] = [];
 
-  // ===== SALE =====
   if (type === "sale") {
     const config = PRICE_CONFIG.sale;
     const sellerCount = getSellerCount(form.numberOfSellers);
@@ -123,14 +160,9 @@ function buildSingleQuote(
       config.disbursements.officeCopyEntries
     );
 
-    addItem(
-      disbursements,
-      `ID checks (${sellerCount})`,
-      idCheckAmount
-    );
+    addItem(disbursements, `ID checks (${sellerCount})`, idCheckAmount);
   }
 
-  // ===== PURCHASE =====
   if (type === "purchase") {
     const config = PRICE_CONFIG.purchase;
 
@@ -161,11 +193,7 @@ function buildSingleQuote(
     }
 
     if (yes(form.newBuild)) {
-      addItem(
-        legalFees,
-        "New build",
-        config.legalFees.newBuildSupplement
-      );
+      addItem(legalFees, "New build", config.legalFees.newBuildSupplement);
     }
 
     if (yes(form.sharedOwnership)) {
@@ -177,11 +205,7 @@ function buildSingleQuote(
     }
 
     if (yes(form.helpToBuy)) {
-      addItem(
-        legalFees,
-        "Help to Buy",
-        config.legalFees.helpToBuySupplement
-      );
+      addItem(legalFees, "Help to Buy", config.legalFees.helpToBuySupplement);
     }
 
     if (yes(form.isCompany)) {
@@ -193,11 +217,7 @@ function buildSingleQuote(
     }
 
     if (yes(form.buyToLet)) {
-      addItem(
-        legalFees,
-        "Buy to let",
-        config.legalFees.buyToLetSupplement
-      );
+      addItem(legalFees, "Buy to let", config.legalFees.buyToLetSupplement);
     }
 
     addItem(disbursements, "Search pack", config.disbursements.searchPack);
@@ -229,7 +249,6 @@ function buildSingleQuote(
     );
   }
 
-  // ===== REMORTGAGE =====
   if (type === "remortgage") {
     const config = PRICE_CONFIG.remortgage;
 
@@ -259,16 +278,81 @@ function buildSingleQuote(
       );
     }
 
-    addItem(disbursements, "Office copy", config.disbursements.officeCopyEntries);
+    addItem(
+      disbursements,
+      "Office copy entries",
+      config.disbursements.officeCopyEntries
+    );
     addItem(disbursements, "ID checks", config.disbursements.idChecks);
+    addItem(
+      disbursements,
+      "OS1 search",
+      config.disbursements.os1PrioritySearch
+    );
+    addItem(
+      disbursements,
+      "Bankruptcy search",
+      config.disbursements.bankruptcySearchPerName
+    );
+    addItem(
+      disbursements,
+      "AP1 submission",
+      config.disbursements.ap1SubmissionFee
+    );
   }
 
-  // ===== TOTALS =====
+  if (type === "transfer") {
+    const config = PRICE_CONFIG.transfer;
+
+    addItem(legalFees, "Transfer legal fee", config.legalFees.baseLegalFee);
+
+    if (tenure === "leasehold") {
+      addItem(
+        legalFees,
+        "Leasehold supplement",
+        config.legalFees.leaseholdSupplement
+      );
+    }
+
+    if (yes(form.transferMortgage)) {
+      addItem(
+        legalFees,
+        "Mortgage supplement",
+        config.legalFees.mortgageSupplement
+      );
+    }
+
+    if (form.ownersChanging === "two" || form.ownersChanging === "more") {
+      addItem(
+        legalFees,
+        "Additional owner change",
+        config.legalFees.additionalOwnerChangeSupplement
+      );
+    }
+
+    addItem(
+      disbursements,
+      "Office copy entries",
+      config.disbursements.officeCopyEntries
+    );
+    addItem(disbursements, "ID checks", config.disbursements.idChecks);
+    addItem(
+      disbursements,
+      "Bankruptcy search",
+      config.disbursements.bankruptcySearchPerName
+    );
+    addItem(
+      disbursements,
+      "AP1 submission",
+      config.disbursements.ap1SubmissionFee
+    );
+  }
+
   const legalFeesExVat = sumItems(legalFees);
   const vat = Number((legalFeesExVat * VAT_RATE).toFixed(2));
-  const legalTotalInclVat = legalFeesExVat + vat;
-  const disbursementTotal = sumItems(disbursements);
-  const grandTotal = legalTotalInclVat + disbursementTotal;
+  const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
+  const disbursementTotal = Number(sumItems(disbursements).toFixed(2));
+  const grandTotal = Number((legalTotalInclVat + disbursementTotal).toFixed(2));
 
   return {
     legalFees,
@@ -278,80 +362,43 @@ function buildSingleQuote(
     legalTotalInclVat,
     disbursementTotal,
     grandTotal,
-    feeBreakdown: "",
+    feeBreakdown: buildFeeBreakdownFromItems(
+      legalFees,
+      disbursements,
+      vat,
+      legalTotalInclVat,
+      disbursementTotal,
+      grandTotal
+    ),
   };
 }
 
-/**
- * 🔥 MAIN ENTRY — SUPPORTS COMBINATIONS
- */
-export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
-  const type = form.type as TransactionType;
-
-  // ===== COMBINED: SALE + PURCHASE =====
-  if (type === "sale_purchase") {
-    const sale = buildSingleQuote(form, "sale");
-    const purchase = buildSingleQuote(form, "purchase");
-
-    return mergeQuotes("SALE & PURCHASE", sale, purchase);
-  }
-
-  // ===== COMBINED: REMORTGAGE + PURCHASE =====
-  if (type === "remortgage_purchase") {
-    const remortgage = buildSingleQuote(form, "remortgage");
-    const purchase = buildSingleQuote(form, "purchase");
-
-    return mergeQuotes("REMORTGAGE & PURCHASE", remortgage, purchase);
-  }
-
-  // ===== NORMAL =====
-  return buildSingleQuote(form);
-}
-
-/**
- * 🔥 MERGE LOGIC (THIS IS THE MAGIC)
- */
 function mergeQuotes(
   title: string,
   a: BuiltQuoteData,
   b: BuiltQuoteData
 ): BuiltQuoteData {
   const legalFees = [...a.legalFees, ...b.legalFees];
-  const disbursements = [...a.disbursements, ...b.disbursements];
+
+  const disbursementsMap = new Map<string, number>();
+
+  [...a.disbursements, ...b.disbursements].forEach((item) => {
+    const existing = disbursementsMap.get(item.label) || 0;
+    disbursementsMap.set(item.label, existing + item.amount);
+  });
+
+  const disbursements = Array.from(disbursementsMap.entries()).map(
+    ([label, amount]) => ({
+      label,
+      amount,
+    })
+  );
 
   const legalFeesExVat = sumItems(legalFees);
   const vat = Number((legalFeesExVat * VAT_RATE).toFixed(2));
-  const legalTotalInclVat = legalFeesExVat + vat;
-  const disbursementTotal = sumItems(disbursements);
-  const grandTotal = legalTotalInclVat + disbursementTotal;
-
-  const lines: string[] = [];
-
-  lines.push(title);
-  lines.push("");
-
-  lines.push("LEGAL FEES");
-  legalFees.forEach((i) =>
-    lines.push(`${i.label}: £${formatMoney(i.amount)}`)
-  );
-
-  lines.push(`VAT: £${formatMoney(vat)}`);
-  lines.push(
-    `Total legal fees including VAT: £${formatMoney(legalTotalInclVat)}`
-  );
-
-  lines.push("");
-  lines.push("DISBURSEMENTS");
-  disbursements.forEach((i) =>
-    lines.push(`${i.label}: £${formatMoney(i.amount)}`)
-  );
-
-  lines.push(
-    `Total disbursements: £${formatMoney(disbursementTotal)}`
-  );
-
-  lines.push("");
-  lines.push(`TOTAL ESTIMATED COST: £${formatMoney(grandTotal)}`);
+  const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
+  const disbursementTotal = Number(sumItems(disbursements).toFixed(2));
+  const grandTotal = Number((legalTotalInclVat + disbursementTotal).toFixed(2));
 
   return {
     legalFees,
@@ -361,6 +408,32 @@ function mergeQuotes(
     legalTotalInclVat,
     disbursementTotal,
     grandTotal,
-    feeBreakdown: lines.join("\n"),
+    feeBreakdown: buildFeeBreakdownFromItems(
+      legalFees,
+      disbursements,
+      vat,
+      legalTotalInclVat,
+      disbursementTotal,
+      grandTotal,
+      title
+    ),
   };
+}
+
+export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
+  const type = form.type as TransactionType;
+
+  if (type === "sale_purchase") {
+    const sale = buildSingleQuote(form, "sale");
+    const purchase = buildSingleQuote(form, "purchase");
+    return mergeQuotes("SALE & PURCHASE", sale, purchase);
+  }
+
+  if (type === "remortgage_purchase") {
+    const remortgage = buildSingleQuote(form, "remortgage");
+    const purchase = buildSingleQuote(form, "purchase");
+    return mergeQuotes("REMORTGAGE & PURCHASE", remortgage, purchase);
+  }
+
+  return buildSingleQuote(form);
 }
