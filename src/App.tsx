@@ -47,6 +47,12 @@ type QuoteForm = {
   consentToPanel: boolean;
 };
 
+type QuoteDataItem = {
+  label: string;
+  amount: number;
+  note?: string;
+};
+
 type ApprovedQuoteForm = {
   clientName: string;
   clientEmail: string;
@@ -58,8 +64,8 @@ type ApprovedQuoteForm = {
   feeBreakdown: string;
   nextSteps: string;
   quoteData: {
-    legalFees: { label: string; amount: number; note?: string }[];
-    disbursements: { label: string; amount: number; note?: string }[];
+    legalFees: QuoteDataItem[];
+    disbursements: QuoteDataItem[];
     vat: number;
   };
 };
@@ -502,49 +508,6 @@ function App() {
     };
   };
 
-  const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const payload = {
-      name: approvedQuote.clientName,
-      email: approvedQuote.clientEmail,
-      type: approvedQuote.transactionType,
-      tenure: approvedQuote.tenure,
-      price: approvedQuote.propertyPrice,
-      quoteAmount: approvedQuote.quoteAmount,
-      quoteReference: approvedQuote.quoteReference,
-      feeBreakdown: approvedQuote.feeBreakdown,
-      nextSteps: approvedQuote.nextSteps,
-      quoteData: approvedQuote.quoteData,
-    };
-
-    try {
-      const response = await fetch("/api/send-approved-quote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert("Approved client quote sent successfully.");
-        setApprovedQuote(initialApprovedQuoteState);
-        setLoadedEnquiryMessage("");
-        setLoadedEnquiry(null);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        alert("Sorry, there was a problem sending the approved quote.");
-        console.error("Approved quote send error:", result);
-      }
-    } catch (error) {
-      alert("Sorry, something went wrong while sending the approved quote.");
-      console.error("Approved quote request error:", error);
-    }
-  };
-
   const buildFeeBreakdown = (quote: LoadedQuote | null | undefined) => {
     if (!quote) return "";
 
@@ -616,6 +579,142 @@ function App() {
     }
 
     return lines.join("\n");
+  };
+
+  const rebuildApprovedQuoteFromQuoteData = (
+    quoteData: ApprovedQuoteForm["quoteData"]
+  ) => {
+    const legalFeesExVat = quoteData.legalFees.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+
+    const vat = Number((legalFeesExVat * 0.2).toFixed(2));
+
+    const disbursementTotal = quoteData.disbursements.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+
+    const grandTotal = Number(
+      (legalFeesExVat + vat + disbursementTotal).toFixed(2)
+    );
+
+    const feeBreakdownLines: string[] = [];
+
+    feeBreakdownLines.push("LEGAL FEES");
+    quoteData.legalFees.forEach((item) => {
+      feeBreakdownLines.push(
+        `${item.label}: £${Number(item.amount || 0).toFixed(2)}`
+      );
+    });
+    feeBreakdownLines.push(`VAT: £${vat.toFixed(2)}`);
+    feeBreakdownLines.push(
+      `Total legal fees including VAT: £${(legalFeesExVat + vat).toFixed(2)}`
+    );
+
+    feeBreakdownLines.push("");
+    feeBreakdownLines.push("DISBURSEMENTS");
+    quoteData.disbursements.forEach((item) => {
+      if (item.note) {
+        feeBreakdownLines.push(`${item.label}: ${item.note}`);
+      } else {
+        feeBreakdownLines.push(
+          `${item.label}: £${Number(item.amount || 0).toFixed(2)}`
+        );
+      }
+    });
+    feeBreakdownLines.push(
+      `Total disbursements: £${disbursementTotal.toFixed(2)}`
+    );
+
+    feeBreakdownLines.push("");
+    feeBreakdownLines.push(`TOTAL ESTIMATED COST: £${grandTotal.toFixed(2)}`);
+
+    return {
+      quoteData: {
+        ...quoteData,
+        vat,
+      },
+      quoteAmount: grandTotal.toFixed(2),
+      feeBreakdown: feeBreakdownLines.join("\n"),
+    };
+  };
+
+  const handleQuoteItemAmountChange = (
+    section: "legalFees" | "disbursements",
+    index: number,
+    value: string
+  ) => {
+    const amount = Number(value);
+
+    setApprovedQuote((prev) => {
+      const updatedSection = prev.quoteData[section].map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              amount: Number.isFinite(amount) ? amount : 0,
+            }
+          : item
+      );
+
+      const newQuoteData = {
+        ...prev.quoteData,
+        [section]: updatedSection,
+      };
+
+      const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
+
+      return {
+        ...prev,
+        quoteData: rebuilt.quoteData,
+        quoteAmount: rebuilt.quoteAmount,
+        feeBreakdown: rebuilt.feeBreakdown,
+      };
+    });
+  };
+
+  const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const payload = {
+      name: approvedQuote.clientName,
+      email: approvedQuote.clientEmail,
+      type: approvedQuote.transactionType,
+      tenure: approvedQuote.tenure,
+      price: approvedQuote.propertyPrice,
+      quoteAmount: approvedQuote.quoteAmount,
+      quoteReference: approvedQuote.quoteReference,
+      feeBreakdown: approvedQuote.feeBreakdown,
+      nextSteps: approvedQuote.nextSteps,
+      quoteData: approvedQuote.quoteData,
+    };
+
+    try {
+      const response = await fetch("/api/send-approved-quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert("Approved client quote sent successfully.");
+        setApprovedQuote(initialApprovedQuoteState);
+        setLoadedEnquiryMessage("");
+        setLoadedEnquiry(null);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        alert("Sorry, there was a problem sending the approved quote.");
+        console.error("Approved quote send error:", result);
+      }
+    } catch (error) {
+      alert("Sorry, something went wrong while sending the approved quote.");
+      console.error("Approved quote request error:", error);
+    }
   };
 
   const loadEnquiryByReference = async (reference: string) => {
@@ -1913,7 +2012,7 @@ function App() {
                       type="text"
                       name="quoteAmount"
                       value={approvedQuote.quoteAmount}
-                      onChange={handleApprovedQuoteChange}
+                      readOnly
                       required
                     />
                   </div>
@@ -1928,6 +2027,70 @@ function App() {
                       onChange={handleApprovedQuoteChange}
                       readOnly
                     />
+                  </div>
+
+                  <div className="field field--full">
+                    <label>Legal fee items</label>
+                    <div className="detail-table">
+                      {approvedQuote.quoteData.legalFees.map((item, index) => (
+                        <div
+                          key={`legal-${item.label}-${index}`}
+                          className="detail-row"
+                        >
+                          <div className="detail-row__label">{item.label}</div>
+                          <div className="detail-row__value">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.amount}
+                              onChange={(e) =>
+                                handleQuoteItemAmountChange(
+                                  "legalFees",
+                                  index,
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="field field--full">
+                    <label>Disbursement items</label>
+                    <div className="detail-table">
+                      {approvedQuote.quoteData.disbursements.map(
+                        (item, index) => (
+                          <div
+                            key={`disbursement-${item.label}-${index}`}
+                            className="detail-row"
+                          >
+                            <div className="detail-row__label">
+                              {item.label}
+                            </div>
+                            <div className="detail-row__value">
+                              {item.note ? (
+                                <div>{item.note}</div>
+                              ) : (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.amount}
+                                  onChange={(e) =>
+                                    handleQuoteItemAmountChange(
+                                      "disbursements",
+                                      index,
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
 
                   <div className="field field--full">
@@ -1956,7 +2119,7 @@ function App() {
                 <div className="form-footer action-row">
                   <p className="form-note">
                     Internal tool only. This sends the approved client-facing
-                    quote email.
+                    quote email using the updated approved figures shown above.
                   </p>
 
                   <button
