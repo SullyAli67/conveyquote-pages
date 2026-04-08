@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
     }
 
     const enquiry = await env.DB.prepare(
-      `SELECT * FROM enquiries WHERE reference = ?`
+      `SELECT * FROM enquiries WHERE reference = ? LIMIT 1`
     )
       .bind(reference)
       .first();
@@ -37,13 +37,16 @@ export async function onRequestGet(context) {
         parsedQuote = JSON.parse(enquiry.quote_json);
       } catch (error) {
         console.error("Quote JSON parse error:", error);
+        parsedQuote = null;
       }
     }
+
+    const { quote_json, ...enquiryWithoutRawQuote } = enquiry;
 
     return jsonResponse({
       success: true,
       enquiry: {
-        ...enquiry,
+        ...enquiryWithoutRawQuote,
         quote: parsedQuote,
       },
     });
