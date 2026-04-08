@@ -1,4 +1,10 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
@@ -78,11 +84,45 @@ type LoadedQuote = {
 type LoadedEnquiry = {
   client_name?: string;
   client_email?: string;
+  client_phone?: string;
   transaction_type?: string;
   tenure?: string;
   price?: string | number;
+  postcode?: string;
   reference?: string;
+
+  mortgage?: string;
+  ownership_type?: string;
+  first_time_buyer?: string;
+  new_build?: string;
+  shared_ownership?: string;
+  help_to_buy?: string;
+  is_company?: string;
+  buy_to_let?: string;
+  gifted_deposit?: string;
+  additional_property?: string;
+  uk_resident_for_sdlt?: string;
+
+  sale_mortgage?: string;
+  management_company?: string;
+  tenanted?: string;
+  number_of_sellers?: string;
+
+  current_lender?: string;
+  new_lender?: string;
+  additional_borrowing?: string;
+  remortgage_transfer?: string;
+
+  transfer_mortgage?: string;
+  owners_changing?: string;
+
+  consent_to_panel?: string;
   quote?: LoadedQuote | null;
+};
+
+type SummaryRow = {
+  label: string;
+  value: string;
 };
 
 const initialFormState: QuoteForm = {
@@ -142,6 +182,225 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   },
 };
 
+function toNumber(value: string | number | undefined | null) {
+  const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: string | number | undefined | null) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "Not provided";
+  return `£${num.toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function prettifyValue(value: string | number | boolean | undefined | null) {
+  if (value === null || value === undefined || value === "") {
+    return "Not provided";
+  }
+
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+
+  const str = String(value).trim();
+  if (!str) return "Not provided";
+
+  const lower = str.toLowerCase();
+
+  if (lower === "yes") return "Yes";
+  if (lower === "no") return "No";
+  if (lower === "mortgage") return "Mortgage";
+  if (lower === "cash") return "Cash";
+  if (lower === "joint") return "Joint";
+  if (lower === "individual") return "Individual";
+  if (lower === "company") return "Company";
+  if (lower === "one") return "One owner";
+  if (lower === "two") return "Two owners";
+  if (lower === "more") return "More than two owners";
+  if (str === "1") return "1";
+  if (str === "2") return "2";
+  if (str === "3") return "3 or more";
+
+  return str.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getTransactionLabel(type: string | undefined) {
+  if (type === "purchase") return "Purchase";
+  if (type === "sale") return "Sale";
+  if (type === "remortgage") return "Remortgage";
+  if (type === "transfer") return "Transfer of Equity";
+  return "Not provided";
+}
+
+function getBuyerCountFromOwnershipType(ownershipType?: string) {
+  return ownershipType === "joint" ? 2 : 1;
+}
+
+function getSellerCount(numberOfSellers?: string) {
+  if (numberOfSellers === "2") return 2;
+  if (numberOfSellers === "3") return 3;
+  return 1;
+}
+
+function calculateStandardSdlt(price: number) {
+  let tax = 0;
+
+  if (price > 250000) {
+    tax += (Math.min(price, 925000) - 250000) * 0.05;
+  }
+
+  if (price > 925000) {
+    tax += (Math.min(price, 1500000) - 925000) * 0.1;
+  }
+
+  if (price > 1500000) {
+    tax += (price - 1500000) * 0.12;
+  }
+
+  return Math.max(0, tax);
+}
+
+function calculateFirstTimeBuyerSdlt(price: number) {
+  if (price > 625000) {
+    return calculateStandardSdlt(price);
+  }
+
+  let tax = 0;
+
+  if (price > 425000) {
+    tax += (price - 425000) * 0.05;
+  }
+
+  return Math.max(0, tax);
+}
+
+function calculateAdminSdlt({
+  price,
+  firstTimeBuyer,
+  additionalProperty,
+  ukResidentForSdlt,
+  isCompany,
+  sharedOwnership,
+}: {
+  price: number;
+  firstTimeBuyer: string;
+  additionalProperty: string;
+  ukResidentForSdlt: string;
+  isCompany: string;
+  sharedOwnership: string;
+}) {
+  const manualReview =
+    sharedOwnership === "yes" || isCompany === "yes" || price <= 0;
+
+  if (manualReview) {
+    return {
+      amount: 0,
+      manualReview: true,
+      note: price <= 0 ? "Enter a valid price" : "Manual review recommended",
+    };
+  }
+
+  const baseTax =
+    firstTimeBuyer === "yes" && additionalProperty !== "yes"
+      ? calculateFirstTimeBuyerSdlt(price)
+      : calculateStandardSdlt(price);
+
+  let surcharge = 0;
+
+  if (additionalProperty === "yes") surcharge += price * 0.05;
+  if (ukResidentForSdlt === "no") surcharge += price * 0.02;
+
+  return {
+    amount: baseTax + surcharge,
+    manualReview: false,
+    note: "",
+  };
+}
+
+function SummaryCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="card" style={{ padding: "20px" }}>
+      <h3 style={{ marginTop: 0, marginBottom: "14px" }}>{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function SummaryGrid({
+  rows,
+}: {
+  rows: SummaryRow[];
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "12px",
+      }}
+    >
+      {rows.map((row) => (
+        <div
+          key={`${row.label}-${row.value}`}
+          style={{
+            border: "1px solid #d9e2ec",
+            borderRadius: "12px",
+            padding: "12px 14px",
+            background: "#f8fafc",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "12px",
+              textTransform: "uppercase",
+              letterSpacing: "0.4px",
+              color: "#6b7280",
+              marginBottom: "6px",
+            }}
+          >
+            {row.label}
+          </div>
+          <div style={{ fontWeight: 700, color: "#0f2747" }}>{row.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetailTable({
+  rows,
+}: {
+  rows: SummaryRow[];
+}) {
+  return (
+    <div style={{ display: "grid", gap: "10px" }}>
+      {rows.map((row) => (
+        <div
+          key={`${row.label}-${row.value}`}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "220px 1fr",
+            gap: "12px",
+            paddingBottom: "10px",
+            borderBottom: "1px solid #eef2f7",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "#0f2747" }}>{row.label}</div>
+          <div style={{ color: "#334155" }}>{row.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [form, setForm] = useState<QuoteForm>(initialFormState);
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
@@ -153,6 +412,17 @@ function App() {
   const [adminReference, setAdminReference] = useState("");
   const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
+  const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
+    null
+  );
+
+  const [vatCalculatorNet, setVatCalculatorNet] = useState("");
+  const [sdltPrice, setSdltPrice] = useState("");
+  const [sdltFirstTimeBuyer, setSdltFirstTimeBuyer] = useState("no");
+  const [sdltAdditionalProperty, setSdltAdditionalProperty] = useState("no");
+  const [sdltUkResident, setSdltUkResident] = useState("yes");
+  const [sdltIsCompany, setSdltIsCompany] = useState("no");
+  const [sdltSharedOwnership, setSdltSharedOwnership] = useState("no");
 
   const ADMIN_PASSCODE = "1212";
 
@@ -220,7 +490,6 @@ function App() {
 
       if (result.success) {
         alert("Thank you. Your enquiry has been submitted for review.");
-        console.log("Internal enquiry email sent:", result);
         setForm(initialFormState);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -239,21 +508,21 @@ function App() {
     const built = buildQuoteData({
       type: enquiry.transaction_type || "",
       tenure: enquiry.tenure || "",
-      mortgage: (enquiry as any).mortgage || "",
-      giftedDeposit: (enquiry as any).gifted_deposit || "",
-      newBuild: (enquiry as any).new_build || "",
-      sharedOwnership: (enquiry as any).shared_ownership || "",
-      helpToBuy: (enquiry as any).help_to_buy || "",
-      isCompany: (enquiry as any).is_company || "",
-      buyToLet: (enquiry as any).buy_to_let || "",
-      saleMortgage: (enquiry as any).sale_mortgage || "",
-      managementCompany: (enquiry as any).management_company || "",
-      tenanted: (enquiry as any).tenanted || "",
-      numberOfSellers: (enquiry as any).number_of_sellers || "",
-      additionalBorrowing: (enquiry as any).additional_borrowing || "",
-      remortgageTransfer: (enquiry as any).remortgage_transfer || "",
-      transferMortgage: (enquiry as any).transfer_mortgage || "",
-      ownersChanging: (enquiry as any).owners_changing || "",
+      mortgage: enquiry.mortgage || "",
+      giftedDeposit: enquiry.gifted_deposit || "",
+      newBuild: enquiry.new_build || "",
+      sharedOwnership: enquiry.shared_ownership || "",
+      helpToBuy: enquiry.help_to_buy || "",
+      isCompany: enquiry.is_company || "",
+      buyToLet: enquiry.buy_to_let || "",
+      saleMortgage: enquiry.sale_mortgage || "",
+      managementCompany: enquiry.management_company || "",
+      tenanted: enquiry.tenanted || "",
+      numberOfSellers: enquiry.number_of_sellers || "",
+      additionalBorrowing: enquiry.additional_borrowing || "",
+      remortgageTransfer: enquiry.remortgage_transfer || "",
+      transferMortgage: enquiry.transfer_mortgage || "",
+      ownersChanging: enquiry.owners_changing || "",
     });
 
     return {
@@ -303,10 +572,10 @@ function App() {
 
       if (result.success) {
         alert("Approved client quote sent successfully.");
-        console.log("Approved quote email sent:", result);
         setApprovedQuote(initialApprovedQuoteState);
         setAdminReference("");
         setLoadedEnquiryMessage("");
+        setLoadedEnquiry(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         alert("Sorry, there was a problem sending the approved quote.");
@@ -407,6 +676,8 @@ function App() {
         const enquiry: LoadedEnquiry = result.enquiry;
         const quote = enquiry.quote || null;
 
+        setLoadedEnquiry(enquiry);
+
         if (quote) {
           setApprovedQuote({
             clientName: enquiry.client_name || "",
@@ -415,9 +686,9 @@ function App() {
             tenure: enquiry.tenure || "",
             propertyPrice: enquiry.price ? String(enquiry.price) : "",
             quoteAmount:
-              typeof quote?.grandTotal === "number"
+              typeof quote.grandTotal === "number"
                 ? quote.grandTotal.toFixed(2)
-                : typeof quote?.legalTotalInclVat === "number"
+                : typeof quote.legalTotalInclVat === "number"
                 ? quote.legalTotalInclVat.toFixed(2)
                 : "",
             quoteReference: enquiry.reference || "",
@@ -432,20 +703,29 @@ function App() {
                   }))
                 : [],
               disbursements: Array.isArray(quote.disbursementItems)
-                ? quote.disbursementItems
-                    .filter((item) => typeof item.amount === "number")
-                    .map((item) => ({
-                      label: item.label,
-                      amount: Number(item.amount || 0),
-                      note: item.note,
-                    }))
+                ? quote.disbursementItems.map((item) => ({
+                    label: item.label,
+                    amount: Number(item.amount || 0),
+                    note: item.note,
+                  }))
                 : [],
               vat: typeof quote.vatAmount === "number" ? quote.vatAmount : 0,
             },
           });
+
+          if (typeof quote.legalFeeTotalExVat === "number") {
+            setVatCalculatorNet(quote.legalFeeTotalExVat.toFixed(2));
+          }
         } else {
           setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
         }
+
+        setSdltPrice(enquiry.price ? String(enquiry.price) : "");
+        setSdltFirstTimeBuyer(enquiry.first_time_buyer || "no");
+        setSdltAdditionalProperty(enquiry.additional_property || "no");
+        setSdltUkResident(enquiry.uk_resident_for_sdlt || "yes");
+        setSdltIsCompany(enquiry.is_company || "no");
+        setSdltSharedOwnership(enquiry.shared_ownership || "no");
 
         setAdminReference(reference);
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
@@ -479,6 +759,217 @@ function App() {
       : form.firstTimeBuyer === "yes"
       ? "First-time buyer relief may apply"
       : "Standard residential SDLT likely";
+
+  const legalFeesExVat = useMemo(
+    () =>
+      approvedQuote.quoteData.legalFees.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      ),
+    [approvedQuote.quoteData.legalFees]
+  );
+
+  const disbursementTotal = useMemo(
+    () =>
+      approvedQuote.quoteData.disbursements.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      ),
+    [approvedQuote.quoteData.disbursements]
+  );
+
+  const vatNet = toNumber(vatCalculatorNet);
+  const vatAmount = vatNet * 0.2;
+  const vatGross = vatNet + vatAmount;
+
+  const sdltResult = useMemo(
+    () =>
+      calculateAdminSdlt({
+        price: toNumber(sdltPrice),
+        firstTimeBuyer: sdltFirstTimeBuyer,
+        additionalProperty: sdltAdditionalProperty,
+        ukResidentForSdlt: sdltUkResident,
+        isCompany: sdltIsCompany,
+        sharedOwnership: sdltSharedOwnership,
+      }),
+    [
+      sdltPrice,
+      sdltFirstTimeBuyer,
+      sdltAdditionalProperty,
+      sdltUkResident,
+      sdltIsCompany,
+      sdltSharedOwnership,
+    ]
+  );
+
+  const enquirySummaryRows: SummaryRow[] = loadedEnquiry
+    ? [
+        {
+          label: "Reference",
+          value: loadedEnquiry.reference || "Not provided",
+        },
+        {
+          label: "Client",
+          value: prettifyValue(loadedEnquiry.client_name),
+        },
+        {
+          label: "Email",
+          value: prettifyValue(loadedEnquiry.client_email),
+        },
+        {
+          label: "Phone",
+          value: prettifyValue(loadedEnquiry.client_phone),
+        },
+        {
+          label: "Transaction",
+          value: getTransactionLabel(loadedEnquiry.transaction_type),
+        },
+        {
+          label: "Tenure",
+          value: prettifyValue(loadedEnquiry.tenure),
+        },
+        {
+          label: "Price / value",
+          value: formatMoney(loadedEnquiry.price),
+        },
+        {
+          label: "Postcode",
+          value: prettifyValue(loadedEnquiry.postcode),
+        },
+        {
+          label: "Consent to panel",
+          value: prettifyValue(loadedEnquiry.consent_to_panel),
+        },
+      ]
+    : [];
+
+  const matterSpecificRows: SummaryRow[] = useMemo(() => {
+    if (!loadedEnquiry) return [];
+
+    if (loadedEnquiry.transaction_type === "purchase") {
+      const buyerCount = getBuyerCountFromOwnershipType(
+        loadedEnquiry.ownership_type
+      );
+
+      return [
+        { label: "Buyer type", value: prettifyValue(loadedEnquiry.ownership_type) },
+        { label: "Number of buyers", value: String(buyerCount) },
+        { label: "Mortgage or cash", value: prettifyValue(loadedEnquiry.mortgage) },
+        {
+          label: "First time buyer",
+          value: prettifyValue(loadedEnquiry.first_time_buyer),
+        },
+        {
+          label: "Additional property",
+          value: prettifyValue(loadedEnquiry.additional_property),
+        },
+        {
+          label: "UK resident for SDLT",
+          value: prettifyValue(loadedEnquiry.uk_resident_for_sdlt),
+        },
+        { label: "Buy to let", value: prettifyValue(loadedEnquiry.buy_to_let) },
+        { label: "New build", value: prettifyValue(loadedEnquiry.new_build) },
+        {
+          label: "Shared ownership",
+          value: prettifyValue(loadedEnquiry.shared_ownership),
+        },
+        {
+          label: "Help to Buy / scheme",
+          value: prettifyValue(loadedEnquiry.help_to_buy),
+        },
+        {
+          label: "Buying via company",
+          value: prettifyValue(loadedEnquiry.is_company),
+        },
+        {
+          label: "Gifted deposit",
+          value: prettifyValue(loadedEnquiry.gifted_deposit),
+        },
+      ];
+    }
+
+    if (loadedEnquiry.transaction_type === "sale") {
+      const sellerCount = getSellerCount(loadedEnquiry.number_of_sellers);
+
+      return [
+        {
+          label: "Number of sellers",
+          value: sellerCount === 3 ? "3 or more" : String(sellerCount),
+        },
+        {
+          label: "Mortgage to redeem",
+          value: prettifyValue(loadedEnquiry.sale_mortgage),
+        },
+        {
+          label: "Management company / service charge",
+          value: prettifyValue(loadedEnquiry.management_company),
+        },
+        {
+          label: "Tenanted",
+          value: prettifyValue(loadedEnquiry.tenanted),
+        },
+      ];
+    }
+
+    if (loadedEnquiry.transaction_type === "remortgage") {
+      return [
+        {
+          label: "Current lender",
+          value: prettifyValue(loadedEnquiry.current_lender),
+        },
+        {
+          label: "New lender",
+          value: prettifyValue(loadedEnquiry.new_lender),
+        },
+        {
+          label: "Additional borrowing",
+          value: prettifyValue(loadedEnquiry.additional_borrowing),
+        },
+        {
+          label: "Transfer of equity at same time",
+          value: prettifyValue(loadedEnquiry.remortgage_transfer),
+        },
+      ];
+    }
+
+    if (loadedEnquiry.transaction_type === "transfer") {
+      return [
+        {
+          label: "Mortgage on property",
+          value: prettifyValue(loadedEnquiry.transfer_mortgage),
+        },
+        {
+          label: "Owners changing",
+          value: prettifyValue(loadedEnquiry.owners_changing),
+        },
+      ];
+    }
+
+    return [];
+  }, [loadedEnquiry]);
+
+  const quoteSummaryRows: SummaryRow[] = [
+    {
+      label: "Legal fees ex VAT",
+      value: formatMoney(legalFeesExVat),
+    },
+    {
+      label: "VAT",
+      value: formatMoney(approvedQuote.quoteData.vat),
+    },
+    {
+      label: "Legal fees inc VAT",
+      value: formatMoney(legalFeesExVat + approvedQuote.quoteData.vat),
+    },
+    {
+      label: "Disbursements",
+      value: formatMoney(disbursementTotal),
+    },
+    {
+      label: "Approved total",
+      value: formatMoney(approvedQuote.quoteAmount),
+    },
+  ];
 
   return (
     <div className="page">
@@ -1201,232 +1692,345 @@ function App() {
         )}
 
         {isAdminPage && isAdminUnlocked && (
-          <section className="card card--form" style={{ marginTop: "24px" }}>
-            <div className="section-heading">
-              <div>
-                <h2>Approve and Send Client Quote</h2>
-                <p>
-                  Internal use only. Review the loaded enquiry, adjust the quote
-                  if needed, and send the client-facing quote email.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
-              {isLoadingEnquiry && (
-                <p className="form-note">Loading enquiry from reference...</p>
-              )}
-
-              {!isLoadingEnquiry && loadedEnquiryMessage && (
-                <p className="form-note">{loadedEnquiryMessage}</p>
-              )}
-
-              {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
-                <p className="form-note">
-                  Admin page unlocked. Ready to load enquiry reference{" "}
-                  {refFromUrl}.
-                </p>
-              )}
-            </div>
-
-            {approvedQuote.quoteReference && (
-              <div
-                className="card"
-                style={{ marginBottom: "20px", padding: "20px" }}
-              >
-                <h3 style={{ marginTop: 0, marginBottom: "12px" }}>
-                  Loaded Enquiry Snapshot
-                </h3>
-                <p style={{ margin: "0 0 8px 0" }}>
-                  <strong>Reference:</strong> {approvedQuote.quoteReference}
-                </p>
-                <p style={{ margin: "0 0 8px 0" }}>
-                  <strong>Client:</strong>{" "}
-                  {approvedQuote.clientName || "Not loaded"}
-                </p>
-                <p style={{ margin: "0 0 8px 0" }}>
-                  <strong>Email:</strong>{" "}
-                  {approvedQuote.clientEmail || "Not loaded"}
-                </p>
-                <p style={{ margin: "0 0 8px 0" }}>
-                  <strong>Transaction:</strong>{" "}
-                  {approvedQuote.transactionType || "Not loaded"}
-                </p>
-                <p style={{ margin: 0 }}>
-                  <strong>Estimate:</strong>{" "}
-                  {approvedQuote.quoteAmount
-                    ? `£${approvedQuote.quoteAmount}`
-                    : "Not loaded"}
-                </p>
-              </div>
-            )}
-
-            <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
-              <div className="form-grid">
-                <div className="field">
-                  <label htmlFor="clientName">Client name</label>
-                  <input
-                    id="clientName"
-                    type="text"
-                    name="clientName"
-                    value={approvedQuote.clientName}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="Client full name"
-                    readOnly
-                    required
-                  />
+          <>
+            <section className="card card--form" style={{ marginTop: "24px" }}>
+              <div className="section-heading">
+                <div>
+                  <h2>Approve and Send Client Quote</h2>
+                  <p>
+                    Internal use only. Review the loaded enquiry, check the
+                    important matter details, use the quick calculators if
+                    needed, and send the client-facing quote email.
+                  </p>
                 </div>
+              </div>
 
-                <div className="field">
-                  <label htmlFor="clientEmail">Client email</label>
-                  <input
-                    id="clientEmail"
-                    type="email"
-                    name="clientEmail"
-                    value={approvedQuote.clientEmail}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="client@example.com"
-                    readOnly
-                    required
-                  />
-                </div>
+              <div style={{ marginBottom: "16px" }}>
+                {isLoadingEnquiry && (
+                  <p className="form-note">Loading enquiry from reference...</p>
+                )}
 
-                <div className="field">
-                  <label htmlFor="transactionType">Transaction type</label>
-                  <select
-                    id="transactionType"
-                    name="transactionType"
-                    value={approvedQuote.transactionType}
-                    onChange={handleApprovedQuoteChange}
-                    disabled
-                    required
+                {!isLoadingEnquiry && loadedEnquiryMessage && (
+                  <p className="form-note">{loadedEnquiryMessage}</p>
+                )}
+
+                {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
+                  <p className="form-note">
+                    Admin page unlocked. Ready to load enquiry reference{" "}
+                    {refFromUrl}.
+                  </p>
+                )}
+              </div>
+
+              {loadedEnquiry && (
+                <div style={{ display: "grid", gap: "20px", marginBottom: "20px" }}>
+                  <SummaryCard title="Loaded Enquiry Snapshot">
+                    <SummaryGrid rows={enquirySummaryRows} />
+                  </SummaryCard>
+
+                  {matterSpecificRows.length > 0 && (
+                    <SummaryCard title="Matter Specific Details">
+                      <DetailTable rows={matterSpecificRows} />
+                    </SummaryCard>
+                  )}
+
+                  <SummaryCard title="Quote Summary">
+                    <SummaryGrid rows={quoteSummaryRows} />
+                  </SummaryCard>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                      gap: "20px",
+                    }}
                   >
-                    <option value="">Please select</option>
-                    <option value="purchase">Purchase</option>
-                    <option value="sale">Sale</option>
-                    <option value="remortgage">Remortgage</option>
-                    <option value="transfer">Transfer of Equity</option>
-                  </select>
+                    <SummaryCard title="VAT Calculator">
+                      <div className="form-grid">
+                        <div className="field field--full">
+                          <label htmlFor="vatCalculatorNet">Net amount (£)</label>
+                          <input
+                            id="vatCalculatorNet"
+                            type="text"
+                            value={vatCalculatorNet}
+                            onChange={(e) => setVatCalculatorNet(e.target.value)}
+                            placeholder="e.g. 1000"
+                          />
+                        </div>
+                      </div>
+
+                      <SummaryGrid
+                        rows={[
+                          {
+                            label: "VAT at 20%",
+                            value: formatMoney(vatAmount),
+                          },
+                          {
+                            label: "Gross total",
+                            value: formatMoney(vatGross),
+                          },
+                        ]}
+                      />
+                    </SummaryCard>
+
+                    <SummaryCard title="SDLT Calculator">
+                      <div className="form-grid">
+                        <div className="field">
+                          <label htmlFor="sdltPrice">Price (£)</label>
+                          <input
+                            id="sdltPrice"
+                            type="text"
+                            value={sdltPrice}
+                            onChange={(e) => setSdltPrice(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="sdltFirstTimeBuyer">First time buyer?</label>
+                          <select
+                            id="sdltFirstTimeBuyer"
+                            value={sdltFirstTimeBuyer}
+                            onChange={(e) => setSdltFirstTimeBuyer(e.target.value)}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="sdltAdditionalProperty">
+                            Additional property?
+                          </label>
+                          <select
+                            id="sdltAdditionalProperty"
+                            value={sdltAdditionalProperty}
+                            onChange={(e) =>
+                              setSdltAdditionalProperty(e.target.value)
+                            }
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="sdltUkResident">UK resident?</label>
+                          <select
+                            id="sdltUkResident"
+                            value={sdltUkResident}
+                            onChange={(e) => setSdltUkResident(e.target.value)}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="sdltIsCompany">Buying via company?</label>
+                          <select
+                            id="sdltIsCompany"
+                            value={sdltIsCompany}
+                            onChange={(e) => setSdltIsCompany(e.target.value)}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="sdltSharedOwnership">
+                            Shared ownership?
+                          </label>
+                          <select
+                            id="sdltSharedOwnership"
+                            value={sdltSharedOwnership}
+                            onChange={(e) => setSdltSharedOwnership(e.target.value)}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <SummaryGrid
+                        rows={[
+                          {
+                            label: sdltResult.manualReview
+                              ? "SDLT status"
+                              : "Estimated SDLT",
+                            value: sdltResult.manualReview
+                              ? sdltResult.note
+                              : formatMoney(sdltResult.amount),
+                          },
+                        ]}
+                      />
+                    </SummaryCard>
+                  </div>
+                </div>
+              )}
+
+              <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="clientName">Client name</label>
+                    <input
+                      id="clientName"
+                      type="text"
+                      name="clientName"
+                      value={approvedQuote.clientName}
+                      onChange={handleApprovedQuoteChange}
+                      readOnly
+                      required
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="clientEmail">Client email</label>
+                    <input
+                      id="clientEmail"
+                      type="email"
+                      name="clientEmail"
+                      value={approvedQuote.clientEmail}
+                      onChange={handleApprovedQuoteChange}
+                      readOnly
+                      required
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="transactionType">Transaction type</label>
+                    <select
+                      id="transactionType"
+                      name="transactionType"
+                      value={approvedQuote.transactionType}
+                      onChange={handleApprovedQuoteChange}
+                      disabled
+                      required
+                    >
+                      <option value="">Please select</option>
+                      <option value="purchase">Purchase</option>
+                      <option value="sale">Sale</option>
+                      <option value="remortgage">Remortgage</option>
+                      <option value="transfer">Transfer of Equity</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="approvedTenure">Tenure</label>
+                    <select
+                      id="approvedTenure"
+                      name="tenure"
+                      value={approvedQuote.tenure}
+                      onChange={handleApprovedQuoteChange}
+                      disabled
+                      required
+                    >
+                      <option value="">Please select</option>
+                      <option value="freehold">Freehold</option>
+                      <option value="leasehold">Leasehold</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="propertyPrice">
+                      Property price / value (£)
+                    </label>
+                    <input
+                      id="propertyPrice"
+                      type="text"
+                      name="propertyPrice"
+                      value={approvedQuote.propertyPrice}
+                      onChange={handleApprovedQuoteChange}
+                      readOnly
+                      required
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="quoteAmount">Approved quote amount</label>
+                    <input
+                      id="quoteAmount"
+                      type="text"
+                      name="quoteAmount"
+                      value={approvedQuote.quoteAmount}
+                      onChange={handleApprovedQuoteChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="field field--full">
+                    <label htmlFor="quoteReference">Quote reference</label>
+                    <input
+                      id="quoteReference"
+                      type="text"
+                      name="quoteReference"
+                      value={approvedQuote.quoteReference}
+                      onChange={handleApprovedQuoteChange}
+                      readOnly
+                    />
+                  </div>
+
+                  <div className="field field--full">
+                    <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
+                    <textarea
+                      id="feeBreakdown"
+                      name="feeBreakdown"
+                      value={approvedQuote.feeBreakdown}
+                      onChange={handleApprovedQuoteChange}
+                      rows={10}
+                    />
+                  </div>
+
+                  <div className="field field--full">
+                    <label htmlFor="nextSteps">Next steps</label>
+                    <textarea
+                      id="nextSteps"
+                      name="nextSteps"
+                      value={approvedQuote.nextSteps}
+                      onChange={handleApprovedQuoteChange}
+                      rows={5}
+                    />
+                  </div>
                 </div>
 
-                <div className="field">
-                  <label htmlFor="approvedTenure">Tenure</label>
-                  <select
-                    id="approvedTenure"
-                    name="tenure"
-                    value={approvedQuote.tenure}
-                    onChange={handleApprovedQuoteChange}
-                    disabled
-                    required
-                  >
-                    <option value="">Please select</option>
-                    <option value="freehold">Freehold</option>
-                    <option value="leasehold">Leasehold</option>
-                  </select>
-                </div>
-
-                <div className="field">
-                  <label htmlFor="propertyPrice">
-                    Property price / value (£)
-                  </label>
-                  <input
-                    id="propertyPrice"
-                    type="text"
-                    name="propertyPrice"
-                    value={approvedQuote.propertyPrice}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="e.g. 325000"
-                    readOnly
-                    required
-                  />
-                </div>
-
-                <div className="field">
-                  <label htmlFor="quoteAmount">Approved quote amount</label>
-                  <input
-                    id="quoteAmount"
-                    type="text"
-                    name="quoteAmount"
-                    value={approvedQuote.quoteAmount}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="e.g. 1450.00"
-                    required
-                  />
-                </div>
-
-                <div className="field field--full">
-                  <label htmlFor="quoteReference">Quote reference</label>
-                  <input
-                    id="quoteReference"
-                    type="text"
-                    name="quoteReference"
-                    value={approvedQuote.quoteReference}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="e.g. CQ-1001"
-                    readOnly
-                  />
-                </div>
-
-                <div className="field field--full">
-                  <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
-                  <textarea
-                    id="feeBreakdown"
-                    name="feeBreakdown"
-                    value={approvedQuote.feeBreakdown}
-                    onChange={handleApprovedQuoteChange}
-                    placeholder="Example: Legal fee estimate for standard sale. Excludes additional work outside the normal scope."
-                    rows={10}
-                  />
-                </div>
-
-                <div className="field field--full">
-                  <label htmlFor="nextSteps">Next steps</label>
-                  <textarea
-                    id="nextSteps"
-                    name="nextSteps"
-                    value={approvedQuote.nextSteps}
-                    onChange={handleApprovedQuoteChange}
-                    rows={5}
-                  />
-                </div>
-              </div>
-
-              <div
-                className="form-footer"
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <p className="form-note" style={{ flex: "1 1 100%" }}>
-                  Internal tool only. This sends the approved client-facing
-                  quote email.
-                </p>
-
-                <button
-                  type="button"
-                  className="primary-button"
+                <div
+                  className="form-footer"
                   style={{
-                    background:
-                      "linear-gradient(90deg, #6b7280 0%, #4b5563 100%)",
-                  }}
-                  onClick={() => {
-                    setApprovedQuote(initialApprovedQuoteState);
-                    setAdminReference("");
-                    setLoadedEnquiryMessage("");
+                    display: "flex",
+                    gap: "12px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
                   }}
                 >
-                  Clear Form
-                </button>
+                  <p className="form-note" style={{ flex: "1 1 100%" }}>
+                    Internal tool only. This sends the approved client-facing
+                    quote email.
+                  </p>
 
-                <button type="submit" className="primary-button">
-                  Send Approved Quote
-                </button>
-              </div>
-            </form>
-          </section>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, #6b7280 0%, #4b5563 100%)",
+                    }}
+                    onClick={() => {
+                      setApprovedQuote(initialApprovedQuoteState);
+                      setAdminReference("");
+                      setLoadedEnquiryMessage("");
+                      setLoadedEnquiry(null);
+                    }}
+                  >
+                    Clear Form
+                  </button>
+
+                  <button type="submit" className="primary-button">
+                    Send Approved Quote
+                  </button>
+                </div>
+              </form>
+            </section>
+          </>
         )}
       </main>
     </div>
