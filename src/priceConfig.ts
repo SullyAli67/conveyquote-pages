@@ -22,7 +22,7 @@ export const PRICE_CONFIG = {
       leaseholdSupplement: 300,
       actingForLenderSupplement: 125,
       telegraphicTransferFee: 45,
-      giftedDepositSupplement: 95,
+      giftedDepositSupplement: 250,
       newBuildSupplement: 200,
       sharedOwnershipSupplement: 250,
       helpToBuySupplement: 200,
