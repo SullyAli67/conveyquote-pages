@@ -832,6 +832,7 @@ function App() {
       price: enquiry.price ? String(enquiry.price) : "",
       tenure: enquiry.tenure || "",
       mortgage: enquiry.mortgage || "",
+      lender: enquiry.lender || "",
       ownershipType: enquiry.ownership_type || "",
       firstTimeBuyer: enquiry.first_time_buyer || "",
       additionalProperty: enquiry.additional_property || "",
@@ -862,6 +863,7 @@ function App() {
       purchasePrice: enquiry.purchase_price ? String(enquiry.purchase_price) : "",
       purchasePostcode: enquiry.purchase_postcode || "",
       purchaseMortgage: enquiry.purchase_mortgage || "",
+      purchaseLender: enquiry.purchase_lender || "",
       purchaseOwnershipType: enquiry.purchase_ownership_type || "",
       purchaseFirstTimeBuyer: enquiry.purchase_first_time_buyer || "",
       purchaseNewBuild: enquiry.purchase_new_build || "",
@@ -996,7 +998,8 @@ function App() {
 
       if (result.success && result.enquiry) {
         const enquiry: LoadedEnquiry = result.enquiry;
-        const quote: LoadedQuote | null = result.adminQuote || enquiry.quote || null;
+        const quote: LoadedQuote | null =
+          result.adminQuote || enquiry.quote || null;
 
         setLoadedEnquiry(enquiry);
 
@@ -1018,7 +1021,9 @@ function App() {
               : [],
             vat: typeof quote.vat === "number" ? quote.vat : 0,
             sdltAmount:
-              typeof quote.sdltAmount === "number" ? quote.sdltAmount : undefined,
+              typeof quote.sdltAmount === "number"
+                ? quote.sdltAmount
+                : undefined,
             sdltNote: quote.sdltNote,
             totalIncludingSdlt:
               typeof quote.totalIncludingSdlt === "number"
@@ -1053,7 +1058,9 @@ function App() {
             quoteAmount: rebuilt.quoteAmount,
             quoteReference: enquiry.reference || "",
             feeBreakdown:
-              quote.feeBreakdown || rebuilt.feeBreakdown || buildFeeBreakdown(quote),
+              quote.feeBreakdown ||
+              rebuilt.feeBreakdown ||
+              buildFeeBreakdown(quote),
             nextSteps: defaultApprovedNextSteps,
             quoteData: rebuilt.quoteData,
           });
@@ -1061,11 +1068,11 @@ function App() {
           if (typeof quote.legalFeesExVat === "number") {
             setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
           } else {
-            const legalFeesExVat = quoteData.legalFees.reduce(
+            const recalculatedLegalFeesExVat = quoteData.legalFees.reduce(
               (sum, item) => sum + Number(item.amount || 0),
               0
             );
-            setVatCalculatorNet(legalFeesExVat.toFixed(2));
+            setVatCalculatorNet(recalculatedLegalFeesExVat.toFixed(2));
           }
         } else {
           setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
@@ -1172,9 +1179,8 @@ function App() {
     [approvedQuote.quoteData.disbursements]
   );
 
-  const vatNet = toNumber(vatCalculatorNet);
-  const vatAmount = vatNet * 0.2;
-  const vatGross = vatNet + vatAmount;
+  const vatAmount = toNumber(vatCalculatorNet) * 0.2;
+  const vatGross = toNumber(vatCalculatorNet) + vatAmount;
 
   const sdltResult = useMemo(
     () =>
@@ -1247,9 +1253,9 @@ function App() {
           value: prettifyValue(loadedEnquiry.mortgage),
         },
         {
-  label: "Lender",
-  value: prettifyValue(loadedEnquiry.lender),
-},
+          label: "Lender",
+          value: prettifyValue(loadedEnquiry.lender),
+        },
         {
           label: "First time buyer",
           value: prettifyValue(loadedEnquiry.first_time_buyer),
@@ -1438,10 +1444,6 @@ function App() {
         {
           label: "Transfer of equity at same time",
           value: prettifyValue(loadedEnquiry.remortgage_transfer),
-        },
-        {
-          label: "Ownership type",
-          value: prettifyValue(loadedEnquiry.ownership_type),
         },
       ];
     }
@@ -1716,19 +1718,22 @@ function App() {
                           <option value="cash">Cash</option>
                         </select>
                       </div>
-          {form.mortgage === "mortgage" && (
-          <div className="field">
-          <label htmlFor="lender">Lender</label>
-          <input
-      id="lender"
-      type="text"
-      name="lender"
-      placeholder="e.g. Nationwide"
-      value={form.lender}
-      onChange={handleChange}
-    />
-  </div>
-)}
+
+                      {form.mortgage === "mortgage" && (
+                        <div className="field">
+                          <label htmlFor="lender">Lender</label>
+                          <input
+                            id="lender"
+                            type="text"
+                            name="lender"
+                            placeholder="e.g. Nationwide"
+                            value={form.lender}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                      )}
+
                       <div className="field">
                         <label htmlFor="ownershipType">Buyer type</label>
                         <select
@@ -1890,7 +1895,12 @@ function App() {
 
                       <div className="field field--full">
                         <label htmlFor="sdltHint">SDLT guidance</label>
-                        <input id="sdltHint" type="text" value={singleSdltHint} readOnly />
+                        <input
+                          id="sdltHint"
+                          type="text"
+                          value={singleSdltHint}
+                          readOnly
+                        />
                       </div>
                     </div>
 
@@ -1910,13 +1920,18 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Sale Details</h2>
-                        <p>These questions help us understand the likely work involved in the sale.</p>
+                        <p>
+                          These questions help us understand the likely work
+                          involved in the sale.
+                        </p>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <div className="field">
-                        <label htmlFor="saleMortgage">Existing mortgage to redeem?</label>
+                        <label htmlFor="saleMortgage">
+                          Existing mortgage to redeem?
+                        </label>
                         <select
                           id="saleMortgage"
                           name="saleMortgage"
@@ -1947,7 +1962,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="numberOfSellers">How many sellers?</label>
+                        <label htmlFor="numberOfSellers">
+                          How many sellers?
+                        </label>
                         <select
                           id="numberOfSellers"
                           name="numberOfSellers"
@@ -1984,7 +2001,9 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Sale Details</h2>
-                        <p>Complete the details for the property you are selling.</p>
+                        <p>
+                          Complete the details for the property you are selling.
+                        </p>
                       </div>
                     </div>
 
@@ -2031,7 +2050,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="saleMortgageCombined">Existing mortgage to redeem?</label>
+                        <label htmlFor="saleMortgageCombined">
+                          Existing mortgage to redeem?
+                        </label>
                         <select
                           id="saleMortgageCombined"
                           name="saleMortgageCombined"
@@ -2062,7 +2083,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="numberOfSellersCombined">How many sellers?</label>
+                        <label htmlFor="numberOfSellersCombined">
+                          How many sellers?
+                        </label>
                         <select
                           id="numberOfSellersCombined"
                           name="numberOfSellersCombined"
@@ -2078,7 +2101,9 @@ function App() {
                       </div>
 
                       <div className="field field--full">
-                        <label htmlFor="tenantedCombined">Is the sale property tenanted?</label>
+                        <label htmlFor="tenantedCombined">
+                          Is the sale property tenanted?
+                        </label>
                         <select
                           id="tenantedCombined"
                           name="tenantedCombined"
@@ -2095,7 +2120,9 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Purchase Details</h2>
-                        <p>Complete the details for the property you are buying.</p>
+                        <p>
+                          Complete the details for the property you are buying.
+                        </p>
                       </div>
                     </div>
 
@@ -2129,7 +2156,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchasePostcode">Purchase postcode</label>
+                        <label htmlFor="purchasePostcode">
+                          Purchase postcode
+                        </label>
                         <input
                           id="purchasePostcode"
                           type="text"
@@ -2142,7 +2171,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseMortgage">Mortgage or cash</label>
+                        <label htmlFor="purchaseMortgage">
+                          Mortgage or cash
+                        </label>
                         <select
                           id="purchaseMortgage"
                           name="purchaseMortgage"
@@ -2155,19 +2186,22 @@ function App() {
                           <option value="cash">Cash</option>
                         </select>
                       </div>
-{form.purchaseMortgage === "mortgage" && (
-  <div className="field">
-    <label htmlFor="purchaseLender">Purchase lender</label>
-    <input
-      id="purchaseLender"
-      type="text"
-      name="purchaseLender"
-      placeholder="e.g. Nationwide"
-      value={form.purchaseLender}
-      onChange={handleChange}
-    />
-  </div>
-)}
+
+                      {form.purchaseMortgage === "mortgage" && (
+                        <div className="field">
+                          <label htmlFor="purchaseLender">Purchase lender</label>
+                          <input
+                            id="purchaseLender"
+                            type="text"
+                            name="purchaseLender"
+                            placeholder="e.g. Nationwide"
+                            value={form.purchaseLender}
+                            onChange={handleChange}
+                            required
+                          />
+                        </div>
+                      )}
+
                       <div className="field">
                         <label htmlFor="purchaseOwnershipType">Buyer type</label>
                         <select
@@ -2184,7 +2218,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseFirstTimeBuyer">First time buyer?</label>
+                        <label htmlFor="purchaseFirstTimeBuyer">
+                          First time buyer?
+                        </label>
                         <select
                           id="purchaseFirstTimeBuyer"
                           name="purchaseFirstTimeBuyer"
@@ -2258,7 +2294,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseSharedOwnership">Shared ownership?</label>
+                        <label htmlFor="purchaseSharedOwnership">
+                          Shared ownership?
+                        </label>
                         <select
                           id="purchaseSharedOwnership"
                           name="purchaseSharedOwnership"
@@ -2272,7 +2310,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseHelpToBuy">Help to Buy / scheme?</label>
+                        <label htmlFor="purchaseHelpToBuy">
+                          Help to Buy / scheme?
+                        </label>
                         <select
                           id="purchaseHelpToBuy"
                           name="purchaseHelpToBuy"
@@ -2286,7 +2326,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseIsCompany">Buying via company?</label>
+                        <label htmlFor="purchaseIsCompany">
+                          Buying via company?
+                        </label>
                         <select
                           id="purchaseIsCompany"
                           name="purchaseIsCompany"
@@ -2300,7 +2342,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseGiftedDeposit">Any gifted deposit?</label>
+                        <label htmlFor="purchaseGiftedDeposit">
+                          Any gifted deposit?
+                        </label>
                         <select
                           id="purchaseGiftedDeposit"
                           name="purchaseGiftedDeposit"
@@ -2314,7 +2358,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseLifetimeIsa">Using a Lifetime ISA?</label>
+                        <label htmlFor="purchaseLifetimeIsa">
+                          Using a Lifetime ISA?
+                        </label>
                         <select
                           id="purchaseLifetimeIsa"
                           name="purchaseLifetimeIsa"
@@ -2355,7 +2401,10 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Remortgage Details</h2>
-                        <p>These questions help us assess the remortgage work involved.</p>
+                        <p>
+                          These questions help us assess the remortgage work
+                          involved.
+                        </p>
                       </div>
                     </div>
 
@@ -2373,7 +2422,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="newLender">New lender (if known)</label>
+                        <label htmlFor="newLender">
+                          New lender (if known)
+                        </label>
                         <input
                           id="newLender"
                           type="text"
@@ -2385,7 +2436,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="additionalBorrowing">Additional borrowing?</label>
+                        <label htmlFor="additionalBorrowing">
+                          Additional borrowing?
+                        </label>
                         <select
                           id="additionalBorrowing"
                           name="additionalBorrowing"
@@ -2495,7 +2548,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPrice">Property value (£)</label>
+                        <label htmlFor="remortgageTransferPrice">
+                          Property value (£)
+                        </label>
                         <input
                           id="remortgageTransferPrice"
                           type="number"
@@ -2508,7 +2563,9 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPostcode">Property postcode</label>
+                        <label htmlFor="remortgageTransferPostcode">
+                          Property postcode
+                        </label>
                         <input
                           id="remortgageTransferPostcode"
                           type="text"
@@ -2524,7 +2581,9 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Remortgage Details</h2>
-                        <p>These questions help us assess the remortgage element.</p>
+                        <p>
+                          These questions help us assess the remortgage element.
+                        </p>
                       </div>
                     </div>
 
@@ -2594,7 +2653,9 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Transfer of Equity Details</h2>
-                        <p>These questions help us assess the transfer element.</p>
+                        <p>
+                          These questions help us assess the transfer element.
+                        </p>
                       </div>
                     </div>
 
@@ -2784,427 +2845,439 @@ function App() {
         )}
 
         {isAdminPage && isAdminUnlocked && (
-          <>
-            <section className="card card--form" style={{ marginTop: "24px" }}>
-              <div className="section-heading">
-                <div>
-                  <h2>Approve and Send Client Quote</h2>
-                  <p>
-                    Internal use only. Review the loaded enquiry, check the
-                    prebuilt quote and send the client-facing quote email.
-                  </p>
-                </div>
+          <section className="card card--form" style={{ marginTop: "24px" }}>
+            <div className="section-heading">
+              <div>
+                <h2>Approve and Send Client Quote</h2>
+                <p>
+                  Internal use only. Review the loaded enquiry, check the
+                  prebuilt quote and send the client-facing quote email.
+                </p>
               </div>
+            </div>
 
-              <div style={{ marginBottom: "16px" }}>
-                {isLoadingEnquiry && (
-                  <p className="form-note">Loading enquiry from reference...</p>
-                )}
-
-                {!isLoadingEnquiry && loadedEnquiryMessage && (
-                  <p className="form-note">{loadedEnquiryMessage}</p>
-                )}
-
-                {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
-                  <p className="form-note">
-                    Admin page unlocked. Ready to load enquiry reference {refFromUrl}.
-                  </p>
-                )}
-              </div>
-
-              {loadedEnquiry && (
-                <div className="admin-stack" style={{ marginBottom: "20px" }}>
-                  <SummaryCard title="Loaded Enquiry Snapshot">
-                    <SummaryGrid rows={enquirySummaryRows} />
-                  </SummaryCard>
-
-                  {matterSpecificRows.length > 0 && (
-                    <SummaryCard title="Matter Specific Details">
-                      <DetailTable rows={matterSpecificRows} />
-                    </SummaryCard>
-                  )}
-
-                  <SummaryCard title="Quote Summary">
-                    <SummaryGrid rows={quoteSummaryRows} />
-                  </SummaryCard>
-
-                  <div className="admin-two-col">
-                    <SummaryCard title="VAT Calculator">
-                      <div className="form-grid">
-                        <div className="field field--full">
-                          <label htmlFor="vatCalculatorNet">Net amount (£)</label>
-                          <input
-                            id="vatCalculatorNet"
-                            type="text"
-                            value={vatCalculatorNet}
-                            onChange={(e) => setVatCalculatorNet(e.target.value)}
-                            placeholder="e.g. 1000"
-                          />
-                        </div>
-                      </div>
-
-                      <SummaryGrid
-                        rows={[
-                          {
-                            label: "VAT at 20%",
-                            value: formatMoney(vatAmount),
-                          },
-                          {
-                            label: "Gross total",
-                            value: formatMoney(vatGross),
-                          },
-                        ]}
-                      />
-                    </SummaryCard>
-
-                    <SummaryCard title="SDLT Calculator">
-                      <div className="form-grid">
-                        <div className="field">
-                          <label htmlFor="sdltPrice">Price (£)</label>
-                          <input
-                            id="sdltPrice"
-                            type="text"
-                            value={sdltPrice}
-                            onChange={(e) => setSdltPrice(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="sdltFirstTimeBuyer">First time buyer?</label>
-                          <select
-                            id="sdltFirstTimeBuyer"
-                            value={sdltFirstTimeBuyer}
-                            onChange={(e) => setSdltFirstTimeBuyer(e.target.value)}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="sdltAdditionalProperty">Additional property?</label>
-                          <select
-                            id="sdltAdditionalProperty"
-                            value={sdltAdditionalProperty}
-                            onChange={(e) => setSdltAdditionalProperty(e.target.value)}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="sdltUkResident">UK resident?</label>
-                          <select
-                            id="sdltUkResident"
-                            value={sdltUkResident}
-                            onChange={(e) => setSdltUkResident(e.target.value)}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="sdltIsCompany">Buying via company?</label>
-                          <select
-                            id="sdltIsCompany"
-                            value={sdltIsCompany}
-                            onChange={(e) => setSdltIsCompany(e.target.value)}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="sdltSharedOwnership">Shared ownership?</label>
-                          <select
-                            id="sdltSharedOwnership"
-                            value={sdltSharedOwnership}
-                            onChange={(e) => setSdltSharedOwnership(e.target.value)}
-                          >
-                            <option value="yes">Yes</option>
-                            <option value="no">No</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <SummaryGrid
-                        rows={[
-                          {
-                            label: sdltResult.manualReview
-                              ? "SDLT status"
-                              : "Estimated SDLT",
-                            value: sdltResult.manualReview
-                              ? sdltResult.note
-                              : formatMoney(sdltResult.amount),
-                          },
-                        ]}
-                      />
-                    </SummaryCard>
-                  </div>
-                </div>
+            <div style={{ marginBottom: "16px" }}>
+              {isLoadingEnquiry && (
+                <p className="form-note">Loading enquiry from reference...</p>
               )}
 
-              <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
-                <div className="form-grid">
-                  <div className="field">
-                    <label htmlFor="clientName">Client name</label>
-                    <input
-                      id="clientName"
-                      type="text"
-                      name="clientName"
-                      value={approvedQuote.clientName}
-                      onChange={handleApprovedQuoteChange}
-                      readOnly
-                      required
+              {!isLoadingEnquiry && loadedEnquiryMessage && (
+                <p className="form-note">{loadedEnquiryMessage}</p>
+              )}
+
+              {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
+                <p className="form-note">
+                  Admin page unlocked. Ready to load enquiry reference {refFromUrl}.
+                </p>
+              )}
+            </div>
+
+            {loadedEnquiry && (
+              <div className="admin-stack" style={{ marginBottom: "20px" }}>
+                <SummaryCard title="Loaded Enquiry Snapshot">
+                  <SummaryGrid rows={enquirySummaryRows} />
+                </SummaryCard>
+
+                {matterSpecificRows.length > 0 && (
+                  <SummaryCard title="Matter Specific Details">
+                    <DetailTable rows={matterSpecificRows} />
+                  </SummaryCard>
+                )}
+
+                <SummaryCard title="Quote Summary">
+                  <SummaryGrid rows={quoteSummaryRows} />
+                </SummaryCard>
+
+                <div className="admin-two-col">
+                  <SummaryCard title="VAT Calculator">
+                    <div className="form-grid">
+                      <div className="field field--full">
+                        <label htmlFor="vatCalculatorNet">Net amount (£)</label>
+                        <input
+                          id="vatCalculatorNet"
+                          type="text"
+                          value={vatCalculatorNet}
+                          onChange={(e) => setVatCalculatorNet(e.target.value)}
+                          placeholder="e.g. 1000"
+                        />
+                      </div>
+                    </div>
+
+                    <SummaryGrid
+                      rows={[
+                        {
+                          label: "VAT at 20%",
+                          value: formatMoney(vatAmount),
+                        },
+                        {
+                          label: "Gross total",
+                          value: formatMoney(vatGross),
+                        },
+                      ]}
                     />
-                  </div>
+                  </SummaryCard>
 
-                  <div className="field">
-                    <label htmlFor="clientEmail">Client email</label>
-                    <input
-                      id="clientEmail"
-                      type="email"
-                      name="clientEmail"
-                      value={approvedQuote.clientEmail}
-                      onChange={handleApprovedQuoteChange}
-                      readOnly
-                      required
-                    />
-                  </div>
+                  <SummaryCard title="SDLT Calculator">
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="sdltPrice">Price (£)</label>
+                        <input
+                          id="sdltPrice"
+                          type="text"
+                          value={sdltPrice}
+                          onChange={(e) => setSdltPrice(e.target.value)}
+                        />
+                      </div>
 
-                  <div className="field">
-                    <label htmlFor="transactionType">Transaction type</label>
-                    <select
-                      id="transactionType"
-                      name="transactionType"
-                      value={approvedQuote.transactionType}
-                      onChange={handleApprovedQuoteChange}
-                      disabled
-                      required
-                    >
-                      <option value="">Please select</option>
-                      <option value="purchase">Purchase</option>
-                      <option value="sale">Sale</option>
-                      <option value="sale_purchase">Sale and Purchase</option>
-                      <option value="remortgage">Remortgage</option>
-                      <option value="transfer">Transfer of Equity</option>
-                      <option value="remortgage_transfer">
-                        Remortgage and Transfer of Equity
-                      </option>
-                    </select>
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="approvedTenure">Tenure / summary</label>
-                    <input
-                      id="approvedTenure"
-                      type="text"
-                      name="tenure"
-                      value={approvedQuote.tenure}
-                      onChange={handleApprovedQuoteChange}
-                      readOnly
-                      required
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="propertyPrice">Property price / value (£)</label>
-                    <input
-                      id="propertyPrice"
-                      type="text"
-                      name="propertyPrice"
-                      value={approvedQuote.propertyPrice}
-                      onChange={handleApprovedQuoteChange}
-                      readOnly
-                      required
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="quoteAmount">Approved quote amount</label>
-                    <input
-                      id="quoteAmount"
-                      type="text"
-                      name="quoteAmount"
-                      value={approvedQuote.quoteAmount}
-                      readOnly
-                      required
-                    />
-                  </div>
-
-                  <div className="field field--full">
-                    <label htmlFor="quoteReference">Quote reference</label>
-                    <input
-                      id="quoteReference"
-                      type="text"
-                      name="quoteReference"
-                      value={approvedQuote.quoteReference}
-                      onChange={handleApprovedQuoteChange}
-                      readOnly
-                    />
-                  </div>
-
-                  <div className="field field--full">
-                    <label>Legal fee items</label>
-                    <div className="detail-table">
-                      {approvedQuote.quoteData.legalFees.map((item, index) => (
-                        <div
-                          key={`legal-${item.label}-${index}`}
-                          className="detail-row"
+                      <div className="field">
+                        <label htmlFor="sdltFirstTimeBuyer">
+                          First time buyer?
+                        </label>
+                        <select
+                          id="sdltFirstTimeBuyer"
+                          value={sdltFirstTimeBuyer}
+                          onChange={(e) => setSdltFirstTimeBuyer(e.target.value)}
                         >
-                          <div className="detail-row__label">{item.label}</div>
-                          <div className="detail-row__value">
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "8px",
-                                alignItems: "center",
-                              }}
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="sdltAdditionalProperty">
+                          Additional property?
+                        </label>
+                        <select
+                          id="sdltAdditionalProperty"
+                          value={sdltAdditionalProperty}
+                          onChange={(e) => setSdltAdditionalProperty(e.target.value)}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="sdltUkResident">UK resident?</label>
+                        <select
+                          id="sdltUkResident"
+                          value={sdltUkResident}
+                          onChange={(e) => setSdltUkResident(e.target.value)}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="sdltIsCompany">
+                          Buying via company?
+                        </label>
+                        <select
+                          id="sdltIsCompany"
+                          value={sdltIsCompany}
+                          onChange={(e) => setSdltIsCompany(e.target.value)}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="sdltSharedOwnership">
+                          Shared ownership?
+                        </label>
+                        <select
+                          id="sdltSharedOwnership"
+                          value={sdltSharedOwnership}
+                          onChange={(e) => setSdltSharedOwnership(e.target.value)}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <SummaryGrid
+                      rows={[
+                        {
+                          label: sdltResult.manualReview
+                            ? "SDLT status"
+                            : "Estimated SDLT",
+                          value: sdltResult.manualReview
+                            ? sdltResult.note
+                            : formatMoney(sdltResult.amount),
+                        },
+                      ]}
+                    />
+                  </SummaryCard>
+                </div>
+              </div>
+            )}
+
+            <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="clientName">Client name</label>
+                  <input
+                    id="clientName"
+                    type="text"
+                    name="clientName"
+                    value={approvedQuote.clientName}
+                    onChange={handleApprovedQuoteChange}
+                    readOnly
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="clientEmail">Client email</label>
+                  <input
+                    id="clientEmail"
+                    type="email"
+                    name="clientEmail"
+                    value={approvedQuote.clientEmail}
+                    onChange={handleApprovedQuoteChange}
+                    readOnly
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="transactionType">Transaction type</label>
+                  <select
+                    id="transactionType"
+                    name="transactionType"
+                    value={approvedQuote.transactionType}
+                    onChange={handleApprovedQuoteChange}
+                    disabled
+                    required
+                  >
+                    <option value="">Please select</option>
+                    <option value="purchase">Purchase</option>
+                    <option value="sale">Sale</option>
+                    <option value="sale_purchase">Sale and Purchase</option>
+                    <option value="remortgage">Remortgage</option>
+                    <option value="transfer">Transfer of Equity</option>
+                    <option value="remortgage_transfer">
+                      Remortgage and Transfer of Equity
+                    </option>
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="approvedTenure">Tenure / summary</label>
+                  <input
+                    id="approvedTenure"
+                    type="text"
+                    name="tenure"
+                    value={approvedQuote.tenure}
+                    onChange={handleApprovedQuoteChange}
+                    readOnly
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="propertyPrice">
+                    Property price / value (£)
+                  </label>
+                  <input
+                    id="propertyPrice"
+                    type="text"
+                    name="propertyPrice"
+                    value={approvedQuote.propertyPrice}
+                    onChange={handleApprovedQuoteChange}
+                    readOnly
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="quoteAmount">Approved quote amount</label>
+                  <input
+                    id="quoteAmount"
+                    type="text"
+                    name="quoteAmount"
+                    value={approvedQuote.quoteAmount}
+                    readOnly
+                    required
+                  />
+                </div>
+
+                <div className="field field--full">
+                  <label htmlFor="quoteReference">Quote reference</label>
+                  <input
+                    id="quoteReference"
+                    type="text"
+                    name="quoteReference"
+                    value={approvedQuote.quoteReference}
+                    onChange={handleApprovedQuoteChange}
+                    readOnly
+                  />
+                </div>
+
+                <div className="field field--full">
+                  <label>Legal fee items</label>
+                  <div className="detail-table">
+                    {approvedQuote.quoteData.legalFees.map((item, index) => (
+                      <div
+                        key={`legal-${item.label}-${index}`}
+                        className="detail-row"
+                      >
+                        <div className="detail-row__label">{item.label}</div>
+                        <div className="detail-row__value">
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              alignItems: "center",
+                            }}
+                          >
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.amount}
+                              onChange={(e) =>
+                                handleQuoteItemAmountChange(
+                                  "legalFees",
+                                  index,
+                                  e.target.value
+                                )
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={() =>
+                                handleRemoveQuoteItem("legalFees", index)
+                              }
                             >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {approvedQuote.quoteData.legalFees.length === 0 && (
+                      <div className="detail-row">
+                        <div className="detail-row__label">
+                          No fee items loaded yet
+                        </div>
+                        <div className="detail-row__value">
+                          Update pricing engine next
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="field field--full">
+                  <label>Disbursement items</label>
+                  <div className="detail-table">
+                    {approvedQuote.quoteData.disbursements.map((item, index) => (
+                      <div
+                        key={`disbursement-${item.label}-${index}`}
+                        className="detail-row"
+                      >
+                        <div className="detail-row__label">{item.label}</div>
+                        <div className="detail-row__value">
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              alignItems: "center",
+                            }}
+                          >
+                            {item.note ? (
+                              <div>{item.note}</div>
+                            ) : (
                               <input
                                 type="number"
                                 step="0.01"
                                 value={item.amount}
                                 onChange={(e) =>
                                   handleQuoteItemAmountChange(
-                                    "legalFees",
+                                    "disbursements",
                                     index,
                                     e.target.value
                                   )
                                 }
                               />
-                              <button
-                                type="button"
-                                className="muted-button"
-                                onClick={() =>
-                                  handleRemoveQuoteItem("legalFees", index)
-                                }
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {approvedQuote.quoteData.legalFees.length === 0 && (
-                        <div className="detail-row">
-                          <div className="detail-row__label">No fee items loaded yet</div>
-                          <div className="detail-row__value">Update pricing engine next</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="field field--full">
-                    <label>Disbursement items</label>
-                    <div className="detail-table">
-                      {approvedQuote.quoteData.disbursements.map((item, index) => (
-                        <div
-                          key={`disbursement-${item.label}-${index}`}
-                          className="detail-row"
-                        >
-                          <div className="detail-row__label">{item.label}</div>
-                          <div className="detail-row__value">
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "8px",
-                                alignItems: "center",
-                              }}
+                            )}
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={() =>
+                                handleRemoveQuoteItem("disbursements", index)
+                              }
                             >
-                              {item.note ? (
-                                <div>{item.note}</div>
-                              ) : (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.amount}
-                                  onChange={(e) =>
-                                    handleQuoteItemAmountChange(
-                                      "disbursements",
-                                      index,
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              )}
-                              <button
-                                type="button"
-                                className="muted-button"
-                                onClick={() =>
-                                  handleRemoveQuoteItem("disbursements", index)
-                                }
-                              >
-                                Remove
-                              </button>
-                            </div>
+                              Remove
+                            </button>
                           </div>
                         </div>
-                      ))}
-                      {approvedQuote.quoteData.disbursements.length === 0 && (
-                        <div className="detail-row">
-                          <div className="detail-row__label">
-                            No disbursements loaded yet
-                          </div>
-                          <div className="detail-row__value">
-                            Update pricing engine next
-                          </div>
+                      </div>
+                    ))}
+                    {approvedQuote.quoteData.disbursements.length === 0 && (
+                      <div className="detail-row">
+                        <div className="detail-row__label">
+                          No disbursements loaded yet
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="field field--full">
-                    <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
-                    <textarea
-                      id="feeBreakdown"
-                      name="feeBreakdown"
-                      value={approvedQuote.feeBreakdown}
-                      onChange={handleApprovedQuoteChange}
-                      rows={10}
-                    />
-                  </div>
-
-                  <div className="field field--full">
-                    <label htmlFor="nextSteps">Next steps</label>
-                    <textarea
-                      id="nextSteps"
-                      name="nextSteps"
-                      value={approvedQuote.nextSteps}
-                      onChange={handleApprovedQuoteChange}
-                      rows={5}
-                    />
+                        <div className="detail-row__value">
+                          Update pricing engine next
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="form-footer action-row">
-                  <p className="form-note">
-                    Internal tool only. This sends the approved client-facing
-                    quote email using the updated approved figures shown above.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="primary-button muted-button"
-                    onClick={() => {
-                      setApprovedQuote(initialApprovedQuoteState);
-                      setLoadedEnquiryMessage("");
-                      setLoadedEnquiry(null);
-                    }}
-                  >
-                    Clear Form
-                  </button>
-
-                  <button type="submit" className="primary-button">
-                    Send Approved Quote
-                  </button>
+                <div className="field field--full">
+                  <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
+                  <textarea
+                    id="feeBreakdown"
+                    name="feeBreakdown"
+                    value={approvedQuote.feeBreakdown}
+                    onChange={handleApprovedQuoteChange}
+                    rows={10}
+                  />
                 </div>
-              </form>
-            </section>
-          </>
+
+                <div className="field field--full">
+                  <label htmlFor="nextSteps">Next steps</label>
+                  <textarea
+                    id="nextSteps"
+                    name="nextSteps"
+                    value={approvedQuote.nextSteps}
+                    onChange={handleApprovedQuoteChange}
+                    rows={5}
+                  />
+                </div>
+              </div>
+
+              <div className="form-footer action-row">
+                <p className="form-note">
+                  Internal tool only. This sends the approved client-facing
+                  quote email using the updated approved figures shown above.
+                </p>
+
+                <button
+                  type="button"
+                  className="primary-button muted-button"
+                  onClick={() => {
+                    setApprovedQuote(initialApprovedQuoteState);
+                    setLoadedEnquiryMessage("");
+                    setLoadedEnquiry(null);
+                  }}
+                >
+                  Clear Form
+                </button>
+
+                <button type="submit" className="primary-button">
+                  Send Approved Quote
+                </button>
+              </div>
+            </form>
+          </section>
         )}
       </main>
     </div>
