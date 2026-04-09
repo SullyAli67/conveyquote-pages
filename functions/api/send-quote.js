@@ -113,6 +113,7 @@ export async function onRequestPost(context) {
       giftedDeposit,
       additionalProperty,
       ukResidentForSdlt,
+      lifetimeIsa,
 
       saleMortgage,
       managementCompany,
@@ -149,6 +150,7 @@ export async function onRequestPost(context) {
       purchaseGiftedDeposit,
       purchaseAdditionalProperty,
       purchaseUkResidentForSdlt,
+      purchaseLifetimeIsa,
 
       remortgageTransferTenure,
       remortgageTransferPrice,
@@ -158,6 +160,7 @@ export async function onRequestPost(context) {
       remortgageTransferAdditionalBorrowing,
       remortgageTransferHasMortgage,
       remortgageTransferOwnersChanging,
+      remortgageTransferOwnershipType,
     } = body;
 
     const prettyType = getTransactionLabel(type);
@@ -174,92 +177,95 @@ export async function onRequestPost(context) {
     const quoteJson = JSON.stringify(quote);
 
     await env.DB.prepare(
-  `
-  INSERT INTO enquiries (
-    reference,
-    client_name,
-    client_email,
-    client_phone,
-    transaction_type,
-    consent_to_panel,
+      `
+      INSERT INTO enquiries (
+        reference,
+        client_name,
+        client_email,
+        client_phone,
+        transaction_type,
+        consent_to_panel,
 
-    tenure,
-    price,
-    postcode,
+        tenure,
+        price,
+        postcode,
 
-    mortgage,
-    ownership_type,
-    first_time_buyer,
-    new_build,
-    shared_ownership,
-    help_to_buy,
-    is_company,
-    buy_to_let,
-    gifted_deposit,
-    additional_property,
-    uk_resident_for_sdlt,
+        mortgage,
+        ownership_type,
+        first_time_buyer,
+        new_build,
+        shared_ownership,
+        help_to_buy,
+        is_company,
+        buy_to_let,
+        gifted_deposit,
+        additional_property,
+        uk_resident_for_sdlt,
+        lifetime_isa,
 
-    sale_mortgage,
-    management_company,
-    tenanted,
-    number_of_sellers,
+        sale_mortgage,
+        management_company,
+        tenanted,
+        number_of_sellers,
 
-    current_lender,
-    new_lender,
-    additional_borrowing,
-    remortgage_transfer,
+        current_lender,
+        new_lender,
+        additional_borrowing,
+        remortgage_transfer,
 
-    transfer_mortgage,
-    owners_changing,
+        transfer_mortgage,
+        owners_changing,
 
-    sale_tenure,
-    sale_price,
-    sale_postcode,
-    sale_mortgage_combined,
-    management_company_combined,
-    tenanted_combined,
-    number_of_sellers_combined,
+        sale_tenure,
+        sale_price,
+        sale_postcode,
+        sale_mortgage_combined,
+        management_company_combined,
+        tenanted_combined,
+        number_of_sellers_combined,
 
-    purchase_tenure,
-    purchase_price,
-    purchase_postcode,
-    purchase_mortgage,
-    purchase_ownership_type,
-    purchase_first_time_buyer,
-    purchase_new_build,
-    purchase_shared_ownership,
-    purchase_help_to_buy,
-    purchase_is_company,
-    purchase_buy_to_let,
-    purchase_gifted_deposit,
-    purchase_additional_property,
-    purchase_uk_resident_for_sdlt,
+        purchase_tenure,
+        purchase_price,
+        purchase_postcode,
+        purchase_mortgage,
+        purchase_ownership_type,
+        purchase_first_time_buyer,
+        purchase_new_build,
+        purchase_shared_ownership,
+        purchase_help_to_buy,
+        purchase_is_company,
+        purchase_buy_to_let,
+        purchase_gifted_deposit,
+        purchase_additional_property,
+        purchase_uk_resident_for_sdlt,
+        purchase_lifetime_isa,
 
-    remortgage_transfer_tenure,
-    remortgage_transfer_price,
-    remortgage_transfer_postcode,
-    remortgage_transfer_current_lender,
-    remortgage_transfer_new_lender,
-    remortgage_transfer_additional_borrowing,
-    remortgage_transfer_has_mortgage,
-    remortgage_transfer_owners_changing,
+        remortgage_transfer_tenure,
+        remortgage_transfer_price,
+        remortgage_transfer_postcode,
+        remortgage_transfer_current_lender,
+        remortgage_transfer_new_lender,
+        remortgage_transfer_additional_borrowing,
+        remortgage_transfer_has_mortgage,
+        remortgage_transfer_owners_changing,
+        remortgage_transfer_ownership_type,
 
-    quote_json
-  )
-  VALUES (
-    ?, ?, ?, ?, ?, ?,
-    ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?,
-    ?, ?, ?, ?,
-    ?, ?,
-    ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?,
-    ?
-  )
-  `
-)
+        quote_json
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?,
+        ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?
+      )
+      `
+    )
       .bind(
         reference,
         name || "",
@@ -283,6 +289,7 @@ export async function onRequestPost(context) {
         giftedDeposit || "",
         additionalProperty || "",
         ukResidentForSdlt || "",
+        lifetimeIsa || "",
 
         saleMortgage || "",
         managementCompany || "",
@@ -319,6 +326,7 @@ export async function onRequestPost(context) {
         purchaseGiftedDeposit || "",
         purchaseAdditionalProperty || "",
         purchaseUkResidentForSdlt || "",
+        purchaseLifetimeIsa || "",
 
         remortgageTransferTenure || "",
         remortgageTransferPrice || "",
@@ -328,6 +336,7 @@ export async function onRequestPost(context) {
         remortgageTransferAdditionalBorrowing || "",
         remortgageTransferHasMortgage || "",
         remortgageTransferOwnersChanging || "",
+        remortgageTransferOwnershipType || "",
 
         quoteJson
       )
@@ -342,7 +351,18 @@ export async function onRequestPost(context) {
       row("Email", safe(email)),
       row("Phone", safe(phone)),
       row("Consent to panel", consentToPanel ? "Yes" : "No"),
-      row("Estimated total", formatMoney(quote.grandTotal)),
+      row(
+        "Estimated legal + disbursement total",
+        formatMoney(quote.grandTotal)
+      ),
+      ...(typeof quote.sdltAmount === "number"
+        ? [row("Estimated SDLT", formatMoney(quote.sdltAmount))]
+        : quote.sdltNote
+        ? [row("SDLT", quote.sdltNote)]
+        : []),
+      ...(typeof quote.totalIncludingSdlt === "number"
+        ? [row("Total including SDLT", formatMoney(quote.totalIncludingSdlt))]
+        : []),
     ];
 
     let matterSections = "";
@@ -363,6 +383,7 @@ export async function onRequestPost(context) {
         row("Help to Buy / scheme", prettifyValue(helpToBuy)),
         row("Buying via company", prettifyValue(isCompany)),
         row("Gifted deposit", prettifyValue(giftedDeposit)),
+        row("Lifetime ISA", prettifyValue(lifetimeIsa)),
       ]);
     }
 
@@ -416,6 +437,7 @@ export async function onRequestPost(context) {
         row("Help to Buy / scheme", prettifyValue(purchaseHelpToBuy)),
         row("Buying via company", prettifyValue(purchaseIsCompany)),
         row("Gifted deposit", prettifyValue(purchaseGiftedDeposit)),
+        row("Lifetime ISA", prettifyValue(purchaseLifetimeIsa)),
       ]);
     }
 
@@ -431,6 +453,7 @@ export async function onRequestPost(context) {
           "Transfer of equity at same time",
           prettifyValue(remortgageTransfer)
         ),
+        row("Ownership type", prettifyValue(ownershipType)),
       ]);
     }
 
@@ -457,6 +480,10 @@ export async function onRequestPost(context) {
         row(
           "Additional borrowing",
           prettifyValue(remortgageTransferAdditionalBorrowing)
+        ),
+        row(
+          "Ownership type",
+          prettifyValue(remortgageTransferOwnershipType)
         ),
       ]);
 
