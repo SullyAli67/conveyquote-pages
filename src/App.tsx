@@ -1360,6 +1360,10 @@ function App() {
           value: prettifyValue(loadedEnquiry.purchase_mortgage),
         },
         {
+  label: "Purchase lender",
+  value: prettifyValue(loadedEnquiry.purchase_lender),
+},
+        {
           label: "Buyer type",
           value: prettifyValue(loadedEnquiry.purchase_ownership_type),
         },
@@ -2132,7 +2136,19 @@ function App() {
                           <option value="cash">Cash</option>
                         </select>
                       </div>
-
+{form.purchaseMortgage === "mortgage" && (
+  <div className="field">
+    <label htmlFor="purchaseLender">Purchase lender</label>
+    <input
+      id="purchaseLender"
+      type="text"
+      name="purchaseLender"
+      placeholder="e.g. Nationwide"
+      value={form.purchaseLender}
+      onChange={handleChange}
+    />
+  </div>
+)}
                       <div className="field">
                         <label htmlFor="purchaseOwnershipType">Buyer type</label>
                         <select
