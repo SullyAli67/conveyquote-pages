@@ -22,6 +22,20 @@ export async function onRequestPost(context) {
       quoteData,
     } = body;
 
+    if (!email) {
+      return jsonResponse(
+        { success: false, error: "Client email is missing." },
+        400
+      );
+    }
+
+    if (!quoteReference) {
+      return jsonResponse(
+        { success: false, error: "Quote reference is missing." },
+        400
+      );
+    }
+
     const prettyType =
       type === "purchase"
         ? "Purchase"
@@ -47,26 +61,6 @@ export async function onRequestPost(context) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
-
-    const prettifyValue = (value) => {
-      if (value === null || value === undefined || value === "") {
-        return "";
-      }
-
-      const str = String(value).trim();
-      if (!str) return "";
-
-      const lower = str.toLowerCase();
-
-      if (lower === "yes") return "Yes";
-      if (lower === "no") return "No";
-      if (lower === "mortgage") return "Mortgage";
-      if (lower === "cash") return "Cash";
-
-      return str
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-    };
 
     const formatMultilineHtml = (value) =>
       escapeHtml(value).replace(/\n/g, "<br />").replace(/  /g, "&nbsp;&nbsp;");
@@ -188,7 +182,6 @@ export async function onRequestPost(context) {
 
     const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
     const displayPrice = formatDisplayMoney(price);
-    const displayTenure = prettifyValue(tenure);
 
     const legalFeeRows = [
       ...legalFees,
@@ -348,18 +341,18 @@ export async function onRequestPost(context) {
         row("Type", escapeHtml(prettyType)),
         row("Sale summary", escapeHtml(salePart || "Not provided")),
         row("Purchase summary", escapeHtml(purchasePart || "Not provided")),
-        row("Tenure summary", escapeHtml(displayTenure || "Not provided")),
+        row("Tenure summary", escapeHtml(tenure || "Not provided")),
       ]);
     } else if (type === "remortgage_transfer") {
       transactionSummaryHtml = sectionTable("Transaction Summary", [
         row("Type", escapeHtml(prettyType)),
         row("Property / value", `£${escapeHtml(displayPrice || "0.00")}`),
-        row("Tenure", escapeHtml(displayTenure || "Not provided")),
+        row("Tenure", escapeHtml(tenure || "Not provided")),
       ]);
     } else {
       transactionSummaryHtml = sectionTable("Transaction Summary", [
         row("Type", escapeHtml(prettyType)),
-        row("Tenure", escapeHtml(displayTenure || "Not provided")),
+        row("Tenure", escapeHtml(tenure || "Not provided")),
         row(
           "Property Price / Value",
           `£${escapeHtml(displayPrice || "0.00")}`
@@ -410,7 +403,7 @@ export async function onRequestPost(context) {
                               Dear ${escapeHtml(name)},
                             </p>
                             <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#4b5563;">
-                              Thank you for your enquiry. We have now reviewed the information provided and set out our current conveyancing estimate below in a clear and straightforward format.
+                              Thank you for your enquiry. We have reviewed the information provided and set out our current conveyancing estimate below in a clear and straightforward format.
                             </p>
                             <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
                               This estimate is based on the information currently available. If further information comes to light, or the matter proves more complex than initially anticipated, we will discuss any change to costs with you before carrying out that additional work.
@@ -465,7 +458,7 @@ export async function onRequestPost(context) {
                               <tr>
                                 <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
                                   <strong>How your matter may proceed</strong><br />
-                                  If you would like to move forward, we will take your matter to the next stage of onboarding. This may include referral to one of our selected panel solicitor firms, depending on the nature of the transaction and allocation requirements.
+                                  If you would like to move forward, we will take your matter to the next stage of onboarding. This may include referral to one of our selected panel solicitor firms, depending on the type of transaction, lender requirements and panel availability.
                                 </td>
                               </tr>
                             </table>
@@ -566,13 +559,11 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, data }, 500);
     }
 
-    if (quoteReference) {
-      await env.DB.prepare(
-        `UPDATE enquiries SET status = 'quote_sent' WHERE reference = ?`
-      )
-        .bind(quoteReference)
-        .run();
-    }
+    await env.DB.prepare(
+      `UPDATE enquiries SET status = 'quote_sent' WHERE reference = ?`
+    )
+      .bind(quoteReference)
+      .run();
 
     return jsonResponse({ success: true, data });
   } catch (error) {
