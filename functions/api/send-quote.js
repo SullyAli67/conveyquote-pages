@@ -103,6 +103,7 @@ export async function onRequestPost(context) {
       postcode,
 
       mortgage,
+      lender,
       ownershipType,
       firstTimeBuyer,
       newBuild,
@@ -140,6 +141,7 @@ export async function onRequestPost(context) {
       purchasePrice,
       purchasePostcode,
       purchaseMortgage,
+      purchaseLender,
       purchaseOwnershipType,
       purchaseFirstTimeBuyer,
       purchaseNewBuild,
@@ -162,6 +164,27 @@ export async function onRequestPost(context) {
       remortgageTransferOwnersChanging,
       remortgageTransferOwnershipType,
     } = body;
+
+    if (mortgage === "mortgage" && !lender) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Lender is required for a mortgaged purchase.",
+        },
+        400
+      );
+    }
+
+    if (purchaseMortgage === "mortgage" && !purchaseLender) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Purchase lender is required for a mortgaged linked purchase.",
+        },
+        400
+      );
+    }
 
     const prettyType = getTransactionLabel(type);
 
@@ -191,6 +214,7 @@ export async function onRequestPost(context) {
         postcode,
 
         mortgage,
+        lender,
         ownership_type,
         first_time_buyer,
         new_build,
@@ -228,6 +252,7 @@ export async function onRequestPost(context) {
         purchase_price,
         purchase_postcode,
         purchase_mortgage,
+        purchase_lender,
         purchase_ownership_type,
         purchase_first_time_buyer,
         purchase_new_build,
@@ -255,12 +280,12 @@ export async function onRequestPost(context) {
       VALUES (
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?
       )
@@ -279,6 +304,7 @@ export async function onRequestPost(context) {
         postcode || "",
 
         mortgage || "",
+        lender || "",
         ownershipType || "",
         firstTimeBuyer || "",
         newBuild || "",
@@ -316,6 +342,7 @@ export async function onRequestPost(context) {
         purchasePrice || "",
         purchasePostcode || "",
         purchaseMortgage || "",
+        purchaseLender || "",
         purchaseOwnershipType || "",
         purchaseFirstTimeBuyer || "",
         purchaseNewBuild || "",
@@ -373,6 +400,7 @@ export async function onRequestPost(context) {
         row("Price", formatMoney(price)),
         row("Postcode", safe(postcode)),
         row("Mortgage or cash", prettifyValue(mortgage)),
+        row("Lender", safe(lender)),
         row("Buyer type", prettifyValue(ownershipType)),
         row("First time buyer", prettifyValue(firstTimeBuyer)),
         row("Additional property", prettifyValue(additionalProperty)),
@@ -421,6 +449,7 @@ export async function onRequestPost(context) {
         row("Purchase price", formatMoney(purchasePrice)),
         row("Purchase postcode", safe(purchasePostcode)),
         row("Mortgage or cash", prettifyValue(purchaseMortgage)),
+        row("Purchase lender", safe(purchaseLender)),
         row("Buyer type", prettifyValue(purchaseOwnershipType)),
         row("First time buyer", prettifyValue(purchaseFirstTimeBuyer)),
         row(
@@ -499,7 +528,10 @@ export async function onRequestPost(context) {
       ]);
     }
 
-    const feeBreakdownHtml = escapeHtml(quote.feeBreakdown).replace(/\n/g, "<br>");
+    const feeBreakdownHtml = escapeHtml(quote.feeBreakdown).replace(
+      /\n/g,
+      "<br>"
+    );
 
     const internalHtml = `
       <html>
