@@ -1,10 +1,10 @@
-export async function onRequestGet(context) {
-  const jsonResponse = (payload, status = 200) =>
-    new Response(JSON.stringify(payload), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    });
+const jsonResponse = (body, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
+export async function onRequestGet(context) {
   try {
     const { request, env } = context;
     const url = new URL(request.url);
@@ -15,29 +15,16 @@ export async function onRequestGet(context) {
       SELECT
         id,
         reference,
-        status,
-        panel_status,
         client_name,
         client_email,
+        client_phone,
         transaction_type,
-        price,
-        purchase_price,
-        remortgage_transfer_price,
-        created_at,
-        quote_sent_at,
-        accepted_at,
-        rejected_at,
-        assigned_firm_name
+        created_at
       FROM enquiries
       WHERE 1 = 1
     `;
 
     const binds = [];
-
-    if (status) {
-      sql += ` AND status = ?`;
-      binds.push(status);
-    }
 
     if (q) {
       sql += `
@@ -50,7 +37,7 @@ export async function onRequestGet(context) {
       binds.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
-    sql += ` ORDER BY created_at DESC`;
+    sql += ` ORDER BY id DESC`;
 
     const stmt = env.DB.prepare(sql).bind(...binds);
     const results = await stmt.all();
