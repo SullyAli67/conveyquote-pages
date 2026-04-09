@@ -93,6 +93,7 @@ type QuoteForm = {
   purchasePrice: string;
   purchasePostcode: string;
   purchaseMortgage: string;
+  purchaseLender: string;
   purchaseOwnershipType: string;
   purchaseFirstTimeBuyer: string;
   purchaseNewBuild: string;
@@ -188,6 +189,7 @@ type LoadedEnquiry = {
   purchase_price?: string | number;
   purchase_postcode?: string;
   purchase_mortgage?: string;
+  purchase_lender?: string;
   purchase_ownership_type?: string;
   purchase_first_time_buyer?: string;
   purchase_new_build?: string;
@@ -263,6 +265,7 @@ const initialFormState: QuoteForm = {
   purchasePrice: "",
   purchasePostcode: "",
   purchaseMortgage: "",
+  purchaseLender: "",
   purchaseOwnershipType: "",
   purchaseFirstTimeBuyer: "",
   purchaseNewBuild: "",
