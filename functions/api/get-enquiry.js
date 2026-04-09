@@ -49,6 +49,21 @@ export async function onRequestGet(context) {
         ...enquiryWithoutRawQuote,
         quote: parsedQuote,
       },
+      adminQuote: parsedQuote
+        ? {
+            legalFees: parsedQuote.legalFees || [],
+            disbursements: parsedQuote.disbursements || [],
+            vat: parsedQuote.vat ?? 0,
+            legalFeesExVat: parsedQuote.legalFeesExVat ?? 0,
+            legalTotalInclVat: parsedQuote.legalTotalInclVat ?? 0,
+            disbursementTotal: parsedQuote.disbursementTotal ?? 0,
+            grandTotal: parsedQuote.grandTotal ?? 0,
+            sdltAmount: parsedQuote.sdltAmount ?? null,
+            sdltNote: parsedQuote.sdltNote ?? null,
+            totalIncludingSdlt: parsedQuote.totalIncludingSdlt ?? null,
+            feeBreakdown: parsedQuote.feeBreakdown || "",
+          }
+        : null,
     });
   } catch (error) {
     return jsonResponse(
