@@ -32,6 +32,9 @@ type LoadedQuote = {
   disbursements?: QuoteLineItem[];
   disbursementTotal?: number;
   grandTotal?: number;
+  sdltAmount?: number;
+  sdltNote?: string;
+  totalIncludingSdlt?: number;
   feeBreakdown?: string;
 };
 
@@ -63,6 +66,7 @@ type QuoteForm = {
   giftedDeposit: string;
   additionalProperty: string;
   ukResidentForSdlt: string;
+  lifetimeIsa: string;
 
   saleMortgage: string;
   managementCompany: string;
@@ -99,6 +103,7 @@ type QuoteForm = {
   purchaseGiftedDeposit: string;
   purchaseAdditionalProperty: string;
   purchaseUkResidentForSdlt: string;
+  purchaseLifetimeIsa: string;
 
   remortgageTransferTenure: string;
   remortgageTransferPrice: string;
@@ -108,6 +113,16 @@ type QuoteForm = {
   remortgageTransferAdditionalBorrowing: string;
   remortgageTransferHasMortgage: string;
   remortgageTransferOwnersChanging: string;
+  remortgageTransferOwnershipType: string;
+};
+
+type ApprovedQuoteData = {
+  legalFees: QuoteDataItem[];
+  disbursements: QuoteDataItem[];
+  vat: number;
+  sdltAmount?: number;
+  sdltNote?: string;
+  totalIncludingSdlt?: number;
 };
 
 type ApprovedQuoteForm = {
@@ -120,11 +135,7 @@ type ApprovedQuoteForm = {
   quoteReference: string;
   feeBreakdown: string;
   nextSteps: string;
-  quoteData: {
-    legalFees: QuoteDataItem[];
-    disbursements: QuoteDataItem[];
-    vat: number;
-  };
+  quoteData: ApprovedQuoteData;
 };
 
 type LoadedEnquiry = {
@@ -150,6 +161,7 @@ type LoadedEnquiry = {
   gifted_deposit?: string;
   additional_property?: string;
   uk_resident_for_sdlt?: string;
+  lifetime_isa?: string;
 
   sale_mortgage?: string;
   management_company?: string;
@@ -186,6 +198,7 @@ type LoadedEnquiry = {
   purchase_gifted_deposit?: string;
   purchase_additional_property?: string;
   purchase_uk_resident_for_sdlt?: string;
+  purchase_lifetime_isa?: string;
 
   remortgage_transfer_tenure?: string;
   remortgage_transfer_price?: string | number;
@@ -195,6 +208,7 @@ type LoadedEnquiry = {
   remortgage_transfer_additional_borrowing?: string;
   remortgage_transfer_has_mortgage?: string;
   remortgage_transfer_owners_changing?: string;
+  remortgage_transfer_ownership_type?: string;
 
   quote?: LoadedQuote | null;
 };
@@ -222,6 +236,7 @@ const initialFormState: QuoteForm = {
   giftedDeposit: "",
   additionalProperty: "",
   ukResidentForSdlt: "",
+  lifetimeIsa: "",
 
   saleMortgage: "",
   managementCompany: "",
@@ -258,6 +273,7 @@ const initialFormState: QuoteForm = {
   purchaseGiftedDeposit: "",
   purchaseAdditionalProperty: "",
   purchaseUkResidentForSdlt: "",
+  purchaseLifetimeIsa: "",
 
   remortgageTransferTenure: "",
   remortgageTransferPrice: "",
@@ -267,6 +283,7 @@ const initialFormState: QuoteForm = {
   remortgageTransferAdditionalBorrowing: "",
   remortgageTransferHasMortgage: "",
   remortgageTransferOwnersChanging: "",
+  remortgageTransferOwnershipType: "",
 };
 
 const defaultApprovedNextSteps =
@@ -286,6 +303,9 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
     legalFees: [],
     disbursements: [],
     vat: 0,
+    sdltAmount: undefined,
+    sdltNote: undefined,
+    totalIncludingSdlt: undefined,
   },
 };
 
@@ -541,18 +561,13 @@ function App() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const payload = {
-      ...form,
-      quoteAmount: "1000",
-    };
-
     try {
       const response = await fetch("/api/send-quote", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       });
 
       const result = await response.json();
@@ -573,118 +588,40 @@ function App() {
     }
   };
 
-  const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
-    const type = enquiry.transaction_type || "";
-
-    if (type === "sale_purchase" || type === "remortgage_transfer") {
-      return {
-        clientName: enquiry.client_name || "",
-        clientEmail: enquiry.client_email || "",
-        transactionType: type,
-        tenure:
-          type === "sale_purchase"
-            ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
-                enquiry.purchase_tenure
-              )}`
-            : prettifyValue(enquiry.remortgage_transfer_tenure),
-        propertyPrice:
-          type === "sale_purchase"
-            ? `Sale ${formatMoney(enquiry.sale_price)} | Purchase ${formatMoney(
-                enquiry.purchase_price
-              )}`
-            : formatMoney(enquiry.remortgage_transfer_price),
-        quoteAmount: "",
-        quoteReference: enquiry.reference || "",
-        feeBreakdown:
-          "Combined matter loaded. Pricing for combined matters will be populated once the pricing engine and email templates are updated.",
-        nextSteps: defaultApprovedNextSteps,
-        quoteData: {
-          legalFees: [],
-          disbursements: [],
-          vat: 0,
-        },
-      };
-    }
-
-    const built = buildQuoteData({
-      type,
-      tenure: enquiry.tenure || "",
-      mortgage: enquiry.mortgage || "",
-      giftedDeposit: enquiry.gifted_deposit || "",
-      newBuild: enquiry.new_build || "",
-      sharedOwnership: enquiry.shared_ownership || "",
-      helpToBuy: enquiry.help_to_buy || "",
-      isCompany: enquiry.is_company || "",
-      buyToLet: enquiry.buy_to_let || "",
-      saleMortgage: enquiry.sale_mortgage || "",
-      managementCompany: enquiry.management_company || "",
-      tenanted: enquiry.tenanted || "",
-      numberOfSellers: enquiry.number_of_sellers || "",
-      additionalBorrowing: enquiry.additional_borrowing || "",
-      remortgageTransfer: enquiry.remortgage_transfer || "",
-      transferMortgage: enquiry.transfer_mortgage || "",
-      ownersChanging: enquiry.owners_changing || "",
-    });
-
-    return {
-      clientName: enquiry.client_name || "",
-      clientEmail: enquiry.client_email || "",
-      transactionType: type,
-      tenure: prettifyValue(enquiry.tenure),
-      propertyPrice: enquiry.price ? String(enquiry.price) : "",
-      quoteAmount: built.grandTotal.toFixed(2),
-      quoteReference: enquiry.reference || "",
-      feeBreakdown: built.feeBreakdown,
-      nextSteps: defaultApprovedNextSteps,
-      quoteData: {
-        legalFees: built.legalFees,
-        disbursements: built.disbursements,
-        vat: built.vat,
-      },
-    };
-  };
-
   const buildFeeBreakdown = (quote: LoadedQuote | null | undefined) => {
     if (!quote) return "";
 
     if (quote.breakdownText) {
-      const disclaimerText =
-        Array.isArray(quote.disclaimerLines) && quote.disclaimerLines.length > 0
-          ? `\n\nIMPORTANT NOTES\n${quote.disclaimerLines.join("\n")}`
-          : "";
-
-      return `${quote.breakdownText}${disclaimerText}`;
+      return quote.breakdownText;
     }
 
     const lines: string[] = [];
 
-   if (Array.isArray(quote.legalFees) && quote.legalFees.length > 0) {
-  lines.push("LEGAL FEES");
-  quote.legalFees.forEach((item) => {
-    lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
-  });
-}
+    if (Array.isArray(quote.legalFees) && quote.legalFees.length > 0) {
+      lines.push("LEGAL FEES");
+      quote.legalFees.forEach((item) => {
+        lines.push(`${item.label}: £${Number(item.amount || 0).toFixed(2)}`);
+      });
+    }
 
-if (typeof quote.legalFeesExVat === "number") {
-  lines.push(`Legal fees ex VAT: £${quote.legalFeesExVat.toFixed(2)}`);
-}
+    if (typeof quote.legalFeesExVat === "number") {
+      lines.push(`Legal fees ex VAT: £${quote.legalFeesExVat.toFixed(2)}`);
+    }
 
-if (typeof quote.vat === "number") {
-  lines.push(`VAT: £${quote.vat.toFixed(2)}`);
-}
+    if (typeof quote.vat === "number") {
+      lines.push(`VAT: £${quote.vat.toFixed(2)}`);
+    }
+
     if (typeof quote.legalTotalInclVat === "number") {
       lines.push(
         `Total legal fees including VAT: £${quote.legalTotalInclVat.toFixed(2)}`
       );
     }
 
-    if (
-  Array.isArray(quote.disbursements) &&
-  quote.disbursements.length > 0
-) {
-  lines.push("");
-  lines.push("DISBURSEMENTS");
-  quote.disbursements.forEach((item) => {
+    if (Array.isArray(quote.disbursements) && quote.disbursements.length > 0) {
+      lines.push("");
+      lines.push("DISBURSEMENTS");
+      quote.disbursements.forEach((item) => {
         if (item.note) {
           lines.push(`${item.label}: ${item.note}`);
         } else {
@@ -698,6 +635,24 @@ if (typeof quote.vat === "number") {
     }
 
     if (typeof quote.grandTotal === "number") {
+      lines.push("");
+      lines.push(
+        `TOTAL LEGAL FEES + DISBURSEMENTS: £${quote.grandTotal.toFixed(2)}`
+      );
+    }
+
+    if (typeof quote.sdltAmount === "number") {
+      lines.push(`Estimated SDLT: £${quote.sdltAmount.toFixed(2)}`);
+    } else if (quote.sdltNote) {
+      lines.push(`SDLT: ${quote.sdltNote}`);
+    }
+
+    if (typeof quote.totalIncludingSdlt === "number") {
+      lines.push("");
+      lines.push(
+        `TOTAL INCLUDING SDLT: £${quote.totalIncludingSdlt.toFixed(2)}`
+      );
+    } else if (typeof quote.grandTotal === "number") {
       lines.push("");
       lines.push(`TOTAL ESTIMATED COST: £${quote.grandTotal.toFixed(2)}`);
     }
@@ -717,7 +672,7 @@ if (typeof quote.vat === "number") {
   };
 
   const rebuildApprovedQuoteFromQuoteData = (
-    quoteData: ApprovedQuoteForm["quoteData"]
+    quoteData: ApprovedQuoteData
   ) => {
     const legalFeesExVat = quoteData.legalFees.reduce(
       (sum, item) => sum + Number(item.amount || 0),
@@ -734,6 +689,11 @@ if (typeof quote.vat === "number") {
     const grandTotal = Number(
       (legalFeesExVat + vat + disbursementTotal).toFixed(2)
     );
+
+    const totalIncludingSdlt =
+      typeof quoteData.sdltAmount === "number"
+        ? Number((grandTotal + quoteData.sdltAmount).toFixed(2))
+        : undefined;
 
     const feeBreakdownLines: string[] = [];
 
@@ -764,14 +724,38 @@ if (typeof quote.vat === "number") {
     );
 
     feeBreakdownLines.push("");
-    feeBreakdownLines.push(`TOTAL ESTIMATED COST: £${grandTotal.toFixed(2)}`);
+    feeBreakdownLines.push(
+      `TOTAL LEGAL FEES + DISBURSEMENTS: £${grandTotal.toFixed(2)}`
+    );
+
+    if (typeof quoteData.sdltAmount === "number") {
+      feeBreakdownLines.push(
+        `Estimated SDLT: £${quoteData.sdltAmount.toFixed(2)}`
+      );
+    } else if (quoteData.sdltNote) {
+      feeBreakdownLines.push(`SDLT: ${quoteData.sdltNote}`);
+    }
+
+    if (typeof totalIncludingSdlt === "number") {
+      feeBreakdownLines.push("");
+      feeBreakdownLines.push(
+        `TOTAL INCLUDING SDLT: £${totalIncludingSdlt.toFixed(2)}`
+      );
+    } else {
+      feeBreakdownLines.push("");
+      feeBreakdownLines.push(`TOTAL ESTIMATED COST: £${grandTotal.toFixed(2)}`);
+    }
 
     return {
       quoteData: {
         ...quoteData,
         vat,
+        totalIncludingSdlt,
       },
-      quoteAmount: grandTotal.toFixed(2),
+      quoteAmount:
+        typeof totalIncludingSdlt === "number"
+          ? totalIncludingSdlt.toFixed(2)
+          : grandTotal.toFixed(2),
       feeBreakdown: feeBreakdownLines.join("\n"),
     };
   };
@@ -807,6 +791,146 @@ if (typeof quote.vat === "number") {
         feeBreakdown: rebuilt.feeBreakdown,
       };
     });
+  };
+
+  const handleRemoveQuoteItem = (
+    section: "legalFees" | "disbursements",
+    index: number
+  ) => {
+    setApprovedQuote((prev) => {
+      const updatedSection = prev.quoteData[section].filter(
+        (_, itemIndex) => itemIndex !== index
+      );
+
+      const newQuoteData = {
+        ...prev.quoteData,
+        [section]: updatedSection,
+      };
+
+      const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
+
+      return {
+        ...prev,
+        quoteData: rebuilt.quoteData,
+        quoteAmount: rebuilt.quoteAmount,
+        feeBreakdown: rebuilt.feeBreakdown,
+      };
+    });
+  };
+
+  const rebuildApprovedQuoteFromEnquiry = (enquiry: LoadedEnquiry) => {
+    const type = enquiry.transaction_type || "";
+
+    const built = buildQuoteData({
+      type,
+      price: enquiry.price ? String(enquiry.price) : "",
+      tenure: enquiry.tenure || "",
+      mortgage: enquiry.mortgage || "",
+      ownershipType: enquiry.ownership_type || "",
+      firstTimeBuyer: enquiry.first_time_buyer || "",
+      additionalProperty: enquiry.additional_property || "",
+      ukResidentForSdlt: enquiry.uk_resident_for_sdlt || "",
+      giftedDeposit: enquiry.gifted_deposit || "",
+      newBuild: enquiry.new_build || "",
+      sharedOwnership: enquiry.shared_ownership || "",
+      helpToBuy: enquiry.help_to_buy || "",
+      isCompany: enquiry.is_company || "",
+      buyToLet: enquiry.buy_to_let || "",
+      lifetimeIsa: enquiry.lifetime_isa || "",
+      saleMortgage: enquiry.sale_mortgage || "",
+      managementCompany: enquiry.management_company || "",
+      tenanted: enquiry.tenanted || "",
+      numberOfSellers: enquiry.number_of_sellers || "",
+      additionalBorrowing: enquiry.additional_borrowing || "",
+      remortgageTransfer: enquiry.remortgage_transfer || "",
+      transferMortgage: enquiry.transfer_mortgage || "",
+      ownersChanging: enquiry.owners_changing || "",
+      saleTenure: enquiry.sale_tenure || "",
+      salePrice: enquiry.sale_price ? String(enquiry.sale_price) : "",
+      salePostcode: enquiry.sale_postcode || "",
+      saleMortgageCombined: enquiry.sale_mortgage_combined || "",
+      managementCompanyCombined: enquiry.management_company_combined || "",
+      tenantedCombined: enquiry.tenanted_combined || "",
+      numberOfSellersCombined: enquiry.number_of_sellers_combined || "",
+      purchaseTenure: enquiry.purchase_tenure || "",
+      purchasePrice: enquiry.purchase_price ? String(enquiry.purchase_price) : "",
+      purchasePostcode: enquiry.purchase_postcode || "",
+      purchaseMortgage: enquiry.purchase_mortgage || "",
+      purchaseOwnershipType: enquiry.purchase_ownership_type || "",
+      purchaseFirstTimeBuyer: enquiry.purchase_first_time_buyer || "",
+      purchaseNewBuild: enquiry.purchase_new_build || "",
+      purchaseSharedOwnership: enquiry.purchase_shared_ownership || "",
+      purchaseHelpToBuy: enquiry.purchase_help_to_buy || "",
+      purchaseIsCompany: enquiry.purchase_is_company || "",
+      purchaseBuyToLet: enquiry.purchase_buy_to_let || "",
+      purchaseGiftedDeposit: enquiry.purchase_gifted_deposit || "",
+      purchaseAdditionalProperty: enquiry.purchase_additional_property || "",
+      purchaseUkResidentForSdlt:
+        enquiry.purchase_uk_resident_for_sdlt || "",
+      purchaseLifetimeIsa: enquiry.purchase_lifetime_isa || "",
+      remortgageTransferTenure: enquiry.remortgage_transfer_tenure || "",
+      remortgageTransferPrice: enquiry.remortgage_transfer_price
+        ? String(enquiry.remortgage_transfer_price)
+        : "",
+      remortgageTransferPostcode:
+        enquiry.remortgage_transfer_postcode || "",
+      remortgageTransferCurrentLender:
+        enquiry.remortgage_transfer_current_lender || "",
+      remortgageTransferNewLender:
+        enquiry.remortgage_transfer_new_lender || "",
+      remortgageTransferAdditionalBorrowing:
+        enquiry.remortgage_transfer_additional_borrowing || "",
+      remortgageTransferHasMortgage:
+        enquiry.remortgage_transfer_has_mortgage || "",
+      remortgageTransferOwnersChanging:
+        enquiry.remortgage_transfer_owners_changing || "",
+      remortgageTransferOwnershipType:
+        enquiry.remortgage_transfer_ownership_type || "",
+    });
+
+    const quoteData: ApprovedQuoteData = {
+      legalFees: built.legalFees,
+      disbursements: built.disbursements,
+      vat: built.vat,
+      sdltAmount: built.sdltAmount,
+      sdltNote: built.sdltNote,
+      totalIncludingSdlt: built.totalIncludingSdlt,
+    };
+
+    const rebuilt = rebuildApprovedQuoteFromQuoteData(quoteData);
+
+    const propertyPrice =
+      type === "sale_purchase"
+        ? `Sale ${formatMoney(enquiry.sale_price)} | Purchase ${formatMoney(
+            enquiry.purchase_price
+          )}`
+        : type === "remortgage_transfer"
+        ? formatMoney(enquiry.remortgage_transfer_price)
+        : enquiry.price
+        ? formatMoney(enquiry.price)
+        : "";
+
+    const tenureSummary =
+      type === "sale_purchase"
+        ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
+            enquiry.purchase_tenure
+          )}`
+        : type === "remortgage_transfer"
+        ? prettifyValue(enquiry.remortgage_transfer_tenure)
+        : prettifyValue(enquiry.tenure);
+
+    return {
+      clientName: enquiry.client_name || "",
+      clientEmail: enquiry.client_email || "",
+      transactionType: type,
+      tenure: tenureSummary,
+      propertyPrice,
+      quoteAmount: rebuilt.quoteAmount,
+      quoteReference: enquiry.reference || "",
+      feeBreakdown: rebuilt.feeBreakdown,
+      nextSteps: defaultApprovedNextSteps,
+      quoteData: rebuilt.quoteData,
+    };
   };
 
   const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -866,62 +990,77 @@ if (typeof quote.vat === "number") {
 
       if (result.success && result.enquiry) {
         const enquiry: LoadedEnquiry = result.enquiry;
-        const quote = enquiry.quote || null;
+        const quote: LoadedQuote | null = result.adminQuote || enquiry.quote || null;
 
         setLoadedEnquiry(enquiry);
 
         if (quote) {
+          const quoteData: ApprovedQuoteData = {
+            legalFees: Array.isArray(quote.legalFees)
+              ? quote.legalFees.map((item) => ({
+                  label: item.label,
+                  amount: Number(item.amount || 0),
+                  note: item.note,
+                }))
+              : [],
+            disbursements: Array.isArray(quote.disbursements)
+              ? quote.disbursements.map((item) => ({
+                  label: item.label,
+                  amount: Number(item.amount || 0),
+                  note: item.note,
+                }))
+              : [],
+            vat: typeof quote.vat === "number" ? quote.vat : 0,
+            sdltAmount:
+              typeof quote.sdltAmount === "number" ? quote.sdltAmount : undefined,
+            sdltNote: quote.sdltNote,
+            totalIncludingSdlt:
+              typeof quote.totalIncludingSdlt === "number"
+                ? quote.totalIncludingSdlt
+                : undefined,
+          };
+
+          const rebuilt = rebuildApprovedQuoteFromQuoteData(quoteData);
+
           setApprovedQuote({
             clientName: enquiry.client_name || "",
             clientEmail: enquiry.client_email || "",
             transactionType: enquiry.transaction_type || "",
             tenure:
-  enquiry.transaction_type === "sale_purchase"
-    ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
-        enquiry.purchase_tenure
-      )}`
-    : enquiry.transaction_type === "remortgage_transfer"
-    ? prettifyValue(enquiry.remortgage_transfer_tenure)
-    : prettifyValue(enquiry.tenure),
+              enquiry.transaction_type === "sale_purchase"
+                ? `${prettifyValue(enquiry.sale_tenure)} / ${prettifyValue(
+                    enquiry.purchase_tenure
+                  )}`
+                : enquiry.transaction_type === "remortgage_transfer"
+                ? prettifyValue(enquiry.remortgage_transfer_tenure)
+                : prettifyValue(enquiry.tenure),
             propertyPrice:
-  enquiry.transaction_type === "sale_purchase"
-    ? `Sale ${formatMoney(
-        enquiry.sale_price
-      )} | Purchase ${formatMoney(enquiry.purchase_price)}`
-    : enquiry.transaction_type === "remortgage_transfer"
-    ? formatMoney(enquiry.remortgage_transfer_price)
-    : enquiry.price
-    ? formatMoney(enquiry.price)
-    : "",
-            quoteAmount:
-  typeof quote.grandTotal === "number"
-    ? quote.grandTotal.toFixed(2)
-    : "",
+              enquiry.transaction_type === "sale_purchase"
+                ? `Sale ${formatMoney(
+                    enquiry.sale_price
+                  )} | Purchase ${formatMoney(enquiry.purchase_price)}`
+                : enquiry.transaction_type === "remortgage_transfer"
+                ? formatMoney(enquiry.remortgage_transfer_price)
+                : enquiry.price
+                ? formatMoney(enquiry.price)
+                : "",
+            quoteAmount: rebuilt.quoteAmount,
             quoteReference: enquiry.reference || "",
-            feeBreakdown: buildFeeBreakdown(quote),
+            feeBreakdown:
+              quote.feeBreakdown || rebuilt.feeBreakdown || buildFeeBreakdown(quote),
             nextSteps: defaultApprovedNextSteps,
-            quoteData: {
-  legalFees: Array.isArray(quote.legalFees)
-    ? quote.legalFees.map((item) => ({
-        label: item.label,
-        amount: Number(item.amount || 0),
-        note: item.note,
-      }))
-    : [],
-  disbursements: Array.isArray(quote.disbursements)
-    ? quote.disbursements.map((item) => ({
-        label: item.label,
-        amount: Number(item.amount || 0),
-        note: item.note,
-      }))
-    : [],
-  vat: typeof quote.vat === "number" ? quote.vat : 0,
-},
+            quoteData: rebuilt.quoteData,
           });
 
           if (typeof quote.legalFeesExVat === "number") {
-  setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
-}
+            setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
+          } else {
+            const legalFeesExVat = quoteData.legalFees.reduce(
+              (sum, item) => sum + Number(item.amount || 0),
+              0
+            );
+            setVatCalculatorNet(legalFeesExVat.toFixed(2));
+          }
         } else {
           setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
         }
@@ -1137,6 +1276,10 @@ if (typeof quote.vat === "number") {
           label: "Gifted deposit",
           value: prettifyValue(loadedEnquiry.gifted_deposit),
         },
+        {
+          label: "Lifetime ISA",
+          value: prettifyValue(loadedEnquiry.lifetime_isa),
+        },
       ];
     }
 
@@ -1254,6 +1397,10 @@ if (typeof quote.vat === "number") {
           label: "Gifted deposit",
           value: prettifyValue(loadedEnquiry.purchase_gifted_deposit),
         },
+        {
+          label: "Lifetime ISA",
+          value: prettifyValue(loadedEnquiry.purchase_lifetime_isa),
+        },
       ];
     }
 
@@ -1277,6 +1424,10 @@ if (typeof quote.vat === "number") {
         {
           label: "Transfer of equity at same time",
           value: prettifyValue(loadedEnquiry.remortgage_transfer),
+        },
+        {
+          label: "Ownership type",
+          value: prettifyValue(loadedEnquiry.ownership_type),
         },
       ];
     }
@@ -1328,6 +1479,12 @@ if (typeof quote.vat === "number") {
           ),
         },
         {
+          label: "Ownership type",
+          value: prettifyValue(
+            loadedEnquiry.remortgage_transfer_ownership_type
+          ),
+        },
+        {
           label: "Mortgage on property",
           value: prettifyValue(
             loadedEnquiry.remortgage_transfer_has_mortgage
@@ -1363,8 +1520,20 @@ if (typeof quote.vat === "number") {
       value: formatMoney(disbursementTotal),
     },
     {
-      label: "Approved total",
+      label: "Quote total",
       value: formatMoney(approvedQuote.quoteAmount),
+    },
+    {
+      label:
+        typeof approvedQuote.quoteData.sdltAmount === "number"
+          ? "Loaded SDLT"
+          : "SDLT check",
+      value:
+        typeof approvedQuote.quoteData.sdltAmount === "number"
+          ? formatMoney(approvedQuote.quoteData.sdltAmount)
+          : sdltResult.manualReview
+          ? sdltResult.note
+          : formatMoney(sdltResult.amount),
     },
   ];
 
@@ -1452,10 +1621,7 @@ if (typeof quote.vat === "number") {
 
                 {usesSingleMatterDetails && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Matter Details</h2>
                         <p>Please complete the details below.</p>
@@ -1511,10 +1677,7 @@ if (typeof quote.vat === "number") {
 
                 {isPurchase && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Purchase Details</h2>
                         <p>
@@ -1630,9 +1793,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sharedOwnership">
-                          Shared ownership?
-                        </label>
+                        <label htmlFor="sharedOwnership">Shared ownership?</label>
                         <select
                           id="sharedOwnership"
                           name="sharedOwnership"
@@ -1673,10 +1834,8 @@ if (typeof quote.vat === "number") {
                         </select>
                       </div>
 
-                      <div className="field field--full">
-                        <label htmlFor="giftedDeposit">
-                          Any gifted deposit?
-                        </label>
+                      <div className="field">
+                        <label htmlFor="giftedDeposit">Any gifted deposit?</label>
                         <select
                           id="giftedDeposit"
                           name="giftedDeposit"
@@ -1689,14 +1848,23 @@ if (typeof quote.vat === "number") {
                         </select>
                       </div>
 
+                      <div className="field">
+                        <label htmlFor="lifetimeIsa">Using a Lifetime ISA?</label>
+                        <select
+                          id="lifetimeIsa"
+                          name="lifetimeIsa"
+                          value={form.lifetimeIsa}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
                       <div className="field field--full">
                         <label htmlFor="sdltHint">SDLT guidance</label>
-                        <input
-                          id="sdltHint"
-                          type="text"
-                          value={singleSdltHint}
-                          readOnly
-                        />
+                        <input id="sdltHint" type="text" value={singleSdltHint} readOnly />
                       </div>
                     </div>
 
@@ -1713,24 +1881,16 @@ if (typeof quote.vat === "number") {
 
                 {isSale && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Sale Details</h2>
-                        <p>
-                          These questions help us understand the likely work
-                          involved in the sale.
-                        </p>
+                        <p>These questions help us understand the likely work involved in the sale.</p>
                       </div>
                     </div>
 
                     <div className="form-grid">
                       <div className="field">
-                        <label htmlFor="saleMortgage">
-                          Existing mortgage to redeem?
-                        </label>
+                        <label htmlFor="saleMortgage">Existing mortgage to redeem?</label>
                         <select
                           id="saleMortgage"
                           name="saleMortgage"
@@ -1761,9 +1921,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="numberOfSellers">
-                          How many sellers?
-                        </label>
+                        <label htmlFor="numberOfSellers">How many sellers?</label>
                         <select
                           id="numberOfSellers"
                           name="numberOfSellers"
@@ -1779,9 +1937,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field field--full">
-                        <label htmlFor="tenanted">
-                          Is the property tenanted?
-                        </label>
+                        <label htmlFor="tenanted">Is the property tenanted?</label>
                         <select
                           id="tenanted"
                           name="tenanted"
@@ -1799,15 +1955,10 @@ if (typeof quote.vat === "number") {
 
                 {isSalePurchase && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Sale Details</h2>
-                        <p>
-                          Complete the details for the property you are selling.
-                        </p>
+                        <p>Complete the details for the property you are selling.</p>
                       </div>
                     </div>
 
@@ -1854,9 +2005,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="saleMortgageCombined">
-                          Existing mortgage to redeem?
-                        </label>
+                        <label htmlFor="saleMortgageCombined">Existing mortgage to redeem?</label>
                         <select
                           id="saleMortgageCombined"
                           name="saleMortgageCombined"
@@ -1887,9 +2036,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="numberOfSellersCombined">
-                          How many sellers?
-                        </label>
+                        <label htmlFor="numberOfSellersCombined">How many sellers?</label>
                         <select
                           id="numberOfSellersCombined"
                           name="numberOfSellersCombined"
@@ -1905,9 +2052,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field field--full">
-                        <label htmlFor="tenantedCombined">
-                          Is the sale property tenanted?
-                        </label>
+                        <label htmlFor="tenantedCombined">Is the sale property tenanted?</label>
                         <select
                           id="tenantedCombined"
                           name="tenantedCombined"
@@ -1921,15 +2066,10 @@ if (typeof quote.vat === "number") {
                       </div>
                     </div>
 
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "18px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Purchase Details</h2>
-                        <p>
-                          Complete the details for the property you are buying.
-                        </p>
+                        <p>Complete the details for the property you are buying.</p>
                       </div>
                     </div>
 
@@ -1976,9 +2116,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseMortgage">
-                          Mortgage or cash
-                        </label>
+                        <label htmlFor="purchaseMortgage">Mortgage or cash</label>
                         <select
                           id="purchaseMortgage"
                           name="purchaseMortgage"
@@ -2008,9 +2146,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseFirstTimeBuyer">
-                          First time buyer?
-                        </label>
+                        <label htmlFor="purchaseFirstTimeBuyer">First time buyer?</label>
                         <select
                           id="purchaseFirstTimeBuyer"
                           name="purchaseFirstTimeBuyer"
@@ -2084,9 +2220,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseSharedOwnership">
-                          Shared ownership?
-                        </label>
+                        <label htmlFor="purchaseSharedOwnership">Shared ownership?</label>
                         <select
                           id="purchaseSharedOwnership"
                           name="purchaseSharedOwnership"
@@ -2100,9 +2234,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseHelpToBuy">
-                          Help to Buy / scheme?
-                        </label>
+                        <label htmlFor="purchaseHelpToBuy">Help to Buy / scheme?</label>
                         <select
                           id="purchaseHelpToBuy"
                           name="purchaseHelpToBuy"
@@ -2116,9 +2248,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseIsCompany">
-                          Buying via company?
-                        </label>
+                        <label htmlFor="purchaseIsCompany">Buying via company?</label>
                         <select
                           id="purchaseIsCompany"
                           name="purchaseIsCompany"
@@ -2131,14 +2261,26 @@ if (typeof quote.vat === "number") {
                         </select>
                       </div>
 
-                      <div className="field field--full">
-                        <label htmlFor="purchaseGiftedDeposit">
-                          Any gifted deposit?
-                        </label>
+                      <div className="field">
+                        <label htmlFor="purchaseGiftedDeposit">Any gifted deposit?</label>
                         <select
                           id="purchaseGiftedDeposit"
                           name="purchaseGiftedDeposit"
                           value={form.purchaseGiftedDeposit}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="purchaseLifetimeIsa">Using a Lifetime ISA?</label>
+                        <select
+                          id="purchaseLifetimeIsa"
+                          name="purchaseLifetimeIsa"
+                          value={form.purchaseLifetimeIsa}
                           onChange={handleChange}
                         >
                           <option value="">Please select</option>
@@ -2172,16 +2314,10 @@ if (typeof quote.vat === "number") {
 
                 {isRemortgage && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Remortgage Details</h2>
-                        <p>
-                          These questions help us assess the remortgage work
-                          involved.
-                        </p>
+                        <p>These questions help us assess the remortgage work involved.</p>
                       </div>
                     </div>
 
@@ -2199,9 +2335,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="newLender">
-                          New lender (if known)
-                        </label>
+                        <label htmlFor="newLender">New lender (if known)</label>
                         <input
                           id="newLender"
                           type="text"
@@ -2213,9 +2347,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="additionalBorrowing">
-                          Additional borrowing?
-                        </label>
+                        <label htmlFor="additionalBorrowing">Additional borrowing?</label>
                         <select
                           id="additionalBorrowing"
                           name="additionalBorrowing"
@@ -2249,10 +2381,7 @@ if (typeof quote.vat === "number") {
 
                 {isTransfer && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Transfer Details</h2>
                         <p>
@@ -2301,10 +2430,7 @@ if (typeof quote.vat === "number") {
 
                 {isRemortgageTransfer && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Property Details</h2>
                         <p>
@@ -2331,9 +2457,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPrice">
-                          Property value (£)
-                        </label>
+                        <label htmlFor="remortgageTransferPrice">Property value (£)</label>
                         <input
                           id="remortgageTransferPrice"
                           type="number"
@@ -2346,9 +2470,7 @@ if (typeof quote.vat === "number") {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPostcode">
-                          Property postcode
-                        </label>
+                        <label htmlFor="remortgageTransferPostcode">Property postcode</label>
                         <input
                           id="remortgageTransferPostcode"
                           type="text"
@@ -2361,15 +2483,10 @@ if (typeof quote.vat === "number") {
                       </div>
                     </div>
 
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "18px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Remortgage Details</h2>
-                        <p>
-                          These questions help us assess the remortgage element.
-                        </p>
+                        <p>These questions help us assess the remortgage element.</p>
                       </div>
                     </div>
 
@@ -2417,17 +2534,29 @@ if (typeof quote.vat === "number") {
                           <option value="no">No</option>
                         </select>
                       </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferOwnershipType">
+                          Borrower type
+                        </label>
+                        <select
+                          id="remortgageTransferOwnershipType"
+                          name="remortgageTransferOwnershipType"
+                          value={form.remortgageTransferOwnershipType}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="individual">Individual</option>
+                          <option value="joint">Joint borrowers</option>
+                          <option value="company">Company</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "18px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Transfer of Equity Details</h2>
-                        <p>
-                          These questions help us assess the transfer element.
-                        </p>
+                        <p>These questions help us assess the transfer element.</p>
                       </div>
                     </div>
 
@@ -2470,10 +2599,7 @@ if (typeof quote.vat === "number") {
 
                 {form.type && (
                   <>
-                    <div
-                      className="section-heading"
-                      style={{ marginTop: "10px" }}
-                    >
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Your Contact Details</h2>
                         <p>
@@ -2627,8 +2753,7 @@ if (typeof quote.vat === "number") {
                   <h2>Approve and Send Client Quote</h2>
                   <p>
                     Internal use only. Review the loaded enquiry, check the
-                    important matter details, use the quick calculators if
-                    needed, and send the client-facing quote email.
+                    prebuilt quote and send the client-facing quote email.
                   </p>
                 </div>
               </div>
@@ -2644,8 +2769,7 @@ if (typeof quote.vat === "number") {
 
                 {!isLoadingEnquiry && !loadedEnquiryMessage && refFromUrl && (
                   <p className="form-note">
-                    Admin page unlocked. Ready to load enquiry reference{" "}
-                    {refFromUrl}.
+                    Admin page unlocked. Ready to load enquiry reference {refFromUrl}.
                   </p>
                 )}
               </div>
@@ -2708,15 +2832,11 @@ if (typeof quote.vat === "number") {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltFirstTimeBuyer">
-                            First time buyer?
-                          </label>
+                          <label htmlFor="sdltFirstTimeBuyer">First time buyer?</label>
                           <select
                             id="sdltFirstTimeBuyer"
                             value={sdltFirstTimeBuyer}
-                            onChange={(e) =>
-                              setSdltFirstTimeBuyer(e.target.value)
-                            }
+                            onChange={(e) => setSdltFirstTimeBuyer(e.target.value)}
                           >
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
@@ -2724,15 +2844,11 @@ if (typeof quote.vat === "number") {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltAdditionalProperty">
-                            Additional property?
-                          </label>
+                          <label htmlFor="sdltAdditionalProperty">Additional property?</label>
                           <select
                             id="sdltAdditionalProperty"
                             value={sdltAdditionalProperty}
-                            onChange={(e) =>
-                              setSdltAdditionalProperty(e.target.value)
-                            }
+                            onChange={(e) => setSdltAdditionalProperty(e.target.value)}
                           >
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
@@ -2752,9 +2868,7 @@ if (typeof quote.vat === "number") {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltIsCompany">
-                            Buying via company?
-                          </label>
+                          <label htmlFor="sdltIsCompany">Buying via company?</label>
                           <select
                             id="sdltIsCompany"
                             value={sdltIsCompany}
@@ -2766,15 +2880,11 @@ if (typeof quote.vat === "number") {
                         </div>
 
                         <div className="field">
-                          <label htmlFor="sdltSharedOwnership">
-                            Shared ownership?
-                          </label>
+                          <label htmlFor="sdltSharedOwnership">Shared ownership?</label>
                           <select
                             id="sdltSharedOwnership"
                             value={sdltSharedOwnership}
-                            onChange={(e) =>
-                              setSdltSharedOwnership(e.target.value)
-                            }
+                            onChange={(e) => setSdltSharedOwnership(e.target.value)}
                           >
                             <option value="yes">Yes</option>
                             <option value="no">No</option>
@@ -2863,9 +2973,7 @@ if (typeof quote.vat === "number") {
                   </div>
 
                   <div className="field">
-                    <label htmlFor="propertyPrice">
-                      Property price / value (£)
-                    </label>
+                    <label htmlFor="propertyPrice">Property price / value (£)</label>
                     <input
                       id="propertyPrice"
                       type="text"
@@ -2911,29 +3019,42 @@ if (typeof quote.vat === "number") {
                         >
                           <div className="detail-row__label">{item.label}</div>
                           <div className="detail-row__value">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.amount}
-                              onChange={(e) =>
-                                handleQuoteItemAmountChange(
-                                  "legalFees",
-                                  index,
-                                  e.target.value
-                                )
-                              }
-                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                alignItems: "center",
+                              }}
+                            >
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.amount}
+                                onChange={(e) =>
+                                  handleQuoteItemAmountChange(
+                                    "legalFees",
+                                    index,
+                                    e.target.value
+                                  )
+                                }
+                              />
+                              <button
+                                type="button"
+                                className="muted-button"
+                                onClick={() =>
+                                  handleRemoveQuoteItem("legalFees", index)
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
                       {approvedQuote.quoteData.legalFees.length === 0 && (
                         <div className="detail-row">
-                          <div className="detail-row__label">
-                            No fee items loaded yet
-                          </div>
-                          <div className="detail-row__value">
-                            Update pricing engine next
-                          </div>
+                          <div className="detail-row__label">No fee items loaded yet</div>
+                          <div className="detail-row__value">Update pricing engine next</div>
                         </div>
                       )}
                     </div>
@@ -2942,16 +3063,20 @@ if (typeof quote.vat === "number") {
                   <div className="field field--full">
                     <label>Disbursement items</label>
                     <div className="detail-table">
-                      {approvedQuote.quoteData.disbursements.map(
-                        (item, index) => (
-                          <div
-                            key={`disbursement-${item.label}-${index}`}
-                            className="detail-row"
-                          >
-                            <div className="detail-row__label">
-                              {item.label}
-                            </div>
-                            <div className="detail-row__value">
+                      {approvedQuote.quoteData.disbursements.map((item, index) => (
+                        <div
+                          key={`disbursement-${item.label}-${index}`}
+                          className="detail-row"
+                        >
+                          <div className="detail-row__label">{item.label}</div>
+                          <div className="detail-row__value">
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                alignItems: "center",
+                              }}
+                            >
                               {item.note ? (
                                 <div>{item.note}</div>
                               ) : (
@@ -2968,10 +3093,19 @@ if (typeof quote.vat === "number") {
                                   }
                                 />
                               )}
+                              <button
+                                type="button"
+                                className="muted-button"
+                                onClick={() =>
+                                  handleRemoveQuoteItem("disbursements", index)
+                                }
+                              >
+                                Remove
+                              </button>
                             </div>
                           </div>
-                        )
-                      )}
+                        </div>
+                      ))}
                       {approvedQuote.quoteData.disbursements.length === 0 && (
                         <div className="detail-row">
                           <div className="detail-row__label">
