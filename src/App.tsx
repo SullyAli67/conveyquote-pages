@@ -56,6 +56,7 @@ type QuoteForm = {
   postcode: string;
 
   mortgage: string;
+  lender: string;
   ownershipType: string;
   firstTimeBuyer: string;
   newBuild: string;
@@ -152,6 +153,7 @@ type LoadedEnquiry = {
   postcode?: string;
 
   mortgage?: string;
+  lender?: string;
   ownership_type?: string;
   first_time_buyer?: string;
   new_build?: string;
@@ -228,6 +230,7 @@ const initialFormState: QuoteForm = {
   postcode: "",
 
   mortgage: "",
+  lender: "",
   ownershipType: "",
   firstTimeBuyer: "",
   newBuild: "",
@@ -290,7 +293,7 @@ const initialFormState: QuoteForm = {
 };
 
 const defaultApprovedNextSteps =
-  "If you would like to proceed, please click the Instruct Us button in this email. Once we receive your instruction, we will contact you with the next steps and client care documentation. If you have any questions in the meantime, please email info@conveyquote.uk.";
+  "If you would like to proceed, please click Accept Quote in this email. Once we receive your instruction, we will move your matter to the next stage and contact you with the next steps and client care documentation. If you have any questions in the meantime, please email info@conveyquote.uk.";
 
 const initialApprovedQuoteState: ApprovedQuoteForm = {
   clientName: "",
@@ -1244,6 +1247,10 @@ function App() {
           value: prettifyValue(loadedEnquiry.mortgage),
         },
         {
+  label: "Lender",
+  value: prettifyValue(loadedEnquiry.lender),
+},
+        {
           label: "First time buyer",
           value: prettifyValue(loadedEnquiry.first_time_buyer),
         },
@@ -1360,9 +1367,9 @@ function App() {
           value: prettifyValue(loadedEnquiry.purchase_mortgage),
         },
         {
-  label: "Purchase lender",
-  value: prettifyValue(loadedEnquiry.purchase_lender),
-},
+          label: "Purchase lender",
+          value: prettifyValue(loadedEnquiry.purchase_lender),
+        },
         {
           label: "Buyer type",
           value: prettifyValue(loadedEnquiry.purchase_ownership_type),
@@ -1709,7 +1716,19 @@ function App() {
                           <option value="cash">Cash</option>
                         </select>
                       </div>
-
+          {form.mortgage === "mortgage" && (
+          <div className="field">
+          <label htmlFor="lender">Lender</label>
+          <input
+      id="lender"
+      type="text"
+      name="lender"
+      placeholder="e.g. Nationwide"
+      value={form.lender}
+      onChange={handleChange}
+    />
+  </div>
+)}
                       <div className="field">
                         <label htmlFor="ownershipType">Buyer type</label>
                         <select
