@@ -502,7 +502,9 @@ function App() {
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
     initialApprovedQuoteState
   );
-
+  
+  const [lenders, setLenders] = useState<{ id: number; name: string }[]>([]);
+  const [loadingLenders, setLoadingLenders] = useState(false);
   const [adminPasscode, setAdminPasscode] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
@@ -1126,7 +1128,30 @@ function App() {
       setIsLoadingEnquiry(false);
     }
   };
+useEffect(() => {
+  async function loadLenders() {
+    setLoadingLenders(true);
 
+    try {
+      const response = await fetch("/api/lenders");
+      const result = await response.json();
+
+      if (result.success && Array.isArray(result.lenders)) {
+        setLenders(result.lenders);
+      } else {
+        setLenders([]);
+      }
+    } catch (error) {
+      console.error("Failed to load lenders:", error);
+      setLenders([]);
+    } finally {
+      setLoadingLenders(false);
+    }
+  }
+
+  loadLenders();
+}, []);
+  
   useEffect(() => {
     if (isAdminPage && isAdminUnlocked && refFromUrl) {
       loadEnquiryByReference(refFromUrl);
@@ -1719,20 +1744,27 @@ function App() {
                         </select>
                       </div>
 
-                      {form.mortgage === "mortgage" && (
-                        <div className="field">
-                          <label htmlFor="lender">Lender</label>
-                          <input
-                            id="lender"
-                            type="text"
-                            name="lender"
-                            placeholder="e.g. Nationwide"
-                            value={form.lender}
-                            onChange={handleChange}
-                            required
-                          />
-                        </div>
-                      )}
+                  {form.mortgage === "mortgage" && (
+  <div className="field">
+    <label htmlFor="lender">Lender</label>
+    <select
+      id="lender"
+      name="lender"
+      value={form.lender}
+      onChange={handleChange}
+      required
+    >
+      <option value="">
+        {loadingLenders ? "Loading lenders..." : "Please select"}
+      </option>
+      {lenders.map((lender) => (
+        <option key={lender.id} value={lender.name}>
+          {lender.name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
 
                       <div className="field">
                         <label htmlFor="ownershipType">Buyer type</label>
@@ -2187,21 +2219,27 @@ function App() {
                         </select>
                       </div>
 
-                      {form.purchaseMortgage === "mortgage" && (
-                        <div className="field">
-                          <label htmlFor="purchaseLender">Purchase lender</label>
-                          <input
-                            id="purchaseLender"
-                            type="text"
-                            name="purchaseLender"
-                            placeholder="e.g. Nationwide"
-                            value={form.purchaseLender}
-                            onChange={handleChange}
-                            required
-                          />
-                        </div>
-                      )}
-
+                {form.purchaseMortgage === "mortgage" && (
+  <div className="field">
+    <label htmlFor="purchaseLender">Purchase lender</label>
+    <select
+      id="purchaseLender"
+      name="purchaseLender"
+      value={form.purchaseLender}
+      onChange={handleChange}
+      required
+    >
+      <option value="">
+        {loadingLenders ? "Loading lenders..." : "Please select"}
+      </option>
+      {lenders.map((lender) => (
+        <option key={lender.id} value={lender.name}>
+          {lender.name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
                       <div className="field">
                         <label htmlFor="purchaseOwnershipType">Buyer type</label>
                         <select
@@ -2422,19 +2460,23 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="newLender">
-                          New lender (if known)
-                        </label>
-                        <input
-                          id="newLender"
-                          type="text"
-                          name="newLender"
-                          placeholder="e.g. Nationwide"
-                          value={form.newLender}
-                          onChange={handleChange}
-                        />
-                      </div>
-
+  <label htmlFor="newLender">New lender</label>
+  <select
+    id="newLender"
+    name="newLender"
+    value={form.newLender}
+    onChange={handleChange}
+  >
+    <option value="">
+      {loadingLenders ? "Loading lenders..." : "Please select"}
+    </option>
+    {lenders.map((lender) => (
+      <option key={lender.id} value={lender.name}>
+        {lender.name}
+      </option>
+    ))}
+  </select>
+</div>
                       <div className="field">
                         <label htmlFor="additionalBorrowing">
                           Additional borrowing?
@@ -2603,18 +2645,23 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferNewLender">
-                          New lender
-                        </label>
-                        <input
-                          id="remortgageTransferNewLender"
-                          type="text"
-                          name="remortgageTransferNewLender"
-                          placeholder="e.g. Nationwide"
-                          value={form.remortgageTransferNewLender}
-                          onChange={handleChange}
-                        />
-                      </div>
+  <label htmlFor="remortgageTransferNewLender">New lender</label>
+  <select
+    id="remortgageTransferNewLender"
+    name="remortgageTransferNewLender"
+    value={form.remortgageTransferNewLender}
+    onChange={handleChange}
+  >
+    <option value="">
+      {loadingLenders ? "Loading lenders..." : "Please select"}
+    </option>
+    {lenders.map((lender) => (
+      <option key={lender.id} value={lender.name}>
+        {lender.name}
+      </option>
+    ))}
+  </select>
+</div>
 
                       <div className="field">
                         <label htmlFor="remortgageTransferAdditionalBorrowing">
