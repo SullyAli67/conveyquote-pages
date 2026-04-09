@@ -54,12 +54,14 @@ export async function onRequestPost(context) {
       }
 
       const str = String(value).trim();
-
       if (!str) return "";
-      if (str.toLowerCase() === "yes") return "Yes";
-      if (str.toLowerCase() === "no") return "No";
-      if (str.toLowerCase() === "mortgage") return "Mortgage";
-      if (str.toLowerCase() === "cash") return "Cash";
+
+      const lower = str.toLowerCase();
+
+      if (lower === "yes") return "Yes";
+      if (lower === "no") return "No";
+      if (lower === "mortgage") return "Mortgage";
+      if (lower === "cash") return "Cash";
 
       return str
         .replace(/_/g, " ")
@@ -67,9 +69,7 @@ export async function onRequestPost(context) {
     };
 
     const formatMultilineHtml = (value) =>
-      escapeHtml(value)
-        .replace(/\n/g, "<br />")
-        .replace(/  /g, "&nbsp;&nbsp;");
+      escapeHtml(value).replace(/\n/g, "<br />").replace(/  /g, "&nbsp;&nbsp;");
 
     const cleanMoney = (value) =>
       safe(value)
@@ -161,6 +161,18 @@ export async function onRequestPost(context) {
       : [];
 
     const vatAmount = Number(quoteData?.vat || 0);
+    const sdltAmount =
+      typeof quoteData?.sdltAmount === "number"
+        ? Number(quoteData.sdltAmount)
+        : null;
+    const sdltNote =
+      quoteData?.sdltNote !== null && quoteData?.sdltNote !== undefined
+        ? String(quoteData.sdltNote)
+        : "";
+    const totalIncludingSdlt =
+      typeof quoteData?.totalIncludingSdlt === "number"
+        ? Number(quoteData.totalIncludingSdlt)
+        : null;
 
     const legalFeesSubtotal = sumItems(legalFees);
     const legalFeesTotal = legalFeesSubtotal + vatAmount;
@@ -170,6 +182,8 @@ export async function onRequestPost(context) {
     const finalQuoteAmountValue =
       quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
         ? Number(cleanMoney(quoteAmount))
+        : totalIncludingSdlt !== null
+        ? totalIncludingSdlt
         : calculatedGrandTotal;
 
     const displayQuoteAmount = formatMoney(finalQuoteAmountValue);
@@ -203,7 +217,19 @@ export async function onRequestPost(context) {
         : []),
     ];
 
-    const totalEstimatedRows = [
+    const totalRows = [
+      {
+        label: "Legal fees and disbursements",
+        amount: calculatedGrandTotal,
+      },
+      ...(sdltAmount !== null
+        ? [
+            {
+              label: "Estimated SDLT",
+              amount: sdltAmount,
+            },
+          ]
+        : []),
       {
         label: "Total Estimated Cost",
         amount: finalQuoteAmountValue,
@@ -260,7 +286,7 @@ export async function onRequestPost(context) {
             <tr>
               <td style="padding:18px 20px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                  ${buildRowsHtml(totalEstimatedRows)}
+                  ${buildRowsHtml(totalRows)}
                 </table>
               </td>
             </tr>
@@ -268,6 +294,24 @@ export async function onRequestPost(context) {
         </td>
       </tr>
     `;
+
+    const sdltReviewHtml =
+      sdltAmount === null && sdltNote
+        ? `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
+                    <strong>SDLT</strong><br />
+                    ${escapeHtml(sdltNote)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        `
+        : "";
 
     const fallbackBreakdownHtml =
       !legalFeesHtml && !disbursementsHtml && feeBreakdown
@@ -290,7 +334,9 @@ export async function onRequestPost(context) {
     let transactionSummaryHtml = "";
 
     if (type === "sale_purchase") {
-      const parts = safe(price).split("|").map((part) => part.trim());
+      const parts = safe(price)
+        .split("|")
+        .map((part) => part.trim());
       const salePart = parts[0] || "";
       const purchasePart = parts[1] || "";
 
@@ -377,10 +423,16 @@ export async function onRequestPost(context) {
                                     £${escapeHtml(displayQuoteAmount)}
                                   </div>
                                   <div style="font-size:14px;color:#52606d;margin-top:8px;line-height:1.8;">
-                                    Including VAT and disbursements
+                                    ${
+                                      sdltAmount !== null
+                                        ? "Including VAT, disbursements and estimated SDLT"
+                                        : "Including VAT and disbursements"
+                                    }
                                   </div>
                                   <div style="font-size:14px;color:#52606d;margin-top:6px;line-height:1.8;">
-                                    Reference: <strong>${escapeHtml(quoteReference)}</strong>
+                                    Reference: <strong>${escapeHtml(
+                                      quoteReference
+                                    )}</strong>
                                   </div>
                                 </td>
                               </tr>
@@ -397,6 +449,7 @@ export async function onRequestPost(context) {
                         ${legalFeesHtml}
                         ${disbursementsHtml}
                         ${totalEstimatedHtml}
+                        ${sdltReviewHtml}
                         ${fallbackBreakdownHtml}
 
                         <tr>
