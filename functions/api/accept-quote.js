@@ -186,8 +186,7 @@ export async function onRequestGet(context) {
                   <p style="margin-top:0;">Dear ${escapeHtml(clientName)},</p>
 
                   <p>
-                    Thank you for confirming that you would like to proceed.
-                    We have now recorded your instruction.
+                    Thank you for confirming that you would like to proceed. We have now recorded your instruction.
                   </p>
 
                   <table style="border-collapse:collapse;width:100%;margin:16px 0 24px 0;">
@@ -206,14 +205,11 @@ export async function onRequestGet(context) {
                   </table>
 
                   <p>
-                    Your matter will now move to the next stage of review and onboarding.
-                    This may include referral to one of our selected panel solicitor firms,
-                    depending on the nature of the transaction and allocation requirements.
+                    Your matter will now move to the next stage of review and onboarding. This may include referral to one of our selected panel solicitor firms, depending on the type of transaction, lender requirements and panel availability.
                   </p>
 
                   <p>
-                    Please allow us a short time to process your instruction and prepare the next steps.
-                    If you have any questions in the meantime, please contact us at
+                    Please allow us a short time to process your instruction and prepare the next steps. If you have any questions in the meantime, please contact us at
                     <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>.
                   </p>
 
@@ -285,12 +281,10 @@ export async function onRequestGet(context) {
                         We have received your instruction to proceed and your matter will now move to the next stage.
                       </p>
                       <p>
-                        This may include referral to one of our selected panel solicitor firms,
-                        depending on the nature of the transaction and allocation requirements.
+                        This may include referral to one of our selected panel solicitor firms, depending on the type of transaction, lender requirements and panel availability.
                       </p>
                       <p>
-                        Please allow us a short time to process your instruction and prepare the next steps.
-                        If you have any questions in the meantime, please contact us at
+                        Please allow us a short time to process your instruction and prepare the next steps. If you have any questions in the meantime, please contact us at
                         <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>.
                       </p>`
                 }
