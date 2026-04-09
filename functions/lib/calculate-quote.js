@@ -1,115 +1,23 @@
-type QuoteItem = {
-  label: string;
-  amount: number;
-  note?: string;
-};
-
-type BuildQuoteInput = {
-  type?: string;
-
-  tenure?: string;
-  price?: string | number;
-  postcode?: string;
-
-  mortgage?: string;
-  lender?: string;
-  ownershipType?: string;
-  firstTimeBuyer?: string;
-  newBuild?: string;
-  sharedOwnership?: string;
-  helpToBuy?: string;
-  isCompany?: string;
-  buyToLet?: string;
-  giftedDeposit?: string;
-  additionalProperty?: string;
-  ukResidentForSdlt?: string;
-  lifetimeIsa?: string;
-
-  saleMortgage?: string;
-  managementCompany?: string;
-  tenanted?: string;
-  numberOfSellers?: string;
-
-  currentLender?: string;
-  newLender?: string;
-  additionalBorrowing?: string;
-  remortgageTransfer?: string;
-
-  transferMortgage?: string;
-  ownersChanging?: string;
-
-  saleTenure?: string;
-  salePrice?: string | number;
-  salePostcode?: string;
-  saleMortgageCombined?: string;
-  managementCompanyCombined?: string;
-  tenantedCombined?: string;
-  numberOfSellersCombined?: string;
-
-  purchaseTenure?: string;
-  purchasePrice?: string | number;
-  purchasePostcode?: string;
-  purchaseMortgage?: string;
-  purchaseLender?: string;
-  purchaseOwnershipType?: string;
-  purchaseFirstTimeBuyer?: string;
-  purchaseNewBuild?: string;
-  purchaseSharedOwnership?: string;
-  purchaseHelpToBuy?: string;
-  purchaseIsCompany?: string;
-  purchaseBuyToLet?: string;
-  purchaseGiftedDeposit?: string;
-  purchaseAdditionalProperty?: string;
-  purchaseUkResidentForSdlt?: string;
-  purchaseLifetimeIsa?: string;
-
-  remortgageTransferTenure?: string;
-  remortgageTransferPrice?: string | number;
-  remortgageTransferPostcode?: string;
-  remortgageTransferCurrentLender?: string;
-  remortgageTransferNewLender?: string;
-  remortgageTransferAdditionalBorrowing?: string;
-  remortgageTransferHasMortgage?: string;
-  remortgageTransferOwnersChanging?: string;
-  remortgageTransferOwnershipType?: string;
-};
-
-type BuildQuoteResult = {
-  legalFees: QuoteItem[];
-  disbursements: QuoteItem[];
-  legalFeesExVat: number;
-  vat: number;
-  legalTotalInclVat: number;
-  disbursementTotal: number;
-  grandTotal: number;
-  sdltAmount?: number;
-  sdltNote?: string;
-  totalIncludingSdlt?: number;
-  feeBreakdown: string;
-  breakdownText: string;
-  disclaimerLines: string[];
-};
-
-function toNumber(value: string | number | undefined | null): number {
+function toNumber(value) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function addItem(items: QuoteItem[], label: string, amount: number, note?: string) {
+function addItem(items, label, amount, note) {
   if (amount > 0) {
     items.push({ label, amount, note });
   }
 }
 
-function sumItems(items: QuoteItem[]): number {
+function sumItems(items) {
   return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
-function formatMoney(value: number): string {
+function formatMoney(value) {
   return `£${value.toFixed(2)}`;
 }
 
-function calculateStandardSdlt(price: number): number {
+function calculateStandardSdlt(price) {
   let tax = 0;
 
   if (price > 250000) {
@@ -127,7 +35,7 @@ function calculateStandardSdlt(price: number): number {
   return Math.max(0, tax);
 }
 
-function calculateFirstTimeBuyerSdlt(price: number): number {
+function calculateFirstTimeBuyerSdlt(price) {
   if (price > 625000) {
     return calculateStandardSdlt(price);
   }
@@ -148,14 +56,7 @@ function calculateSdlt({
   ukResidentForSdlt,
   isCompany,
   sharedOwnership,
-}: {
-  price: number;
-  firstTimeBuyer?: string;
-  additionalProperty?: string;
-  ukResidentForSdlt?: string;
-  isCompany?: string;
-  sharedOwnership?: string;
-}): { sdltAmount?: number; sdltNote?: string } {
+}) {
   if (price <= 0) {
     return {};
   }
@@ -181,18 +82,7 @@ function calculateSdlt({
   };
 }
 
-function buildFeeBreakdown(params: {
-  legalFees: QuoteItem[];
-  vat: number;
-  legalTotalInclVat: number;
-  disbursements: QuoteItem[];
-  disbursementTotal: number;
-  grandTotal: number;
-  sdltAmount?: number;
-  sdltNote?: string;
-  totalIncludingSdlt?: number;
-  disclaimerLines: string[];
-}): string {
+function buildFeeBreakdown(params) {
   const {
     legalFees,
     vat,
@@ -206,7 +96,7 @@ function buildFeeBreakdown(params: {
     disclaimerLines,
   } = params;
 
-  const lines: string[] = [];
+  const lines = [];
 
   lines.push("LEGAL FEES");
   legalFees.forEach((item) => {
@@ -251,14 +141,7 @@ function buildFeeBreakdown(params: {
   return lines.join("\n");
 }
 
-function finaliseQuote(args: {
-  legalFees: QuoteItem[];
-  disbursements: QuoteItem[];
-  sdltAmount?: number;
-  sdltNote?: string;
-  disclaimerLines?: string[];
-  breakdownTitle?: string;
-}): BuildQuoteResult {
+function finaliseQuote(args) {
   const legalFeesExVat = Number(sumItems(args.legalFees).toFixed(2));
   const vat = Number((legalFeesExVat * 0.2).toFixed(2));
   const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
@@ -305,9 +188,9 @@ function finaliseQuote(args: {
   };
 }
 
-function buildPurchaseQuote(input: BuildQuoteInput): BuildQuoteResult {
-  const legalFees: QuoteItem[] = [];
-  const disbursements: QuoteItem[] = [];
+function buildPurchaseQuote(input) {
+  const legalFees = [];
+  const disbursements = [];
   const price = toNumber(input.price);
 
   addItem(legalFees, "Purchase legal fee", 1195);
@@ -357,9 +240,9 @@ function buildPurchaseQuote(input: BuildQuoteInput): BuildQuoteResult {
   });
 }
 
-function buildSaleQuote(input: BuildQuoteInput): BuildQuoteResult {
-  const legalFees: QuoteItem[] = [];
-  const disbursements: QuoteItem[] = [];
+function buildSaleQuote(input) {
+  const legalFees = [];
+  const disbursements = [];
 
   addItem(legalFees, "Sale legal fee", 995);
 
@@ -389,9 +272,9 @@ function buildSaleQuote(input: BuildQuoteInput): BuildQuoteResult {
   });
 }
 
-function buildRemortgageQuote(input: BuildQuoteInput): BuildQuoteResult {
-  const legalFees: QuoteItem[] = [];
-  const disbursements: QuoteItem[] = [];
+function buildRemortgageQuote(input) {
+  const legalFees = [];
+  const disbursements = [];
 
   addItem(legalFees, "Remortgage legal fee", 595);
 
@@ -417,9 +300,9 @@ function buildRemortgageQuote(input: BuildQuoteInput): BuildQuoteResult {
   });
 }
 
-function buildTransferQuote(input: BuildQuoteInput): BuildQuoteResult {
-  const legalFees: QuoteItem[] = [];
-  const disbursements: QuoteItem[] = [];
+function buildTransferQuote(input) {
+  const legalFees = [];
+  const disbursements = [];
 
   addItem(legalFees, "Transfer of equity legal fee", 650);
 
@@ -450,9 +333,9 @@ function buildTransferQuote(input: BuildQuoteInput): BuildQuoteResult {
   });
 }
 
-function buildRemortgageTransferQuote(input: BuildQuoteInput): BuildQuoteResult {
-  const legalFees: QuoteItem[] = [];
-  const disbursements: QuoteItem[] = [];
+function buildRemortgageTransferQuote(input) {
+  const legalFees = [];
+  const disbursements = [];
 
   addItem(legalFees, "Remortgage legal fee", 595);
   addItem(legalFees, "Transfer of equity supplement", 350);
@@ -484,12 +367,7 @@ function buildRemortgageTransferQuote(input: BuildQuoteInput): BuildQuoteResult 
   });
 }
 
-function combineQuotes(
-  title: string,
-  first: BuildQuoteResult,
-  second: BuildQuoteResult,
-  sdltFromSecond = false
-): BuildQuoteResult {
+function combineQuotes(title, first, second, sdltFromSecond = false) {
   const legalFees = [...first.legalFees, ...second.legalFees];
   const disbursements = [...first.disbursements, ...second.disbursements];
   const sdltAmount = sdltFromSecond ? second.sdltAmount : undefined;
@@ -508,7 +386,7 @@ function combineQuotes(
   });
 }
 
-export function buildQuoteData(input: BuildQuoteInput): BuildQuoteResult {
+export function buildQuoteData(input) {
   const type = input.type || "";
 
   if (type === "purchase") {
