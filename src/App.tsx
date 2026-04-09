@@ -57,9 +57,9 @@ type DashboardEnquiry = {
 type DashboardFirm = {
   id: number;
   firm_name?: string;
-  contact_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
   active?: string;
   accepting_new_matters?: string;
   lender_count?: number;
@@ -544,6 +544,10 @@ function App() {
   const [dashboardFirms, setDashboardFirms] = useState<DashboardFirm[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
 
+  const [adminTab, setAdminTab] = useState<
+    "dashboard" | "enquiries" | "firms" | "quote"
+  >("dashboard");
+
   const [vatCalculatorNet, setVatCalculatorNet] = useState("");
   const [sdltPrice, setSdltPrice] = useState("");
   const [sdltFirstTimeBuyer, setSdltFirstTimeBuyer] = useState("no");
@@ -585,6 +589,84 @@ function App() {
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const loadDashboardData = async () => {
+    setIsLoadingDashboard(true);
+
+    try {
+      const [enquiriesResponse, firmsResponse] = await Promise.all([
+        fetch("/api/list-enquiries"),
+        fetch("/api/list-panel-firms"),
+      ]);
+
+      const enquiriesResult = await enquiriesResponse.json();
+      const firmsResult = await firmsResponse.json();
+
+      if (enquiriesResult.success && Array.isArray(enquiriesResult.enquiries)) {
+        setDashboardEnquiries(enquiriesResult.enquiries);
+      } else {
+        setDashboardEnquiries([]);
+      }
+
+      if (firmsResult.success && Array.isArray(firmsResult.firms)) {
+        setDashboardFirms(firmsResult.firms);
+      } else {
+        setDashboardFirms([]);
+      }
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+      setDashboardEnquiries([]);
+      setDashboardFirms([]);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
+  const handleAdminUnlock = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (adminPasscode === ADMIN_PASSCODE) {
+      setIsAdminUnlocked(true);
+      setManualReference(refFromUrl);
+
+      if (!refFromUrl) {
+        setAdminTab("dashboard");
+        await loadDashboardData();
+      }
+    } else {
+      alert("Incorrect passcode");
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch("/api/send-quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert("Thank you. Your enquiry has been submitted for review.");
+        setForm(initialFormState);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        alert(
+          "Sorry, there was a problem submitting your enquiry. Please try again."
+        );
+        console.error("Send error:", result);
+      }
+    } catch (error) {
+      alert("Sorry, something went wrong while submitting your enquiry.");
+      console.error("Request error:", error);
+    }
   };
 
   const buildFeeBreakdown = (quote: LoadedQuote | null | undefined) => {
@@ -934,6 +1016,57 @@ function App() {
     };
   };
 
+  const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const payload = {
+      name: approvedQuote.clientName,
+      email: approvedQuote.clientEmail,
+      type: approvedQuote.transactionType,
+      tenure: approvedQuote.tenure,
+      price: approvedQuote.propertyPrice,
+      quoteAmount: approvedQuote.quoteAmount,
+      quoteReference: approvedQuote.quoteReference,
+      feeBreakdown: approvedQuote.feeBreakdown,
+      nextSteps: approvedQuote.nextSteps,
+      quoteData: approvedQuote.quoteData,
+    };
+
+    try {
+      const response = await fetch("/api/send-approved-quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert("Approved client quote sent successfully.");
+        setApprovedQuote(initialApprovedQuoteState);
+        setLoadedEnquiryMessage("");
+        setLoadedEnquiry(null);
+        setAdminTab("dashboard");
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.delete("ref");
+        window.history.replaceState({}, "", nextUrl.toString());
+
+        setManualReference("");
+        await loadDashboardData();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        alert("Sorry, there was a problem sending the approved quote.");
+        console.error("Approved quote send error:", result);
+      }
+    } catch (error) {
+      alert("Sorry, something went wrong while sending the approved quote.");
+      console.error("Approved quote request error:", error);
+    }
+  };
+
   const loadEnquiryByReference = async (reference: string) => {
     if (!reference) return;
 
@@ -1077,38 +1210,6 @@ function App() {
     }
   };
 
-  const loadDashboardData = async () => {
-    setIsLoadingDashboard(true);
-
-    try {
-      const [enquiriesResponse, firmsResponse] = await Promise.all([
-        fetch("/api/list-enquiries"),
-        fetch("/api/list-panel-firms"),
-      ]);
-
-      const enquiriesResult = await enquiriesResponse.json();
-      const firmsResult = await firmsResponse.json();
-
-      if (enquiriesResult.success && Array.isArray(enquiriesResult.enquiries)) {
-        setDashboardEnquiries(enquiriesResult.enquiries);
-      } else {
-        setDashboardEnquiries([]);
-      }
-
-      if (firmsResult.success && Array.isArray(firmsResult.firms)) {
-        setDashboardFirms(firmsResult.firms);
-      } else {
-        setDashboardFirms([]);
-      }
-    } catch (error) {
-      console.error("Failed to load dashboard data:", error);
-      setDashboardEnquiries([]);
-      setDashboardFirms([]);
-    } finally {
-      setIsLoadingDashboard(false);
-    }
-  };
-
   const handleManualReferenceLoad = async () => {
     if (!manualReference.trim()) {
       alert("Please enter a reference.");
@@ -1116,6 +1217,8 @@ function App() {
     }
 
     const nextReference = manualReference.trim();
+    setAdminTab("quote");
+
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", nextReference);
     window.history.replaceState({}, "", nextUrl.toString());
@@ -1127,6 +1230,7 @@ function App() {
     if (!reference) return;
 
     setManualReference(reference);
+    setAdminTab("quote");
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", reference);
@@ -1136,6 +1240,7 @@ function App() {
   };
 
   const handleBackToDashboard = async () => {
+    setAdminTab("dashboard");
     setLoadedEnquiry(null);
     setLoadedEnquiryMessage("");
     setApprovedQuote(initialApprovedQuoteState);
@@ -1146,92 +1251,6 @@ function App() {
 
     setManualReference("");
     await loadDashboardData();
-  };
-
-  const handleAdminUnlock = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (adminPasscode === ADMIN_PASSCODE) {
-      setIsAdminUnlocked(true);
-      setManualReference(refFromUrl);
-
-      if (!refFromUrl) {
-        await loadDashboardData();
-      }
-    } else {
-      alert("Incorrect passcode");
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch("/api/send-quote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert("Thank you. Your enquiry has been submitted for review.");
-        setForm(initialFormState);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        alert(
-          "Sorry, there was a problem submitting your enquiry. Please try again."
-        );
-        console.error("Send error:", result);
-      }
-    } catch (error) {
-      alert("Sorry, something went wrong while submitting your enquiry.");
-      console.error("Request error:", error);
-    }
-  };
-
-  const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const payload = {
-      name: approvedQuote.clientName,
-      email: approvedQuote.clientEmail,
-      type: approvedQuote.transactionType,
-      tenure: approvedQuote.tenure,
-      price: approvedQuote.propertyPrice,
-      quoteAmount: approvedQuote.quoteAmount,
-      quoteReference: approvedQuote.quoteReference,
-      feeBreakdown: approvedQuote.feeBreakdown,
-      nextSteps: approvedQuote.nextSteps,
-      quoteData: approvedQuote.quoteData,
-    };
-
-    try {
-      const response = await fetch("/api/send-approved-quote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert("Approved client quote sent successfully.");
-        await handleBackToDashboard();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        alert("Sorry, there was a problem sending the approved quote.");
-        console.error("Approved quote send error:", result);
-      }
-    } catch (error) {
-      alert("Sorry, something went wrong while sending the approved quote.");
-      console.error("Approved quote request error:", error);
-    }
   };
 
   useEffect(() => {
@@ -1263,8 +1282,10 @@ function App() {
 
     if (refFromUrl) {
       setManualReference(refFromUrl);
+      setAdminTab("quote");
       loadEnquiryByReference(refFromUrl);
     } else {
+      setAdminTab("dashboard");
       loadDashboardData();
     }
   }, [isAdminPage, isAdminUnlocked, refFromUrl]);
@@ -1751,12 +1772,12 @@ function App() {
             </span>
             <h1>
               {isAdminPage
-                ? "Approve and send client quotes"
+                ? "Approve and manage conveyancing quotes"
                 : "Fast, clear conveyancing quotes with solicitor oversight"}
             </h1>
             <p className="hero__summary">
               {isAdminPage
-                ? "Use this internal page to review a saved enquiry, check the prebuilt quote and issue the client-facing quote email."
+                ? "Use this internal page to review saved enquiries, manage the dashboard and issue client-facing quote emails."
                 : "Get a tailored quote for your sale, purchase, sale and purchase, remortgage, transfer of equity, or remortgage with transfer of equity. We review the details before issuing your quote so you get a clearer starting point."}
             </p>
 
@@ -1764,7 +1785,7 @@ function App() {
               {isAdminPage ? (
                 <>
                   <span>Internal use only</span>
-                  <span>Auto-loaded enquiry</span>
+                  <span>Super user dashboard</span>
                   <span>Approval workflow</span>
                 </>
               ) : (
@@ -1912,9 +1933,7 @@ function App() {
                             required
                           >
                             <option value="">
-                              {loadingLenders
-                                ? "Loading lenders..."
-                                : "Please select"}
+                              {loadingLenders ? "Loading lenders..." : "Please select"}
                             </option>
                             {lenders.map((lender) => (
                               <option key={lender.id} value={lender.name}>
@@ -2086,12 +2105,7 @@ function App() {
 
                       <div className="field field--full">
                         <label htmlFor="sdltHint">SDLT guidance</label>
-                        <input
-                          id="sdltHint"
-                          type="text"
-                          value={singleSdltHint}
-                          readOnly
-                        />
+                        <input id="sdltHint" type="text" value={singleSdltHint} readOnly />
                       </div>
                     </div>
 
@@ -2120,9 +2134,7 @@ function App() {
 
                     <div className="form-grid">
                       <div className="field">
-                        <label htmlFor="saleMortgage">
-                          Existing mortgage to redeem?
-                        </label>
+                        <label htmlFor="saleMortgage">Existing mortgage to redeem?</label>
                         <select
                           id="saleMortgage"
                           name="saleMortgage"
@@ -2153,9 +2165,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="numberOfSellers">
-                          How many sellers?
-                        </label>
+                        <label htmlFor="numberOfSellers">How many sellers?</label>
                         <select
                           id="numberOfSellers"
                           name="numberOfSellers"
@@ -2192,9 +2202,7 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "10px" }}>
                       <div>
                         <h2>Sale Details</h2>
-                        <p>
-                          Complete the details for the property you are selling.
-                        </p>
+                        <p>Complete the details for the property you are selling.</p>
                       </div>
                     </div>
 
@@ -2311,9 +2319,7 @@ function App() {
                     <div className="section-heading" style={{ marginTop: "18px" }}>
                       <div>
                         <h2>Purchase Details</h2>
-                        <p>
-                          Complete the details for the property you are buying.
-                        </p>
+                        <p>Complete the details for the property you are buying.</p>
                       </div>
                     </div>
 
@@ -2347,9 +2353,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchasePostcode">
-                          Purchase postcode
-                        </label>
+                        <label htmlFor="purchasePostcode">Purchase postcode</label>
                         <input
                           id="purchasePostcode"
                           type="text"
@@ -2362,9 +2366,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseMortgage">
-                          Mortgage or cash
-                        </label>
+                        <label htmlFor="purchaseMortgage">Mortgage or cash</label>
                         <select
                           id="purchaseMortgage"
                           name="purchaseMortgage"
@@ -2389,9 +2391,7 @@ function App() {
                             required
                           >
                             <option value="">
-                              {loadingLenders
-                                ? "Loading lenders..."
-                                : "Please select"}
+                              {loadingLenders ? "Loading lenders..." : "Please select"}
                             </option>
                             {lenders.map((lender) => (
                               <option key={lender.id} value={lender.name}>
@@ -2418,9 +2418,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseFirstTimeBuyer">
-                          First time buyer?
-                        </label>
+                        <label htmlFor="purchaseFirstTimeBuyer">First time buyer?</label>
                         <select
                           id="purchaseFirstTimeBuyer"
                           name="purchaseFirstTimeBuyer"
@@ -2494,9 +2492,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseSharedOwnership">
-                          Shared ownership?
-                        </label>
+                        <label htmlFor="purchaseSharedOwnership">Shared ownership?</label>
                         <select
                           id="purchaseSharedOwnership"
                           name="purchaseSharedOwnership"
@@ -2510,9 +2506,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseHelpToBuy">
-                          Help to Buy / scheme?
-                        </label>
+                        <label htmlFor="purchaseHelpToBuy">Help to Buy / scheme?</label>
                         <select
                           id="purchaseHelpToBuy"
                           name="purchaseHelpToBuy"
@@ -2526,9 +2520,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseIsCompany">
-                          Buying via company?
-                        </label>
+                        <label htmlFor="purchaseIsCompany">Buying via company?</label>
                         <select
                           id="purchaseIsCompany"
                           name="purchaseIsCompany"
@@ -2542,9 +2534,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseGiftedDeposit">
-                          Any gifted deposit?
-                        </label>
+                        <label htmlFor="purchaseGiftedDeposit">Any gifted deposit?</label>
                         <select
                           id="purchaseGiftedDeposit"
                           name="purchaseGiftedDeposit"
@@ -2558,9 +2548,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="purchaseLifetimeIsa">
-                          Using a Lifetime ISA?
-                        </label>
+                        <label htmlFor="purchaseLifetimeIsa">Using a Lifetime ISA?</label>
                         <select
                           id="purchaseLifetimeIsa"
                           name="purchaseLifetimeIsa"
@@ -2630,9 +2618,7 @@ function App() {
                           onChange={handleChange}
                         >
                           <option value="">
-                            {loadingLenders
-                              ? "Loading lenders..."
-                              : "Please select"}
+                            {loadingLenders ? "Loading lenders..." : "Please select"}
                           </option>
                           {lenders.map((lender) => (
                             <option key={lender.id} value={lender.name}>
@@ -2643,9 +2629,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="additionalBorrowing">
-                          Additional borrowing?
-                        </label>
+                        <label htmlFor="additionalBorrowing">Additional borrowing?</label>
                         <select
                           id="additionalBorrowing"
                           name="additionalBorrowing"
@@ -2707,9 +2691,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="ownersChanging">
-                          How many owners are changing?
-                        </label>
+                        <label htmlFor="ownersChanging">How many owners are changing?</label>
                         <select
                           id="ownersChanging"
                           name="ownersChanging"
@@ -2755,9 +2737,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPrice">
-                          Property value (£)
-                        </label>
+                        <label htmlFor="remortgageTransferPrice">Property value (£)</label>
                         <input
                           id="remortgageTransferPrice"
                           type="number"
@@ -2770,9 +2750,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="remortgageTransferPostcode">
-                          Property postcode
-                        </label>
+                        <label htmlFor="remortgageTransferPostcode">Property postcode</label>
                         <input
                           id="remortgageTransferPostcode"
                           type="text"
@@ -2818,9 +2796,7 @@ function App() {
                           onChange={handleChange}
                         >
                           <option value="">
-                            {loadingLenders
-                              ? "Loading lenders..."
-                              : "Please select"}
+                            {loadingLenders ? "Loading lenders..." : "Please select"}
                           </option>
                           {lenders.map((lender) => (
                             <option key={lender.id} value={lender.name}>
@@ -3002,10 +2978,7 @@ function App() {
                 <ol className="steps">
                   <li>Select your transaction type.</li>
                   <li>Answer only the questions relevant to your matter.</li>
-                  <li>
-                    We review the details and then issue your quote by email if
-                    appropriate.
-                  </li>
+                  <li>We review the details and then issue your quote by email if appropriate.</li>
                 </ol>
               </article>
 
@@ -3026,9 +2999,7 @@ function App() {
             <div className="section-heading">
               <div>
                 <h2>Admin Access</h2>
-                <p>
-                  Enter the internal passcode to access the quote approval area.
-                </p>
+                <p>Enter the internal passcode to access the super user dashboard.</p>
               </div>
             </div>
 
@@ -3062,16 +3033,57 @@ function App() {
           <section className="card card--form" style={{ marginTop: "24px" }}>
             <div className="section-heading">
               <div>
-                <h2>Approve and Send Client Quote</h2>
+                <h2>Super User Dashboard</h2>
                 <p>
-                  Internal use only. Review the loaded enquiry, check the
-                  prebuilt quote and send the client-facing quote email.
+                  View the dashboard, open enquiries, check firms, and review
+                  client quotes from one admin area.
                 </p>
               </div>
             </div>
 
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap",
+                marginBottom: "20px",
+              }}
+            >
+              <button
+                type="button"
+                className={adminTab === "dashboard" ? "primary-button" : "muted-button"}
+                onClick={() => setAdminTab("dashboard")}
+              >
+                Dashboard
+              </button>
+
+              <button
+                type="button"
+                className={adminTab === "enquiries" ? "primary-button" : "muted-button"}
+                onClick={() => setAdminTab("enquiries")}
+              >
+                Enquiries
+              </button>
+
+              <button
+                type="button"
+                className={adminTab === "firms" ? "primary-button" : "muted-button"}
+                onClick={() => setAdminTab("firms")}
+              >
+                Firms
+              </button>
+
+              <button
+                type="button"
+                className={adminTab === "quote" ? "primary-button" : "muted-button"}
+                onClick={() => setAdminTab("quote")}
+              >
+                Quote Review
+              </button>
+            </div>
+
             <div style={{ marginBottom: "20px" }}>
-              <SummaryCard title="Super User Dashboard">
+              <SummaryCard title="Quick Actions">
                 <div className="form-grid">
                   <div className="field">
                     <label htmlFor="manualReference">Load enquiry by reference</label>
@@ -3080,7 +3092,7 @@ function App() {
                       type="text"
                       value={manualReference}
                       onChange={(e) => setManualReference(e.target.value)}
-                      placeholder="e.g. CQ-12345"
+                      placeholder="e.g. CQ-20260409-5757"
                     />
                   </div>
 
@@ -3119,87 +3131,103 @@ function App() {
                   <p className="form-note">Loading dashboard...</p>
                 )}
               </SummaryCard>
-
-              {!loadedEnquiry && !isLoadingDashboard && (
-                <div className="admin-stack" style={{ marginTop: "20px" }}>
-                  <SummaryCard title="Dashboard Overview">
-                    <SummaryGrid rows={dashboardSummaryRows} />
-                  </SummaryCard>
-
-                  <SummaryCard title="Recent Enquiries">
-                    {dashboardEnquiries.length === 0 ? (
-                      <p className="form-note">No recent enquiries found.</p>
-                    ) : (
-                      <div className="detail-table">
-                        {dashboardEnquiries.map((enquiry) => (
-                          <div
-                            key={`${enquiry.id}-${enquiry.reference}`}
-                            className="detail-row"
-                          >
-                            <div className="detail-row__label">
-                              <strong>{enquiry.reference || "No reference"}</strong>
-                              <div>{prettifyValue(enquiry.client_name)}</div>
-                              <div>{getTransactionLabel(enquiry.transaction_type)}</div>
-                            </div>
-                            <div className="detail-row__value">
-                              <div>{prettifyValue(enquiry.status || "new")}</div>
-                              <div>{prettifyValue(enquiry.created_at)}</div>
-                              {enquiry.reference && (
-                                <button
-                                  type="button"
-                                  className="muted-button"
-                                  onClick={() =>
-                                    handleOpenDashboardEnquiry(
-                                      enquiry.reference || ""
-                                    )
-                                  }
-                                >
-                                  Open
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </SummaryCard>
-
-                  <SummaryCard title="Panel Firms">
-                    {dashboardFirms.length === 0 ? (
-                      <p className="form-note">No firms found.</p>
-                    ) : (
-                      <div className="detail-table">
-                        {dashboardFirms.map((firm) => (
-                          <div
-                            key={`${firm.id}-${firm.firm_name}`}
-                            className="detail-row"
-                          >
-                            <div className="detail-row__label">
-                              <strong>{prettifyValue(firm.firm_name)}</strong>
-                              <div>Contact: {prettifyValue(firm.contact_name)}</div>
-                              <div>Email: {prettifyValue(firm.contact_email)}</div>
-                            </div>
-                            <div className="detail-row__value">
-                              <div>Active: {prettifyValue(firm.active)}</div>
-                              <div>
-                                Taking matters:{" "}
-                                {prettifyValue(firm.accepting_new_matters)}
-                              </div>
-                              <div>
-                                Active lenders:{" "}
-                                {String(Number(firm.lender_count || 0))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </SummaryCard>
-                </div>
-              )}
             </div>
 
-            {loadedEnquiry && (
+            {adminTab === "dashboard" && !loadedEnquiry && !isLoadingDashboard && (
+              <div className="admin-stack" style={{ marginTop: "20px" }}>
+                <SummaryCard title="Dashboard Overview">
+                  <SummaryGrid rows={dashboardSummaryRows} />
+                </SummaryCard>
+              </div>
+            )}
+
+            {adminTab === "enquiries" && !loadedEnquiry && !isLoadingDashboard && (
+              <div className="admin-stack" style={{ marginTop: "20px" }}>
+                <SummaryCard title="All Recent Enquiries">
+                  {dashboardEnquiries.length === 0 ? (
+                    <p className="form-note">No enquiries found.</p>
+                  ) : (
+                    <div className="detail-table">
+                      {dashboardEnquiries.map((enquiry) => (
+                        <div
+                          key={`${enquiry.id}-${enquiry.reference}`}
+                          className="detail-row"
+                        >
+                          <div className="detail-row__label">
+                            <strong>{enquiry.reference || "No reference"}</strong>
+                            <div>{prettifyValue(enquiry.client_name)}</div>
+                            <div>{prettifyValue(enquiry.client_email)}</div>
+                            <div>{getTransactionLabel(enquiry.transaction_type)}</div>
+                          </div>
+                          <div className="detail-row__value">
+                            <div>{prettifyValue(enquiry.status || "new")}</div>
+                            <div>{prettifyValue(enquiry.created_at)}</div>
+                            {enquiry.reference && (
+                              <button
+                                type="button"
+                                className="muted-button"
+                                onClick={() =>
+                                  handleOpenDashboardEnquiry(enquiry.reference || "")
+                                }
+                              >
+                                Open Quote
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SummaryCard>
+              </div>
+            )}
+
+            {adminTab === "firms" && !loadedEnquiry && !isLoadingDashboard && (
+              <div className="admin-stack" style={{ marginTop: "20px" }}>
+                <SummaryCard title="Panel Firms">
+                  {dashboardFirms.length === 0 ? (
+                    <p className="form-note">No firms found.</p>
+                  ) : (
+                    <div className="detail-table">
+                      {dashboardFirms.map((firm) => (
+                        <div
+                          key={`${firm.id}-${firm.firm_name}`}
+                          className="detail-row"
+                        >
+                          <div className="detail-row__label">
+                            <strong>{prettifyValue(firm.firm_name)}</strong>
+                            <div>Contact: {prettifyValue(firm.contact_name)}</div>
+                            <div>Email: {prettifyValue(firm.contact_email)}</div>
+                            <div>Phone: {prettifyValue(firm.contact_phone)}</div>
+                          </div>
+                          <div className="detail-row__value">
+                            <div>Active: {prettifyValue(firm.active)}</div>
+                            <div>
+                              Taking matters:{" "}
+                              {prettifyValue(firm.accepting_new_matters)}
+                            </div>
+                            <div>
+                              Active lenders: {String(Number(firm.lender_count || 0))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SummaryCard>
+              </div>
+            )}
+
+            {adminTab === "quote" && !loadedEnquiry && !isLoadingEnquiry && (
+              <SummaryCard title="Quote Review">
+                <p className="form-note">
+                  No enquiry is currently loaded. Open one from the Enquiries tab
+                  or load a reference above.
+                </p>
+              </SummaryCard>
+            )}
+
+            {adminTab === "quote" && loadedEnquiry && (
               <div className="admin-stack" style={{ marginBottom: "20px" }}>
                 <SummaryCard title="Loaded Enquiry Snapshot">
                   <SummaryGrid rows={enquirySummaryRows} />
@@ -3257,9 +3285,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sdltFirstTimeBuyer">
-                          First time buyer?
-                        </label>
+                        <label htmlFor="sdltFirstTimeBuyer">First time buyer?</label>
                         <select
                           id="sdltFirstTimeBuyer"
                           value={sdltFirstTimeBuyer}
@@ -3271,9 +3297,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sdltAdditionalProperty">
-                          Additional property?
-                        </label>
+                        <label htmlFor="sdltAdditionalProperty">Additional property?</label>
                         <select
                           id="sdltAdditionalProperty"
                           value={sdltAdditionalProperty}
@@ -3297,9 +3321,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sdltIsCompany">
-                          Buying via company?
-                        </label>
+                        <label htmlFor="sdltIsCompany">Buying via company?</label>
                         <select
                           id="sdltIsCompany"
                           value={sdltIsCompany}
@@ -3311,9 +3333,7 @@ function App() {
                       </div>
 
                       <div className="field">
-                        <label htmlFor="sdltSharedOwnership">
-                          Shared ownership?
-                        </label>
+                        <label htmlFor="sdltSharedOwnership">Shared ownership?</label>
                         <select
                           id="sdltSharedOwnership"
                           value={sdltSharedOwnership}
@@ -3342,7 +3362,7 @@ function App() {
               </div>
             )}
 
-            {loadedEnquiry && (
+            {adminTab === "quote" && loadedEnquiry && (
               <form className="quote-form" onSubmit={handleApprovedQuoteSubmit}>
                 <div className="form-grid">
                   <div className="field">
@@ -3407,9 +3427,7 @@ function App() {
                   </div>
 
                   <div className="field">
-                    <label htmlFor="propertyPrice">
-                      Property price / value (£)
-                    </label>
+                    <label htmlFor="propertyPrice">Property price / value (£)</label>
                     <input
                       id="propertyPrice"
                       type="text"
@@ -3489,12 +3507,8 @@ function App() {
                       ))}
                       {approvedQuote.quoteData.legalFees.length === 0 && (
                         <div className="detail-row">
-                          <div className="detail-row__label">
-                            No fee items loaded yet
-                          </div>
-                          <div className="detail-row__value">
-                            Update pricing engine next
-                          </div>
+                          <div className="detail-row__label">No fee items loaded yet</div>
+                          <div className="detail-row__value">Update pricing engine next</div>
                         </div>
                       )}
                     </div>
@@ -3591,7 +3605,12 @@ function App() {
                   <button
                     type="button"
                     className="primary-button muted-button"
-                    onClick={handleBackToDashboard}
+                    onClick={() => {
+                      setApprovedQuote(initialApprovedQuoteState);
+                      setLoadedEnquiryMessage("");
+                      setLoadedEnquiry(null);
+                      setAdminTab("dashboard");
+                    }}
                   >
                     Clear Form
                   </button>
