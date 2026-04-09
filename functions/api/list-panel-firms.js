@@ -1,42 +1,41 @@
-export async function onRequestGet(context) {
-  const jsonResponse = (payload, status = 200) =>
-    new Response(JSON.stringify(payload), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    });
+const jsonResponse = (payload, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
+export async function onRequestGet(context) {
   try {
     const { env } = context;
 
-    const results = await env.DB.prepare(
-      `
+    const result = await env.DB.prepare(`
       SELECT
-        id,
-        firm_name,
-        contact_name,
-        contact_email,
-        contact_phone,
-        active,
-        panel_terms_accepted,
-        panel_terms_accepted_at,
-        handles_purchase,
-        handles_sale,
-        handles_remortgage,
-        handles_transfer,
-        handles_leasehold,
-        handles_new_build,
-        handles_company_buyers,
-        notes,
-        created_at,
-        updated_at
-      FROM panel_firms
-      ORDER BY firm_name COLLATE NOCASE ASC
-      `
-    ).all();
+        f.id,
+        f.firm_name,
+        f.contact_name,
+        f.contact_email,
+        f.contact_phone,
+        f.active,
+        f.accepting_new_matters,
+        COUNT(flp.lender_id) AS lender_count
+      FROM firms f
+      LEFT JOIN firm_lender_panels flp
+        ON flp.firm_id = f.id
+       AND flp.panel_status = 'active'
+      GROUP BY
+        f.id,
+        f.firm_name,
+        f.contact_name,
+        f.contact_email,
+        f.contact_phone,
+        f.active,
+        f.accepting_new_matters
+      ORDER BY f.id DESC
+    `).all();
 
     return jsonResponse({
       success: true,
-      firms: results.results || [],
+      firms: result.results || [],
     });
   } catch (error) {
     return jsonResponse(
