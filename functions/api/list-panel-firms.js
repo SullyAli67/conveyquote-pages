@@ -10,27 +10,48 @@ export async function onRequestGet(context) {
 
     const result = await env.DB.prepare(`
       SELECT
-        f.id,
-        f.firm_name,
-        f.contact_name,
-        f.contact_email,
-        f.contact_phone,
-        f.active,
-        f.accepting_new_matters,
-        COUNT(flp.lender_id) AS lender_count
-      FROM firms f
-      LEFT JOIN firm_lender_panels flp
-        ON flp.firm_id = f.id
-       AND flp.panel_status = 'active'
+        pf.id,
+        pf.firm_name,
+        pf.contact_name,
+        pf.contact_email,
+        pf.contact_phone,
+        pf.active,
+        pf.panel_terms_accepted,
+        pf.panel_terms_accepted_at,
+        pf.handles_purchase,
+        pf.handles_sale,
+        pf.handles_remortgage,
+        pf.handles_transfer,
+        pf.handles_leasehold,
+        pf.handles_new_build,
+        pf.handles_company_buyers,
+        pf.notes,
+        pf.created_at,
+        pf.updated_at,
+        COUNT(CASE WHEN m.active = 1 THEN m.id END) AS lender_count
+      FROM panel_firms pf
+      LEFT JOIN panel_firm_lender_memberships m
+        ON m.firm_id = pf.id
       GROUP BY
-        f.id,
-        f.firm_name,
-        f.contact_name,
-        f.contact_email,
-        f.contact_phone,
-        f.active,
-        f.accepting_new_matters
-      ORDER BY f.id DESC
+        pf.id,
+        pf.firm_name,
+        pf.contact_name,
+        pf.contact_email,
+        pf.contact_phone,
+        pf.active,
+        pf.panel_terms_accepted,
+        pf.panel_terms_accepted_at,
+        pf.handles_purchase,
+        pf.handles_sale,
+        pf.handles_remortgage,
+        pf.handles_transfer,
+        pf.handles_leasehold,
+        pf.handles_new_build,
+        pf.handles_company_buyers,
+        pf.notes,
+        pf.created_at,
+        pf.updated_at
+      ORDER BY pf.firm_name COLLATE NOCASE ASC
     `).all();
 
     return jsonResponse({
