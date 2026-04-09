@@ -8,7 +8,6 @@ export async function onRequestGet(context) {
   try {
     const { request, env } = context;
     const url = new URL(request.url);
-    const status = url.searchParams.get("status") || "";
     const q = (url.searchParams.get("q") || "").trim();
 
     let sql = `
@@ -39,8 +38,7 @@ export async function onRequestGet(context) {
 
     sql += ` ORDER BY id DESC`;
 
-    const stmt = env.DB.prepare(sql).bind(...binds);
-    const results = await stmt.all();
+    const results = await env.DB.prepare(sql).bind(...binds).all();
 
     return jsonResponse({
       success: true,
