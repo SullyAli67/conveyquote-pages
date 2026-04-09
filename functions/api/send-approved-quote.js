@@ -241,9 +241,13 @@ export async function onRequestPost(context) {
       safe(quoteReference)
     )}`;
 
+    const rejectUrl = `https://conveyquote.uk/api/reject-quote?ref=${encodeURIComponent(
+      safe(quoteReference)
+    )}`;
+
     const formattedNextSteps = formatMultilineHtml(
       nextSteps ||
-        "If you would like us to proceed, please click the button below. Once we receive your instruction, we will contact you with the next steps and client care documentation."
+        "If you would like to proceed, please click Accept Quote below. Once we receive your instruction, we will move your matter to the next stage, which may include referral to one of our selected panel solicitor firms. If you do not wish to proceed, you may click Decline Quote. If you have any questions before deciding, please contact us at info@conveyquote.uk."
     );
 
     const logoUrl = "https://conveyquote.uk/logo.png";
@@ -395,7 +399,7 @@ export async function onRequestPost(context) {
                               Your Conveyancing Estimate
                             </div>
                             <div style="font-size:15px;line-height:1.6;margin-top:10px;opacity:0.95;">
-                              A clear estimate prepared from the information currently available for your proposed transaction.
+                              A reviewed estimate prepared from the information currently available for your proposed transaction.
                             </div>
                           </td>
                         </tr>
@@ -405,8 +409,11 @@ export async function onRequestPost(context) {
                             <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#222;">
                               Dear ${escapeHtml(name)},
                             </p>
+                            <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#4b5563;">
+                              Thank you for your enquiry. We have now reviewed the information provided and set out our current conveyancing estimate below in a clear and straightforward format.
+                            </p>
                             <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
-                              Thank you for your enquiry. We have reviewed the information provided and set out our current estimate below in a clear and straightforward format.
+                              This estimate is based on the information currently available. If further information comes to light, or the matter proves more complex than initially anticipated, we will discuss any change to costs with you before carrying out that additional work.
                             </p>
                           </td>
                         </tr>
@@ -454,6 +461,19 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:0 28px 24px 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#eef6ff;border:1px solid #c9dcef;">
+                              <tr>
+                                <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
+                                  <strong>How your matter may proceed</strong><br />
+                                  If you would like to move forward, we will take your matter to the next stage of onboarding. This may include referral to one of our selected panel solicitor firms, depending on the nature of the transaction and allocation requirements.
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:0 28px 24px 28px;">
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
                               <tr>
                                 <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
@@ -475,12 +495,18 @@ export async function onRequestPost(context) {
                         </tr>
 
                         <tr>
-                          <td align="center" style="padding:28px;">
+                          <td align="center" style="padding:28px 28px 12px 28px;">
                             <a
                               href="${acceptUrl}"
-                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;"
+                              style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;margin:0 8px 12px 8px;"
                             >
-                              Instruct Us
+                              Accept Quote
+                            </a>
+                            <a
+                              href="${rejectUrl}"
+                              style="display:inline-block;background:#ffffff;color:#0f2747;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;border:1px solid #0f2747;margin:0 8px 12px 8px;"
+                            >
+                              Decline Quote
                             </a>
                           </td>
                         </tr>
@@ -488,7 +514,7 @@ export async function onRequestPost(context) {
                         <tr>
                           <td style="padding:0 28px 28px 28px;">
                             <div style="font-size:14px;line-height:1.8;color:#4b5563;text-align:center;">
-                              If you have any questions, please contact us at
+                              If you have any questions before deciding, please contact us at
                               <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">info@conveyquote.uk</a>.
                             </div>
                           </td>
