@@ -1,196 +1,573 @@
-function toNumber(value) {
-  const parsed = Number(String(value || "").replace(/,/g, "").trim());
+type QuoteItem = {
+  label: string;
+  amount: number;
+  note?: string;
+};
+
+type BuildQuoteInput = {
+  type?: string;
+
+  tenure?: string;
+  price?: string | number;
+  postcode?: string;
+
+  mortgage?: string;
+  lender?: string;
+  ownershipType?: string;
+  firstTimeBuyer?: string;
+  newBuild?: string;
+  sharedOwnership?: string;
+  helpToBuy?: string;
+  isCompany?: string;
+  buyToLet?: string;
+  giftedDeposit?: string;
+  additionalProperty?: string;
+  ukResidentForSdlt?: string;
+  lifetimeIsa?: string;
+
+  saleMortgage?: string;
+  managementCompany?: string;
+  tenanted?: string;
+  numberOfSellers?: string;
+
+  currentLender?: string;
+  newLender?: string;
+  additionalBorrowing?: string;
+  remortgageTransfer?: string;
+
+  transferMortgage?: string;
+  ownersChanging?: string;
+
+  saleTenure?: string;
+  salePrice?: string | number;
+  salePostcode?: string;
+  saleMortgageCombined?: string;
+  managementCompanyCombined?: string;
+  tenantedCombined?: string;
+  numberOfSellersCombined?: string;
+
+  purchaseTenure?: string;
+  purchasePrice?: string | number;
+  purchasePostcode?: string;
+  purchaseMortgage?: string;
+  purchaseLender?: string;
+  purchaseOwnershipType?: string;
+  purchaseFirstTimeBuyer?: string;
+  purchaseNewBuild?: string;
+  purchaseSharedOwnership?: string;
+  purchaseHelpToBuy?: string;
+  purchaseIsCompany?: string;
+  purchaseBuyToLet?: string;
+  purchaseGiftedDeposit?: string;
+  purchaseAdditionalProperty?: string;
+  purchaseUkResidentForSdlt?: string;
+  purchaseLifetimeIsa?: string;
+
+  remortgageTransferTenure?: string;
+  remortgageTransferPrice?: string | number;
+  remortgageTransferPostcode?: string;
+  remortgageTransferCurrentLender?: string;
+  remortgageTransferNewLender?: string;
+  remortgageTransferAdditionalBorrowing?: string;
+  remortgageTransferHasMortgage?: string;
+  remortgageTransferOwnersChanging?: string;
+  remortgageTransferOwnershipType?: string;
+};
+
+type BuildQuoteResult = {
+  legalFees: QuoteItem[];
+  disbursements: QuoteItem[];
+  legalFeesExVat: number;
+  vat: number;
+  legalTotalInclVat: number;
+  disbursementTotal: number;
+  grandTotal: number;
+  sdltAmount?: number;
+  sdltNote?: string;
+  totalIncludingSdlt?: number;
+  feeBreakdown: string;
+  breakdownText: string;
+  disclaimerLines: string[];
+};
+
+function toNumber(value: string | number | undefined | null): number {
+  const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function money(value) {
-  return `£${Number(value).toFixed(2)}`;
-}
-
-function addItem(items, label, amount) {
+function addItem(items: QuoteItem[], label: string, amount: number, note?: string) {
   if (amount > 0) {
-    items.push({ label, amount });
+    items.push({ label, amount, note });
   }
 }
 
-function sumAmounts(items) {
-  return items.reduce((sum, item) => sum + (item.amount || 0), 0);
+function sumItems(items: QuoteItem[]): number {
+  return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
-/**
- * 🔥 NORMALISE
- */
-function normaliseEnquiry(enquiry) {
+function formatMoney(value: number): string {
+  return `£${value.toFixed(2)}`;
+}
+
+function calculateStandardSdlt(price: number): number {
+  let tax = 0;
+
+  if (price > 250000) {
+    tax += (Math.min(price, 925000) - 250000) * 0.05;
+  }
+
+  if (price > 925000) {
+    tax += (Math.min(price, 1500000) - 925000) * 0.1;
+  }
+
+  if (price > 1500000) {
+    tax += (price - 1500000) * 0.12;
+  }
+
+  return Math.max(0, tax);
+}
+
+function calculateFirstTimeBuyerSdlt(price: number): number {
+  if (price > 625000) {
+    return calculateStandardSdlt(price);
+  }
+
+  let tax = 0;
+
+  if (price > 425000) {
+    tax += (price - 425000) * 0.05;
+  }
+
+  return Math.max(0, tax);
+}
+
+function calculateSdlt({
+  price,
+  firstTimeBuyer,
+  additionalProperty,
+  ukResidentForSdlt,
+  isCompany,
+  sharedOwnership,
+}: {
+  price: number;
+  firstTimeBuyer?: string;
+  additionalProperty?: string;
+  ukResidentForSdlt?: string;
+  isCompany?: string;
+  sharedOwnership?: string;
+}): { sdltAmount?: number; sdltNote?: string } {
+  if (price <= 0) {
+    return {};
+  }
+
+  if (sharedOwnership === "yes" || isCompany === "yes") {
+    return {
+      sdltNote: "SDLT requires manual review based on the information provided.",
+    };
+  }
+
+  const baseTax =
+    firstTimeBuyer === "yes" && additionalProperty !== "yes"
+      ? calculateFirstTimeBuyerSdlt(price)
+      : calculateStandardSdlt(price);
+
+  let surcharge = 0;
+
+  if (additionalProperty === "yes") surcharge += price * 0.05;
+  if (ukResidentForSdlt === "no") surcharge += price * 0.02;
+
   return {
-    transaction_type: enquiry.transaction_type ?? enquiry.type ?? "",
-    tenure: enquiry.tenure ?? "",
-    price: enquiry.price ?? "",
-
-    mortgage: enquiry.mortgage ?? "",
-    ownership_type: enquiry.ownership_type ?? enquiry.ownershipType ?? "",
-    first_time_buyer:
-      enquiry.first_time_buyer ?? enquiry.firstTimeBuyer ?? "",
-    new_build: enquiry.new_build ?? enquiry.newBuild ?? "",
-    shared_ownership:
-      enquiry.shared_ownership ?? enquiry.sharedOwnership ?? "",
-    help_to_buy: enquiry.help_to_buy ?? enquiry.helpToBuy ?? "",
-    is_company: enquiry.is_company ?? enquiry.isCompany ?? "",
-    buy_to_let: enquiry.buy_to_let ?? enquiry.buyToLet ?? "",
-    gifted_deposit: enquiry.gifted_deposit ?? enquiry.giftedDeposit ?? "",
-    additional_property:
-      enquiry.additional_property ?? enquiry.additionalProperty ?? "",
-    uk_resident_for_sdlt:
-      enquiry.uk_resident_for_sdlt ?? enquiry.ukResidentForSdlt ?? "",
-
-    sale_mortgage: enquiry.sale_mortgage ?? enquiry.saleMortgage ?? "",
-    management_company:
-      enquiry.management_company ?? enquiry.managementCompany ?? "",
-    tenanted: enquiry.tenanted ?? "",
-    number_of_sellers:
-      enquiry.number_of_sellers ?? enquiry.numberOfSellers ?? "",
-
-    additional_borrowing:
-      enquiry.additional_borrowing ?? enquiry.additionalBorrowing ?? "",
-    remortgage_transfer:
-      enquiry.remortgage_transfer ?? enquiry.remortgageTransfer ?? "",
+    sdltAmount: Number((baseTax + surcharge).toFixed(2)),
   };
 }
 
-/**
- * 🔥 CORE SINGLE BUILDER
- */
-function buildSingleQuote(enquiry, overrideType) {
-  const type = overrideType || enquiry.transaction_type;
-  const price = toNumber(enquiry.price);
+function buildFeeBreakdown(params: {
+  legalFees: QuoteItem[];
+  vat: number;
+  legalTotalInclVat: number;
+  disbursements: QuoteItem[];
+  disbursementTotal: number;
+  grandTotal: number;
+  sdltAmount?: number;
+  sdltNote?: string;
+  totalIncludingSdlt?: number;
+  disclaimerLines: string[];
+}): string {
+  const {
+    legalFees,
+    vat,
+    legalTotalInclVat,
+    disbursements,
+    disbursementTotal,
+    grandTotal,
+    sdltAmount,
+    sdltNote,
+    totalIncludingSdlt,
+    disclaimerLines,
+  } = params;
 
-  const legalFeeItems = [];
-  const disbursementItems = [];
+  const lines: string[] = [];
 
-  // ===== SALE =====
-  if (type === "sale") {
-    addItem(legalFeeItems, "Sale legal fee", 995);
+  lines.push("LEGAL FEES");
+  legalFees.forEach((item) => {
+    lines.push(`${item.label}: ${formatMoney(item.amount)}`);
+  });
+  lines.push(`VAT: ${formatMoney(vat)}`);
+  lines.push(`Total legal fees including VAT: ${formatMoney(legalTotalInclVat)}`);
 
-    if (enquiry.tenure === "leasehold") {
-      addItem(legalFeeItems, "Leasehold supplement", 300);
+  lines.push("");
+  lines.push("DISBURSEMENTS");
+  disbursements.forEach((item) => {
+    if (item.note) {
+      lines.push(`${item.label}: ${item.note}`);
+    } else {
+      lines.push(`${item.label}: ${formatMoney(item.amount)}`);
     }
-    if (enquiry.sale_mortgage === "yes") {
-      addItem(legalFeeItems, "Mortgage redemption", 50);
-    }
-    if (enquiry.management_company === "yes") {
-      addItem(legalFeeItems, "Management company", 175);
-    }
-    if (enquiry.tenanted === "yes") {
-      addItem(legalFeeItems, "Tenanted property", 150);
-    }
+  });
+  lines.push(`Total disbursements: ${formatMoney(disbursementTotal)}`);
 
-    addItem(disbursementItems, "Office copy entries", 12);
-    addItem(disbursementItems, "ID checks", 14.4);
+  lines.push("");
+  lines.push(`TOTAL LEGAL FEES + DISBURSEMENTS: ${formatMoney(grandTotal)}`);
+
+  if (typeof sdltAmount === "number") {
+    lines.push(`Estimated SDLT: ${formatMoney(sdltAmount)}`);
+  } else if (sdltNote) {
+    lines.push(`SDLT: ${sdltNote}`);
   }
 
-  // ===== PURCHASE =====
+  lines.push("");
+  lines.push(
+    `TOTAL ESTIMATED COST: ${formatMoney(
+      typeof totalIncludingSdlt === "number" ? totalIncludingSdlt : grandTotal
+    )}`
+  );
+
+  if (disclaimerLines.length > 0) {
+    lines.push("");
+    lines.push("IMPORTANT NOTES");
+    disclaimerLines.forEach((line) => lines.push(line));
+  }
+
+  return lines.join("\n");
+}
+
+function finaliseQuote(args: {
+  legalFees: QuoteItem[];
+  disbursements: QuoteItem[];
+  sdltAmount?: number;
+  sdltNote?: string;
+  disclaimerLines?: string[];
+  breakdownTitle?: string;
+}): BuildQuoteResult {
+  const legalFeesExVat = Number(sumItems(args.legalFees).toFixed(2));
+  const vat = Number((legalFeesExVat * 0.2).toFixed(2));
+  const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
+  const disbursementTotal = Number(sumItems(args.disbursements).toFixed(2));
+  const grandTotal = Number((legalTotalInclVat + disbursementTotal).toFixed(2));
+
+  const totalIncludingSdlt =
+    typeof args.sdltAmount === "number"
+      ? Number((grandTotal + args.sdltAmount).toFixed(2))
+      : undefined;
+
+  const disclaimerLines = args.disclaimerLines ?? [
+    "This estimate is based on the information currently available.",
+    "If further information comes to light or the matter is more complex than expected, costs may change.",
+  ];
+
+  const feeBreakdown = buildFeeBreakdown({
+    legalFees: args.legalFees,
+    vat,
+    legalTotalInclVat,
+    disbursements: args.disbursements,
+    disbursementTotal,
+    grandTotal,
+    sdltAmount: args.sdltAmount,
+    sdltNote: args.sdltNote,
+    totalIncludingSdlt,
+    disclaimerLines,
+  });
+
+  return {
+    legalFees: args.legalFees,
+    disbursements: args.disbursements,
+    legalFeesExVat,
+    vat,
+    legalTotalInclVat,
+    disbursementTotal,
+    grandTotal,
+    sdltAmount: args.sdltAmount,
+    sdltNote: args.sdltNote,
+    totalIncludingSdlt,
+    feeBreakdown,
+    breakdownText: args.breakdownTitle || "CONVEYANCING QUOTE",
+    disclaimerLines,
+  };
+}
+
+function buildPurchaseQuote(input: BuildQuoteInput): BuildQuoteResult {
+  const legalFees: QuoteItem[] = [];
+  const disbursements: QuoteItem[] = [];
+  const price = toNumber(input.price);
+
+  addItem(legalFees, "Purchase legal fee", 1195);
+
+  if (input.tenure === "leasehold") {
+    addItem(legalFees, "Leasehold supplement", 350);
+  }
+
+  if (input.mortgage === "mortgage") {
+    addItem(legalFees, "Acting for lender", 125);
+  }
+
+  if (input.giftedDeposit === "yes") {
+    addItem(legalFees, "Gifted deposit supplement", 95);
+  }
+
+  if (input.lifetimeIsa === "yes") {
+    addItem(legalFees, "Lifetime ISA admin fee", 50);
+  }
+
+  addItem(disbursements, "Search pack", 350);
+  addItem(disbursements, "Land Registry fee", 150);
+  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, "OS1 search", 8.8);
+  addItem(disbursements, "Bankruptcy search", 7.6);
+
+  if (price > 0) {
+    addItem(disbursements, "SDLT submission", 6);
+    addItem(disbursements, "AP1 submission", 6);
+  }
+
+  const sdlt = calculateSdlt({
+    price,
+    firstTimeBuyer: input.firstTimeBuyer,
+    additionalProperty: input.additionalProperty,
+    ukResidentForSdlt: input.ukResidentForSdlt,
+    isCompany: input.isCompany,
+    sharedOwnership: input.sharedOwnership,
+  });
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    sdltAmount: sdlt.sdltAmount,
+    sdltNote: sdlt.sdltNote,
+    breakdownTitle: "PURCHASE QUOTE",
+  });
+}
+
+function buildSaleQuote(input: BuildQuoteInput): BuildQuoteResult {
+  const legalFees: QuoteItem[] = [];
+  const disbursements: QuoteItem[] = [];
+
+  addItem(legalFees, "Sale legal fee", 995);
+
+  if (input.tenure === "leasehold") {
+    addItem(legalFees, "Leasehold supplement", 300);
+  }
+
+  if (input.saleMortgage === "yes") {
+    addItem(legalFees, "Mortgage redemption supplement", 50);
+  }
+
+  if (input.managementCompany === "yes") {
+    addItem(legalFees, "Management company / service charge supplement", 175);
+  }
+
+  if (input.tenanted === "yes") {
+    addItem(legalFees, "Tenanted property supplement", 150);
+  }
+
+  addItem(disbursements, "Office copy entries", 12);
+  addItem(disbursements, "ID checks", 14.4);
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    breakdownTitle: "SALE QUOTE",
+  });
+}
+
+function buildRemortgageQuote(input: BuildQuoteInput): BuildQuoteResult {
+  const legalFees: QuoteItem[] = [];
+  const disbursements: QuoteItem[] = [];
+
+  addItem(legalFees, "Remortgage legal fee", 595);
+
+  if (input.tenure === "leasehold") {
+    addItem(legalFees, "Leasehold supplement", 250);
+  }
+
+  if (input.additionalBorrowing === "yes") {
+    addItem(legalFees, "Additional borrowing supplement", 75);
+  }
+
+  if (input.remortgageTransfer === "yes") {
+    addItem(legalFees, "Simultaneous transfer of equity supplement", 350);
+  }
+
+  addItem(disbursements, "Office copy entries", 12);
+  addItem(disbursements, "ID checks", 14.4);
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    breakdownTitle: "REMORTGAGE QUOTE",
+  });
+}
+
+function buildTransferQuote(input: BuildQuoteInput): BuildQuoteResult {
+  const legalFees: QuoteItem[] = [];
+  const disbursements: QuoteItem[] = [];
+
+  addItem(legalFees, "Transfer of equity legal fee", 650);
+
+  if (input.tenure === "leasehold") {
+    addItem(legalFees, "Leasehold supplement", 250);
+  }
+
+  if (input.transferMortgage === "yes") {
+    addItem(legalFees, "Lender consent / mortgage element", 125);
+  }
+
+  if (input.ownersChanging === "two") {
+    addItem(legalFees, "Additional ownership change supplement", 75);
+  }
+
+  if (input.ownersChanging === "more") {
+    addItem(legalFees, "Complex ownership change supplement", 150);
+  }
+
+  addItem(disbursements, "Office copy entries", 12);
+  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, "AP1 submission", 6);
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    breakdownTitle: "TRANSFER OF EQUITY QUOTE",
+  });
+}
+
+function buildRemortgageTransferQuote(input: BuildQuoteInput): BuildQuoteResult {
+  const legalFees: QuoteItem[] = [];
+  const disbursements: QuoteItem[] = [];
+
+  addItem(legalFees, "Remortgage legal fee", 595);
+  addItem(legalFees, "Transfer of equity supplement", 350);
+
+  if (input.remortgageTransferTenure === "leasehold") {
+    addItem(legalFees, "Leasehold supplement", 250);
+  }
+
+  if (input.remortgageTransferAdditionalBorrowing === "yes") {
+    addItem(legalFees, "Additional borrowing supplement", 75);
+  }
+
+  if (input.remortgageTransferOwnersChanging === "two") {
+    addItem(legalFees, "Additional ownership change supplement", 75);
+  }
+
+  if (input.remortgageTransferOwnersChanging === "more") {
+    addItem(legalFees, "Complex ownership change supplement", 150);
+  }
+
+  addItem(disbursements, "Office copy entries", 12);
+  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, "AP1 submission", 6);
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    breakdownTitle: "REMORTGAGE AND TRANSFER OF EQUITY QUOTE",
+  });
+}
+
+function combineQuotes(
+  title: string,
+  first: BuildQuoteResult,
+  second: BuildQuoteResult,
+  sdltFromSecond = false
+): BuildQuoteResult {
+  const legalFees = [...first.legalFees, ...second.legalFees];
+  const disbursements = [...first.disbursements, ...second.disbursements];
+  const sdltAmount = sdltFromSecond ? second.sdltAmount : undefined;
+  const sdltNote = sdltFromSecond ? second.sdltNote : undefined;
+
+  return finaliseQuote({
+    legalFees,
+    disbursements,
+    sdltAmount,
+    sdltNote,
+    breakdownTitle: title,
+    disclaimerLines: [
+      "This is a combined estimate based on the information currently available.",
+      "If either matter becomes more complex than expected, costs may change.",
+    ],
+  });
+}
+
+export function buildQuoteData(input: BuildQuoteInput): BuildQuoteResult {
+  const type = input.type || "";
+
   if (type === "purchase") {
-    addItem(legalFeeItems, "Purchase legal fee", 1195);
-
-    if (enquiry.tenure === "leasehold") {
-      addItem(legalFeeItems, "Leasehold supplement", 350);
-    }
-    if (enquiry.mortgage === "mortgage") {
-      addItem(legalFeeItems, "Acting for lender", 125);
-    }
-    if (enquiry.gifted_deposit === "yes") {
-      addItem(legalFeeItems, "Gifted deposit", 95);
-    }
-
-    addItem(disbursementItems, "Search pack", 350);
-    addItem(disbursementItems, "Land Registry fee", 150);
-    addItem(disbursementItems, "ID checks", 14.4);
-    addItem(disbursementItems, "OS1 search", 8.8);
-    addItem(disbursementItems, "Bankruptcy search", 7.6);
-    addItem(disbursementItems, "SDLT submission", 6);
-    addItem(disbursementItems, "AP1 submission", 6);
+    return buildPurchaseQuote(input);
   }
 
-  // ===== REMORTGAGE =====
+  if (type === "sale") {
+    return buildSaleQuote(input);
+  }
+
   if (type === "remortgage") {
-    addItem(legalFeeItems, "Remortgage legal fee", 595);
-
-    if (enquiry.tenure === "leasehold") {
-      addItem(legalFeeItems, "Leasehold supplement", 250);
-    }
-    if (enquiry.additional_borrowing === "yes") {
-      addItem(legalFeeItems, "Additional borrowing", 75);
-    }
-    if (enquiry.remortgage_transfer === "yes") {
-      addItem(legalFeeItems, "Transfer of equity", 350);
-    }
-
-    addItem(disbursementItems, "Office copy", 12);
-    addItem(disbursementItems, "ID checks", 14.4);
+    return buildRemortgageQuote(input);
   }
 
-  const legalFeeTotalExVat = sumAmounts(legalFeeItems);
-  const vatAmount = Number((legalFeeTotalExVat * 0.2).toFixed(2));
-  const legalTotalInclVat = legalFeeTotalExVat + vatAmount;
-  const disbursementTotal = sumAmounts(disbursementItems);
-  const grandTotal = legalTotalInclVat + disbursementTotal;
+  if (type === "transfer") {
+    return buildTransferQuote(input);
+  }
 
-  return {
-    legalFeeItems,
-    disbursementItems,
-    legalFeeTotalExVat,
-    vatAmount,
-    legalTotalInclVat,
-    disbursementTotal,
-    grandTotal,
-  };
-}
+  if (type === "remortgage_transfer") {
+    return buildRemortgageTransferQuote(input);
+  }
 
-/**
- * 🔥 MERGE (THIS FIXES EVERYTHING)
- */
-function mergeQuotes(title, a, b) {
-  const legalFeeItems = [...a.legalFeeItems, ...b.legalFeeItems];
-  const disbursementItems = [...a.disbursementItems, ...b.disbursementItems];
-
-  const legalFeeTotalExVat = sumAmounts(legalFeeItems);
-  const vatAmount = Number((legalFeeTotalExVat * 0.2).toFixed(2));
-  const legalTotalInclVat = legalFeeTotalExVat + vatAmount;
-  const disbursementTotal = sumAmounts(disbursementItems);
-  const grandTotal = legalTotalInclVat + disbursementTotal;
-
-  return {
-    legalFeeItems,
-    disbursementItems,
-    legalFeeTotalExVat,
-    vatAmount,
-    legalTotalInclVat,
-    disbursementTotal,
-    grandTotal,
-    breakdownText: `${title} COMBINED QUOTE`,
-    disclaimerLines: [],
-  };
-}
-
-/**
- * 🚀 MAIN ENTRY
- */
-export function calculateQuote(rawEnquiry) {
-  const enquiry = normaliseEnquiry(rawEnquiry);
-  const type = enquiry.transaction_type;
-
-  // 🔥 COMBINED SUPPORT
   if (type === "sale_purchase") {
-    const sale = buildSingleQuote(enquiry, "sale");
-    const purchase = buildSingleQuote(enquiry, "purchase");
-    return mergeQuotes("SALE & PURCHASE", sale, purchase);
+    const saleQuote = buildSaleQuote({
+      tenure: input.saleTenure,
+      price: input.salePrice,
+      postcode: input.salePostcode,
+      saleMortgage: input.saleMortgageCombined,
+      managementCompany: input.managementCompanyCombined,
+      tenanted: input.tenantedCombined,
+      numberOfSellers: input.numberOfSellersCombined,
+    });
+
+    const purchaseQuote = buildPurchaseQuote({
+      tenure: input.purchaseTenure,
+      price: input.purchasePrice,
+      postcode: input.purchasePostcode,
+      mortgage: input.purchaseMortgage,
+      lender: input.purchaseLender,
+      ownershipType: input.purchaseOwnershipType,
+      firstTimeBuyer: input.purchaseFirstTimeBuyer,
+      newBuild: input.purchaseNewBuild,
+      sharedOwnership: input.purchaseSharedOwnership,
+      helpToBuy: input.purchaseHelpToBuy,
+      isCompany: input.purchaseIsCompany,
+      buyToLet: input.purchaseBuyToLet,
+      giftedDeposit: input.purchaseGiftedDeposit,
+      additionalProperty: input.purchaseAdditionalProperty,
+      ukResidentForSdlt: input.purchaseUkResidentForSdlt,
+      lifetimeIsa: input.purchaseLifetimeIsa,
+    });
+
+    return combineQuotes("SALE AND PURCHASE QUOTE", saleQuote, purchaseQuote, true);
   }
 
-  if (type === "remortgage_purchase") {
-    const remortgage = buildSingleQuote(enquiry, "remortgage");
-    const purchase = buildSingleQuote(enquiry, "purchase");
-    return mergeQuotes("REMORTGAGE & PURCHASE", remortgage, purchase);
-  }
-
-  // 🔹 NORMAL
-  return buildSingleQuote(enquiry);
+  return finaliseQuote({
+    legalFees: [],
+    disbursements: [],
+    breakdownTitle: "QUOTE",
+    disclaimerLines: ["No pricing data available for this transaction type."],
+  });
 }
