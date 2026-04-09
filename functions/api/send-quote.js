@@ -12,7 +12,7 @@ const safe = (value) =>
     : String(value);
 
 const escapeHtml = (value) =>
-  String(value)
+  String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -165,7 +165,7 @@ export async function onRequestPost(context) {
       remortgageTransferOwnershipType,
     } = body;
 
-    if (mortgage === "mortgage" && !lender) {
+    if (type === "purchase" && mortgage === "mortgage" && !lender) {
       return jsonResponse(
         {
           success: false,
@@ -175,12 +175,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    if (purchaseMortgage === "mortgage" && !purchaseLender) {
+    if (
+      type === "sale_purchase" &&
+      purchaseMortgage === "mortgage" &&
+      !purchaseLender
+    ) {
       return jsonResponse(
         {
           success: false,
-          error:
-            "Purchase lender is required for a mortgaged linked purchase.",
+          error: "Purchase lender is required for a mortgaged linked purchase.",
         },
         400
       );
@@ -400,7 +403,10 @@ export async function onRequestPost(context) {
         row("Price", formatMoney(price)),
         row("Postcode", safe(postcode)),
         row("Mortgage or cash", prettifyValue(mortgage)),
-        row("Lender", safe(lender)),
+        row(
+          "Lender",
+          mortgage === "mortgage" ? safe(lender) : "Not applicable"
+        ),
         row("Buyer type", prettifyValue(ownershipType)),
         row("First time buyer", prettifyValue(firstTimeBuyer)),
         row("Additional property", prettifyValue(additionalProperty)),
@@ -449,13 +455,15 @@ export async function onRequestPost(context) {
         row("Purchase price", formatMoney(purchasePrice)),
         row("Purchase postcode", safe(purchasePostcode)),
         row("Mortgage or cash", prettifyValue(purchaseMortgage)),
-        row("Purchase lender", safe(purchaseLender)),
+        row(
+          "Purchase lender",
+          purchaseMortgage === "mortgage"
+            ? safe(purchaseLender)
+            : "Not applicable"
+        ),
         row("Buyer type", prettifyValue(purchaseOwnershipType)),
         row("First time buyer", prettifyValue(purchaseFirstTimeBuyer)),
-        row(
-          "Additional property",
-          prettifyValue(purchaseAdditionalProperty)
-        ),
+        row("Additional property", prettifyValue(purchaseAdditionalProperty)),
         row(
           "UK resident for SDLT",
           prettifyValue(purchaseUkResidentForSdlt)
@@ -528,7 +536,7 @@ export async function onRequestPost(context) {
       ]);
     }
 
-    const feeBreakdownHtml = escapeHtml(quote.feeBreakdown).replace(
+    const feeBreakdownHtml = escapeHtml(quote.feeBreakdown || "").replace(
       /\n/g,
       "<br>"
     );
