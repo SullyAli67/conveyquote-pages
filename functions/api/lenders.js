@@ -1,3 +1,4 @@
+// lenders endpoint  
 export async function onRequestGet(context) {
   const jsonResponse = (payload, status = 200) =>
     new Response(JSON.stringify(payload), {
