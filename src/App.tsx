@@ -54,15 +54,45 @@ type DashboardEnquiry = {
   created_at?: string;
 };
 
-type DashboardFirm = {
+type PanelFirm = {
   id: number;
   firm_name?: string;
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
-  active?: string;
-  accepting_new_matters?: string;
+  active?: number;
+  panel_terms_accepted?: number;
+  handles_purchase?: number;
+  handles_sale?: number;
+  handles_remortgage?: number;
+  handles_transfer?: number;
+  handles_leasehold?: number;
+  handles_new_build?: number;
+  handles_company_buyers?: number;
+  notes?: string | null;
   lender_count?: number;
+};
+
+type PanelLender = {
+  id: number;
+  lender_name?: string;
+  active?: number;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type PanelMembership = {
+  id: number;
+  firm_id: number;
+  lender_id: number;
+  active?: number;
+  notes?: string | null;
+  last_checked_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  firm_name?: string;
+  lender_name?: string;
 };
 
 type QuoteForm = {
@@ -241,6 +271,33 @@ type LoadedEnquiry = {
 
 type AdminTab = "dashboard" | "enquiries" | "firms" | "quote";
 
+type FirmEditorState = {
+  id: number | null;
+  firm_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  active: boolean;
+  panel_terms_accepted: boolean;
+  handles_purchase: boolean;
+  handles_sale: boolean;
+  handles_remortgage: boolean;
+  handles_transfer: boolean;
+  handles_leasehold: boolean;
+  handles_new_build: boolean;
+  handles_company_buyers: boolean;
+  notes: string;
+};
+
+type MembershipEditorState = {
+  id: number | null;
+  firm_id: number | "";
+  lender_id: number | "";
+  active: boolean;
+  notes: string;
+  last_checked_at: string;
+};
+
 const initialFormState: QuoteForm = {
   type: "",
 
@@ -339,6 +396,33 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   },
 };
 
+const initialFirmEditorState: FirmEditorState = {
+  id: null,
+  firm_name: "",
+  contact_name: "",
+  contact_email: "",
+  contact_phone: "",
+  active: true,
+  panel_terms_accepted: false,
+  handles_purchase: true,
+  handles_sale: true,
+  handles_remortgage: true,
+  handles_transfer: true,
+  handles_leasehold: false,
+  handles_new_build: false,
+  handles_company_buyers: false,
+  notes: "",
+};
+
+const initialMembershipEditorState: MembershipEditorState = {
+  id: null,
+  firm_id: "",
+  lender_id: "",
+  active: true,
+  notes: "",
+  last_checked_at: "",
+};
+
 function toNumber(value: string | number | undefined | null) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
@@ -358,8 +442,8 @@ function prettifyValue(value: string | number | boolean | undefined | null) {
     return "Not provided";
   }
 
-  if (value === true) return "Yes";
-  if (value === false) return "No";
+  if (value === true || value === 1) return "Yes";
+  if (value === false || value === 0) return "No";
 
   const str = String(value).trim();
   if (!str) return "Not provided";
@@ -521,6 +605,34 @@ function DetailTable({ rows }: { rows: SummaryRow[] }) {
   );
 }
 
+function CheckboxField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        fontSize: "14px",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 function App() {
   const [form, setForm] = useState<QuoteForm>(initialFormState);
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
@@ -543,10 +655,23 @@ function App() {
   const [dashboardEnquiries, setDashboardEnquiries] = useState<
     DashboardEnquiry[]
   >([]);
-  const [dashboardFirms, setDashboardFirms] = useState<DashboardFirm[]>([]);
+  const [dashboardFirms, setDashboardFirms] = useState<PanelFirm[]>([]);
+  const [panelLenders, setPanelLenders] = useState<PanelLender[]>([]);
+  const [panelMemberships, setPanelMemberships] = useState<PanelMembership[]>(
+    []
+  );
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
 
   const [adminTab, setAdminTab] = useState<AdminTab>("dashboard");
+
+  const [selectedFirmId, setSelectedFirmId] = useState<number | null>(null);
+  const [firmEditor, setFirmEditor] = useState<FirmEditorState>(
+    initialFirmEditorState
+  );
+  const [membershipEditor, setMembershipEditor] =
+    useState<MembershipEditorState>(initialMembershipEditorState);
+  const [firmSaveMessage, setFirmSaveMessage] = useState("");
+  const [membershipSaveMessage, setMembershipSaveMessage] = useState("");
 
   const [vatCalculatorNet, setVatCalculatorNet] = useState("");
   const [sdltPrice, setSdltPrice] = useState("");
@@ -562,6 +687,25 @@ function App() {
   const isAdminPage = currentPath === "/admin";
   const currentUrl = new URL(window.location.href);
   const refFromUrl = currentUrl.searchParams.get("ref") || "";
+
+  const selectedFirm = useMemo(
+    () => dashboardFirms.find((firm) => firm.id === selectedFirmId) || null,
+    [dashboardFirms, selectedFirmId]
+  );
+
+  const selectedFirmMemberships = useMemo(() => {
+    if (!selectedFirmId) return [];
+    return panelMemberships
+      .filter((membership) => membership.firm_id === selectedFirmId)
+      .sort((a, b) =>
+        String(a.lender_name || "").localeCompare(String(b.lender_name || ""))
+      );
+  }, [panelMemberships, selectedFirmId]);
+
+  const activePanelLenders = useMemo(
+    () => panelLenders.filter((lender) => Number(lender.active) === 1),
+    [panelLenders]
+  );
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -595,41 +739,278 @@ function App() {
     setIsLoadingDashboard(true);
 
     try {
-      const [enquiriesResponse, firmsResponse] = await Promise.all([
+      const [
+        enquiriesResponse,
+        firmsResponse,
+        panelLendersResponse,
+        membershipsResponse,
+      ] = await Promise.all([
         fetch("/api/list-enquiries"),
         fetch("/api/list-panel-firms"),
+        fetch("/api/list-panel-lenders"),
+        fetch("/api/list-panel-memberships"),
       ]);
 
       const enquiriesResult = await enquiriesResponse.json();
       const firmsResult = await firmsResponse.json();
+      const panelLendersResult = await panelLendersResponse.json();
+      const membershipsResult = await membershipsResponse.json();
 
-      if (enquiriesResult.success && Array.isArray(enquiriesResult.enquiries)) {
-        setDashboardEnquiries(enquiriesResult.enquiries);
-      } else {
-        setDashboardEnquiries([]);
-      }
+      setDashboardEnquiries(
+        enquiriesResult.success && Array.isArray(enquiriesResult.enquiries)
+          ? enquiriesResult.enquiries
+          : []
+      );
 
-      if (firmsResult.success && Array.isArray(firmsResult.firms)) {
-        setDashboardFirms(firmsResult.firms);
-      } else {
-        setDashboardFirms([]);
-      }
+      setDashboardFirms(
+        firmsResult.success && Array.isArray(firmsResult.firms)
+          ? firmsResult.firms
+          : []
+      );
+
+      setPanelLenders(
+        panelLendersResult.success && Array.isArray(panelLendersResult.lenders)
+          ? panelLendersResult.lenders
+          : []
+      );
+
+      setPanelMemberships(
+        membershipsResult.success &&
+          Array.isArray(membershipsResult.memberships)
+          ? membershipsResult.memberships
+          : []
+      );
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
       setDashboardEnquiries([]);
       setDashboardFirms([]);
+      setPanelLenders([]);
+      setPanelMemberships([]);
     } finally {
       setIsLoadingDashboard(false);
+    }
+  };
+
+  const mapFirmToEditor = (firm: PanelFirm): FirmEditorState => ({
+    id: firm.id,
+    firm_name: firm.firm_name || "",
+    contact_name: firm.contact_name || "",
+    contact_email: firm.contact_email || "",
+    contact_phone: firm.contact_phone || "",
+    active: Number(firm.active) === 1,
+    panel_terms_accepted: Number(firm.panel_terms_accepted) === 1,
+    handles_purchase: Number(firm.handles_purchase) === 1,
+    handles_sale: Number(firm.handles_sale) === 1,
+    handles_remortgage: Number(firm.handles_remortgage) === 1,
+    handles_transfer: Number(firm.handles_transfer) === 1,
+    handles_leasehold: Number(firm.handles_leasehold) === 1,
+    handles_new_build: Number(firm.handles_new_build) === 1,
+    handles_company_buyers: Number(firm.handles_company_buyers) === 1,
+    notes: firm.notes || "",
+  });
+
+  const startNewFirm = () => {
+    setSelectedFirmId(null);
+    setFirmEditor(initialFirmEditorState);
+    setMembershipEditor(initialMembershipEditorState);
+    setFirmSaveMessage("");
+    setMembershipSaveMessage("");
+  };
+
+  const selectFirmForEditing = (firm: PanelFirm) => {
+    setSelectedFirmId(firm.id);
+    setFirmEditor(mapFirmToEditor(firm));
+    setMembershipEditor({
+      ...initialMembershipEditorState,
+      firm_id: firm.id,
+    });
+    setFirmSaveMessage("");
+    setMembershipSaveMessage("");
+  };
+
+  const handleFirmEditorTextChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFirmEditor((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSaveFirm = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFirmSaveMessage("");
+
+    try {
+      const response = await fetch("/api/save-panel-firm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(firmEditor),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        setFirmSaveMessage(result.error || "Failed to save firm.");
+        return;
+      }
+
+      await loadDashboardData();
+
+      const savedId =
+        typeof result.id === "number"
+          ? result.id
+          : firmEditor.id ?? selectedFirmId ?? null;
+
+      if (savedId) {
+        const savedFirm =
+          dashboardFirms.find((firm) => firm.id === savedId) ||
+          null;
+        setSelectedFirmId(savedId);
+        setMembershipEditor((prev) => ({
+          ...prev,
+          firm_id: savedId,
+        }));
+        if (savedFirm) {
+          setFirmEditor(mapFirmToEditor(savedFirm));
+        } else {
+          setFirmEditor((prev) => ({
+            ...prev,
+            id: savedId,
+          }));
+        }
+      }
+
+      setFirmSaveMessage(
+        result.mode === "created" ? "Firm created." : "Firm updated."
+      );
+    } catch (error) {
+      console.error("Save firm error:", error);
+      setFirmSaveMessage("Something went wrong saving the firm.");
+    }
+  };
+
+  const handleMembershipTextChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+
+    setMembershipEditor((prev) => ({
+      ...prev,
+      [name]:
+        name === "firm_id" || name === "lender_id"
+          ? value === ""
+            ? ""
+            : Number(value)
+          : value,
+    }));
+  };
+
+  const handleSaveMembership = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setMembershipSaveMessage("");
+
+    if (!membershipEditor.firm_id || !membershipEditor.lender_id) {
+      setMembershipSaveMessage("Please select a firm and lender.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/save-panel-membership", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(membershipEditor),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        setMembershipSaveMessage(result.error || "Failed to save membership.");
+        return;
+      }
+
+      await loadDashboardData();
+
+      setMembershipEditor((prev) => ({
+        ...initialMembershipEditorState,
+        firm_id: prev.firm_id,
+      }));
+
+      setMembershipSaveMessage(
+        result.mode === "created"
+          ? "Lender panel entry added."
+          : "Lender panel entry updated."
+      );
+    } catch (error) {
+      console.error("Save membership error:", error);
+      setMembershipSaveMessage("Something went wrong saving the membership.");
+    }
+  };
+
+  const handleEditMembership = (membership: PanelMembership) => {
+    setMembershipEditor({
+      id: membership.id,
+      firm_id: membership.firm_id,
+      lender_id: membership.lender_id,
+      active: Number(membership.active) === 1,
+      notes: membership.notes || "",
+      last_checked_at: membership.last_checked_at || "",
+    });
+    setMembershipSaveMessage("");
+  };
+
+  const handleDeleteMembership = async (id: number) => {
+    const confirmed = window.confirm(
+      "Delete this lender panel entry from the firm?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch("/api/delete-panel-membership", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        alert(result.error || "Failed to delete lender panel entry.");
+        return;
+      }
+
+      await loadDashboardData();
+
+      if (membershipEditor.id === id) {
+        setMembershipEditor((prev) => ({
+          ...initialMembershipEditorState,
+          firm_id: prev.firm_id,
+        }));
+      }
+
+      setMembershipSaveMessage("Lender panel entry deleted.");
+    } catch (error) {
+      console.error("Delete membership error:", error);
+      alert("Something went wrong deleting the lender panel entry.");
     }
   };
 
   const handleAdminTabChange = async (tab: AdminTab) => {
     setAdminTab(tab);
 
-    if (tab === "dashboard" || tab === "enquiries" || tab === "firms") {
-      if (!loadedEnquiry) {
-        await loadDashboardData();
-      }
+    if (tab !== "quote") {
+      await loadDashboardData();
+    }
+
+    if (tab === "firms" && dashboardFirms.length === 0) {
+      startNewFirm();
     }
   };
 
@@ -1264,15 +1645,39 @@ function App() {
   };
 
   useEffect(() => {
-    async function loadLenders() {
+    async function loadPublicLenders() {
       setLoadingLenders(true);
 
       try {
-        const response = await fetch("/api/lenders");
+        const publicResponse = await fetch("/api/lenders");
+        const publicResult = await publicResponse.json();
+
+        if (publicResult.success && Array.isArray(publicResult.lenders)) {
+          setLenders(
+            publicResult.lenders.map((item: any) => ({
+              id: Number(item.id),
+              name: String(item.name || item.lender_name || ""),
+            }))
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Public lenders endpoint failed, trying panel lenders.");
+      }
+
+      try {
+        const response = await fetch("/api/list-panel-lenders");
         const result = await response.json();
 
         if (result.success && Array.isArray(result.lenders)) {
-          setLenders(result.lenders);
+          setLenders(
+            result.lenders
+              .filter((item: PanelLender) => Number(item.active) === 1)
+              .map((item: PanelLender) => ({
+                id: Number(item.id),
+                name: String(item.lender_name || ""),
+              }))
+          );
         } else {
           setLenders([]);
         }
@@ -1284,7 +1689,7 @@ function App() {
       }
     }
 
-    loadLenders();
+    loadPublicLenders();
   }, []);
 
   useEffect(() => {
@@ -1293,12 +1698,18 @@ function App() {
     if (refFromUrl) {
       setManualReference(refFromUrl);
       setAdminTab("quote");
-      loadEnquiryByReference(refFromUrl);
+      void loadEnquiryByReference(refFromUrl);
     } else {
       setAdminTab("dashboard");
-      loadDashboardData();
+      void loadDashboardData();
     }
   }, [isAdminPage, isAdminUnlocked, refFromUrl]);
+
+  useEffect(() => {
+    if (!selectedFirmId && dashboardFirms.length > 0 && adminTab === "firms") {
+      selectFirmForEditing(dashboardFirms[0]);
+    }
+  }, [dashboardFirms, selectedFirmId, adminTab]);
 
   const isPurchase = form.type === "purchase";
   const isSale = form.type === "sale";
@@ -1691,18 +2102,20 @@ function App() {
       value: String(dashboardEnquiries.length),
     },
     {
-      label: "Active firms",
+      label: "Active panel firms",
       value: String(
-        dashboardFirms.filter((firm) => firm.active === "yes").length
+        dashboardFirms.filter((firm) => Number(firm.active) === 1).length
       ),
     },
     {
-      label: "Firms taking matters",
+      label: "Panel lenders",
+      value: String(activePanelLenders.length),
+    },
+    {
+      label: "Active lender memberships",
       value: String(
-        dashboardFirms.filter(
-          (firm) =>
-            firm.active === "yes" && firm.accepting_new_matters === "yes"
-        ).length
+        panelMemberships.filter((membership) => Number(membership.active) === 1)
+          .length
       ),
     },
     {
@@ -1718,14 +2131,6 @@ function App() {
       value: String(
         dashboardEnquiries.filter(
           (enquiry) => enquiry.transaction_type === "sale"
-        ).length
-      ),
-    },
-    {
-      label: "Sale and Purchase",
-      value: String(
-        dashboardEnquiries.filter(
-          (enquiry) => enquiry.transaction_type === "sale_purchase"
         ).length
       ),
     },
@@ -1782,12 +2187,12 @@ function App() {
             </span>
             <h1>
               {isAdminPage
-                ? "Approve and manage conveyancing quotes"
+                ? "Approve quotes and manage panel firms"
                 : "Fast, clear conveyancing quotes with solicitor oversight"}
             </h1>
             <p className="hero__summary">
               {isAdminPage
-                ? "Use this internal page to review saved enquiries, manage the dashboard and issue client-facing quote emails."
+                ? "Use this internal page to review enquiries, send approved quotes, manage panel firms and control lender memberships."
                 : "Get a tailored quote for your sale, purchase, sale and purchase, remortgage, transfer of equity, or remortgage with transfer of equity. We review the details before issuing your quote so you get a clearer starting point."}
             </p>
 
@@ -1795,8 +2200,8 @@ function App() {
               {isAdminPage ? (
                 <>
                   <span>Internal use only</span>
-                  <span>Super user dashboard</span>
-                  <span>Approval workflow</span>
+                  <span>Firm management</span>
+                  <span>Lender panel control</span>
                 </>
               ) : (
                 <>
@@ -2117,15 +2522,6 @@ function App() {
                         <label htmlFor="sdltHint">SDLT guidance</label>
                         <input id="sdltHint" type="text" value={singleSdltHint} readOnly />
                       </div>
-                    </div>
-
-                    <div className="form-footer" style={{ paddingTop: "0" }}>
-                      <p className="form-note">
-                        SDLT is highly fact-sensitive. Any figure produced later
-                        will be an estimate only and may change depending on
-                        buyer status, reliefs, surcharge position and the final
-                        transaction structure.
-                      </p>
                     </div>
                   </>
                 )}
@@ -2582,14 +2978,6 @@ function App() {
                           readOnly
                         />
                       </div>
-                    </div>
-
-                    <div className="form-footer" style={{ paddingTop: "0" }}>
-                      <p className="form-note">
-                        For combined sale and purchase matters, SDLT only applies
-                        to the purchase side. Any figure produced later will be
-                        an estimate only and may still need solicitor review.
-                      </p>
                     </div>
                   </>
                 )}
@@ -3048,8 +3436,8 @@ function App() {
               <div>
                 <h2>Super User Dashboard</h2>
                 <p>
-                  View the dashboard, open enquiries, check firms, and review
-                  client quotes from one admin area.
+                  Review enquiries, manage panel firms, edit lender panel
+                  memberships and send approved quotes from one page.
                 </p>
               </div>
             </div>
@@ -3083,7 +3471,7 @@ function App() {
                 className={adminTab === "firms" ? "primary-button" : "muted-button"}
                 onClick={() => void handleAdminTabChange("firms")}
               >
-                Firms
+                Firms & Lenders
               </button>
 
               <button
@@ -3119,11 +3507,21 @@ function App() {
                     </button>
                   </div>
 
+                  <div className="field" style={{ alignSelf: "end" }}>
+                    <button
+                      type="button"
+                      className="muted-button"
+                      onClick={() => void loadDashboardData()}
+                    >
+                      Refresh Admin Data
+                    </button>
+                  </div>
+
                   {loadedEnquiry && (
                     <div className="field" style={{ alignSelf: "end" }}>
                       <button
                         type="button"
-                        className="primary-button muted-button"
+                        className="muted-button"
                         onClick={() => void handleBackToDashboard()}
                       >
                         Back to Dashboard
@@ -3151,6 +3549,71 @@ function App() {
                 <SummaryCard title="Dashboard Overview">
                   <SummaryGrid rows={dashboardSummaryRows} />
                 </SummaryCard>
+
+                <div className="admin-two-col">
+                  <SummaryCard title="Recent Enquiries">
+                    {dashboardEnquiries.length === 0 ? (
+                      <p className="form-note">No enquiries found.</p>
+                    ) : (
+                      <div className="detail-table">
+                        {dashboardEnquiries.slice(0, 8).map((enquiry) => (
+                          <div
+                            key={`${enquiry.id}-${enquiry.reference}`}
+                            className="detail-row"
+                          >
+                            <div className="detail-row__label">
+                              <strong>{enquiry.reference || "No reference"}</strong>
+                              <div>{prettifyValue(enquiry.client_name)}</div>
+                              <div>{getTransactionLabel(enquiry.transaction_type)}</div>
+                            </div>
+                            <div className="detail-row__value">
+                              <div>{prettifyValue(enquiry.created_at)}</div>
+                              {enquiry.reference && (
+                                <button
+                                  type="button"
+                                  className="muted-button"
+                                  onClick={() =>
+                                    void handleOpenDashboardEnquiry(
+                                      enquiry.reference || ""
+                                    )
+                                  }
+                                >
+                                  Open
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </SummaryCard>
+
+                  <SummaryCard title="Panel Firms Snapshot">
+                    {dashboardFirms.length === 0 ? (
+                      <p className="form-note">No panel firms found.</p>
+                    ) : (
+                      <div className="detail-table">
+                        {dashboardFirms.slice(0, 8).map((firm) => (
+                          <div
+                            key={firm.id}
+                            className="detail-row"
+                          >
+                            <div className="detail-row__label">
+                              <strong>{prettifyValue(firm.firm_name)}</strong>
+                              <div>{prettifyValue(firm.contact_email)}</div>
+                            </div>
+                            <div className="detail-row__value">
+                              <div>Active: {prettifyValue(firm.active)}</div>
+                              <div>
+                                Lenders: {String(Number(firm.lender_count || 0))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </SummaryCard>
+                </div>
               </div>
             )}
 
@@ -3198,38 +3661,427 @@ function App() {
             )}
 
             {adminTab === "firms" && !loadedEnquiry && !isLoadingDashboard && (
-              <div className="admin-stack" style={{ marginTop: "20px" }}>
-                <SummaryCard title="Panel Firms">
-                  {dashboardFirms.length === 0 ? (
-                    <p className="form-note">No firms found.</p>
-                  ) : (
-                    <div className="detail-table">
-                      {dashboardFirms.map((firm) => (
-                        <div
-                          key={`${firm.id}-${firm.firm_name}`}
-                          className="detail-row"
-                        >
-                          <div className="detail-row__label">
-                            <strong>{prettifyValue(firm.firm_name)}</strong>
-                            <div>Contact: {prettifyValue(firm.contact_name)}</div>
-                            <div>Email: {prettifyValue(firm.contact_email)}</div>
-                            <div>Phone: {prettifyValue(firm.contact_phone)}</div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(300px, 1fr) minmax(380px, 1.4fr)",
+                  gap: "20px",
+                  alignItems: "start",
+                }}
+              >
+                <div className="admin-stack">
+                  <SummaryCard title="Panel Firms">
+                    <div style={{ marginBottom: "12px" }}>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={startNewFirm}
+                      >
+                        Add New Firm
+                      </button>
+                    </div>
+
+                    {dashboardFirms.length === 0 ? (
+                      <p className="form-note">No panel firms found.</p>
+                    ) : (
+                      <div className="detail-table">
+                        {dashboardFirms.map((firm) => (
+                          <div
+                            key={firm.id}
+                            className="detail-row"
+                            style={{
+                              border:
+                                selectedFirmId === firm.id
+                                  ? "2px solid #0f2747"
+                                  : undefined,
+                              borderRadius: "10px",
+                              padding: "8px",
+                            }}
+                          >
+                            <div className="detail-row__label">
+                              <strong>{prettifyValue(firm.firm_name)}</strong>
+                              <div>{prettifyValue(firm.contact_name)}</div>
+                              <div>{prettifyValue(firm.contact_email)}</div>
+                            </div>
+                            <div className="detail-row__value">
+                              <div>Active: {prettifyValue(firm.active)}</div>
+                              <div>
+                                Lenders: {String(Number(firm.lender_count || 0))}
+                              </div>
+                              <button
+                                type="button"
+                                className="muted-button"
+                                onClick={() => selectFirmForEditing(firm)}
+                              >
+                                Edit Firm
+                              </button>
+                            </div>
                           </div>
-                          <div className="detail-row__value">
-                            <div>Active: {prettifyValue(firm.active)}</div>
-                            <div>
-                              Taking matters:{" "}
-                              {prettifyValue(firm.accepting_new_matters)}
-                            </div>
-                            <div>
-                              Active lenders: {String(Number(firm.lender_count || 0))}
-                            </div>
+                        ))}
+                      </div>
+                    )}
+                  </SummaryCard>
+                </div>
+
+                <div className="admin-stack">
+                  <SummaryCard
+                    title={
+                      firmEditor.id ? "Edit Panel Firm" : "Create Panel Firm"
+                    }
+                  >
+                    <form className="quote-form" onSubmit={handleSaveFirm}>
+                      <div className="form-grid">
+                        <div className="field">
+                          <label htmlFor="firm_name">Firm name</label>
+                          <input
+                            id="firm_name"
+                            name="firm_name"
+                            type="text"
+                            value={firmEditor.firm_name}
+                            onChange={handleFirmEditorTextChange}
+                            required
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="contact_name">Contact name</label>
+                          <input
+                            id="contact_name"
+                            name="contact_name"
+                            type="text"
+                            value={firmEditor.contact_name}
+                            onChange={handleFirmEditorTextChange}
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="contact_email">Contact email</label>
+                          <input
+                            id="contact_email"
+                            name="contact_email"
+                            type="email"
+                            value={firmEditor.contact_email}
+                            onChange={handleFirmEditorTextChange}
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="contact_phone">Contact phone</label>
+                          <input
+                            id="contact_phone"
+                            name="contact_phone"
+                            type="text"
+                            value={firmEditor.contact_phone}
+                            onChange={handleFirmEditorTextChange}
+                          />
+                        </div>
+
+                        <div className="field field--full">
+                          <label htmlFor="firm_notes">Notes</label>
+                          <textarea
+                            id="firm_notes"
+                            name="notes"
+                            rows={4}
+                            value={firmEditor.notes}
+                            onChange={handleFirmEditorTextChange}
+                          />
+                        </div>
+
+                        <div className="field field--full">
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: "10px",
+                              gridTemplateColumns:
+                                "repeat(auto-fit, minmax(180px, 1fr))",
+                            }}
+                          >
+                            <CheckboxField
+                              label="Active"
+                              checked={firmEditor.active}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  active: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Panel terms accepted"
+                              checked={firmEditor.panel_terms_accepted}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  panel_terms_accepted: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles purchase"
+                              checked={firmEditor.handles_purchase}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_purchase: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles sale"
+                              checked={firmEditor.handles_sale}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_sale: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles remortgage"
+                              checked={firmEditor.handles_remortgage}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_remortgage: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles transfer"
+                              checked={firmEditor.handles_transfer}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_transfer: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles leasehold"
+                              checked={firmEditor.handles_leasehold}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_leasehold: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles new build"
+                              checked={firmEditor.handles_new_build}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_new_build: checked,
+                                }))
+                              }
+                            />
+                            <CheckboxField
+                              label="Handles company buyers"
+                              checked={firmEditor.handles_company_buyers}
+                              onChange={(checked) =>
+                                setFirmEditor((prev) => ({
+                                  ...prev,
+                                  handles_company_buyers: checked,
+                                }))
+                              }
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </SummaryCard>
+                      </div>
+
+                      <div className="form-footer action-row">
+                        <p className="form-note">
+                          {firmSaveMessage || "Save the selected firm details here."}
+                        </p>
+
+                        <button
+                          type="button"
+                          className="muted-button"
+                          onClick={startNewFirm}
+                        >
+                          Clear Firm Form
+                        </button>
+
+                        <button type="submit" className="primary-button">
+                          {firmEditor.id ? "Update Firm" : "Create Firm"}
+                        </button>
+                      </div>
+                    </form>
+                  </SummaryCard>
+
+                  <SummaryCard title="Lender Panel Management">
+                    {!selectedFirmId ? (
+                      <p className="form-note">
+                        Select a firm first to manage its lender panel.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="form-note" style={{ marginBottom: "12px" }}>
+                          Managing lender memberships for{" "}
+                          <strong>{selectedFirm?.firm_name || "selected firm"}</strong>.
+                        </p>
+
+                        <form className="quote-form" onSubmit={handleSaveMembership}>
+                          <div className="form-grid">
+                            <div className="field">
+                              <label htmlFor="membership_firm_id">Firm</label>
+                              <select
+                                id="membership_firm_id"
+                                name="firm_id"
+                                value={membershipEditor.firm_id}
+                                onChange={handleMembershipTextChange}
+                                required
+                              >
+                                <option value="">Please select</option>
+                                {dashboardFirms.map((firm) => (
+                                  <option key={firm.id} value={firm.id}>
+                                    {firm.firm_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="field">
+                              <label htmlFor="membership_lender_id">Lender</label>
+                              <select
+                                id="membership_lender_id"
+                                name="lender_id"
+                                value={membershipEditor.lender_id}
+                                onChange={handleMembershipTextChange}
+                                required
+                              >
+                                <option value="">Please select</option>
+                                {activePanelLenders.map((lender) => (
+                                  <option key={lender.id} value={lender.id}>
+                                    {lender.lender_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="field">
+                              <label htmlFor="membership_last_checked_at">
+                                Last checked at
+                              </label>
+                              <input
+                                id="membership_last_checked_at"
+                                name="last_checked_at"
+                                type="text"
+                                placeholder="e.g. 2026-04-10"
+                                value={membershipEditor.last_checked_at}
+                                onChange={handleMembershipTextChange}
+                              />
+                            </div>
+
+                            <div className="field field--full">
+                              <label htmlFor="membership_notes">Notes</label>
+                              <textarea
+                                id="membership_notes"
+                                name="notes"
+                                rows={3}
+                                value={membershipEditor.notes}
+                                onChange={handleMembershipTextChange}
+                              />
+                            </div>
+
+                            <div className="field field--full">
+                              <CheckboxField
+                                label="Membership active"
+                                checked={membershipEditor.active}
+                                onChange={(checked) =>
+                                  setMembershipEditor((prev) => ({
+                                    ...prev,
+                                    active: checked,
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-footer action-row">
+                            <p className="form-note">
+                              {membershipSaveMessage ||
+                                "Add a lender to the selected firm, or edit an existing lender panel entry."}
+                            </p>
+
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={() =>
+                                setMembershipEditor({
+                                  ...initialMembershipEditorState,
+                                  firm_id: selectedFirmId,
+                                })
+                              }
+                            >
+                              Clear Membership Form
+                            </button>
+
+                            <button type="submit" className="primary-button">
+                              {membershipEditor.id
+                                ? "Update Membership"
+                                : "Add Lender to Firm"}
+                            </button>
+                          </div>
+                        </form>
+
+                        <div style={{ marginTop: "20px" }}>
+                          <h4 style={{ marginTop: 0 }}>Current Lender Memberships</h4>
+
+                          {selectedFirmMemberships.length === 0 ? (
+                            <p className="form-note">
+                              No lenders linked to this firm yet.
+                            </p>
+                          ) : (
+                            <div className="detail-table">
+                              {selectedFirmMemberships.map((membership) => (
+                                <div
+                                  key={membership.id}
+                                  className="detail-row"
+                                >
+                                  <div className="detail-row__label">
+                                    <strong>
+                                      {prettifyValue(membership.lender_name)}
+                                    </strong>
+                                    <div>
+                                      Active: {prettifyValue(membership.active)}
+                                    </div>
+                                    <div>
+                                      Last checked:{" "}
+                                      {prettifyValue(membership.last_checked_at)}
+                                    </div>
+                                    <div>{prettifyValue(membership.notes)}</div>
+                                  </div>
+                                  <div className="detail-row__value">
+                                    <button
+                                      type="button"
+                                      className="muted-button"
+                                      onClick={() =>
+                                        handleEditMembership(membership)
+                                      }
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="muted-button"
+                                      onClick={() =>
+                                        void handleDeleteMembership(membership.id)
+                                      }
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </SummaryCard>
+                </div>
               </div>
             )}
 
@@ -3620,7 +4472,7 @@ function App() {
 
                     <button
                       type="button"
-                      className="primary-button muted-button"
+                      className="muted-button"
                       onClick={() => {
                         setApprovedQuote(initialApprovedQuoteState);
                         setLoadedEnquiryMessage("");
