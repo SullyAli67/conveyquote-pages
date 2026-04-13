@@ -2689,53 +2689,53 @@ function App() {
   };
 
   useEffect(() => {
-    async function loadPublicLenders() {
-      setLoadingLenders(true);
+  async function loadPublicLenders() {
+    setLoadingLenders(true);
 
-      try {
-        const publicResponse = await fetch("/api/lenders");
-        const publicResult = await publicResponse.json();
+    try {
+      const publicResponse = await fetch("/api/lenders");
+      const publicResult = await publicResponse.json();
 
-        if (publicResult.success && Array.isArray(publicResult.lenders)) {
-          setLenders(
-            publicResult.lenders.map((item: any) => ({
-              id: Number(item.id),
-              name: String(item.name || item.lender_name || ""),
-            }))
-          );
-          return;
-        }
-      } catch (error) {
-        console.error("Public lenders endpoint failed, trying panel lenders.");
+      if (publicResult.success && Array.isArray(publicResult.lenders) && publicResult.lenders.length > 0) {
+        setLenders(
+          publicResult.lenders.map((item: any) => ({
+            id: Number(item.id),
+            name: String(item.name || item.lender_name || ""),
+          }))
+        );
+        return;
       }
-
-      try {
-        const response = await fetch("/api/list-panel-lenders");
-        const result = await response.json();
-
-        if (result.success && Array.isArray(result.lenders)) {
-          setLenders(
-            result.lenders
-              .filter((item: PanelLender) => Number(item.active) === 1)
-              .map((item: PanelLender) => ({
-                id: Number(item.id),
-                name: String(item.lender_name || ""),
-              }))
-          );
-        } else {
-          setLenders([]);
-        }
-      } catch (error) {
-        console.error("Failed to load lenders:", error);
-        setLenders([]);
-      } finally {
-        setLoadingLenders(false);
-      }
+    } catch (error) {
+      console.error("Public lenders endpoint failed, trying panel lenders.");
     }
 
-    loadPublicLenders();
-  }, []);
+    try {
+      const response = await fetch("/api/list-panel-lenders");
+      const result = await response.json();
 
+      if (result.success && Array.isArray(result.lenders)) {
+        setLenders(
+          result.lenders
+            .filter((item: PanelLender) => Number(item.active) === 1)
+            .map((item: PanelLender) => ({
+              id: Number(item.id),
+              name: String(item.lender_name || ""),
+            }))
+        );
+      } else {
+        setLenders([]);
+      }
+    } catch (error) {
+      console.error("Failed to load lenders:", error);
+      setLenders([]);
+    } finally {
+      setLoadingLenders(false);
+    }
+  }
+
+  loadPublicLenders();
+}, []);
+  
   useEffect(() => {
     if (!isAdminPage || !isAdminUnlocked) return;
 
