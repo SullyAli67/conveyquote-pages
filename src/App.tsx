@@ -63,6 +63,10 @@ type PanelFirm = {
   contact_email?: string | null;
   contact_phone?: string | null;
   active?: number;
+
+  portal_active?: number;
+  portal_email?: string | null;
+
   panel_terms_accepted?: number;
   handles_purchase?: number;
   handles_sale?: number;
@@ -200,6 +204,7 @@ type LoadedEnquiry = {
   client_phone?: string;
   transaction_type?: string;
   reference?: string;
+  status?: string;
   consent_to_panel?: string;
 
   tenure?: string;
@@ -740,6 +745,7 @@ function App() {
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
     null
   );
+  const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
 
   const [manualReference, setManualReference] = useState("");
   const [dashboardEnquiries, setDashboardEnquiries] = useState<
