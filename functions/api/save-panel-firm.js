@@ -27,6 +27,8 @@ export async function onRequestPost(context) {
       handles_new_build,
       handles_company_buyers,
       notes,
+      default_referral_fee,
+      suspended,
     } = body;
 
     if (!firm_name || !String(firm_name).trim()) {
@@ -62,6 +64,8 @@ export async function onRequestPost(context) {
           handles_new_build = ?,
           handles_company_buyers = ?,
           notes = ?,
+          default_referral_fee = ?,
+          suspended = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         `
@@ -84,6 +88,8 @@ export async function onRequestPost(context) {
           toFlag(handles_new_build),
           toFlag(handles_company_buyers),
           notes || "",
+          Number(default_referral_fee || 0),
+          toFlag(suspended),
           id
         )
         .run();
@@ -108,9 +114,11 @@ export async function onRequestPost(context) {
         handles_leasehold,
         handles_new_build,
         handles_company_buyers,
-        notes
+        notes,
+        default_referral_fee,
+        suspended
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
       .bind(
@@ -128,7 +136,9 @@ export async function onRequestPost(context) {
         toFlag(handles_leasehold),
         toFlag(handles_new_build),
         toFlag(handles_company_buyers),
-        notes || ""
+        notes || "",
+        Number(default_referral_fee || 0),
+        toFlag(suspended)
       )
       .run();
 
