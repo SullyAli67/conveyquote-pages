@@ -291,7 +291,7 @@ export async function onRequestPost(context) {
 
     await insertEnquiryRow(env.DB, enquiryRow);
 
-    const adminUrl = `https://conveyquote.uk/admin?ref=${reference}`;
+    const adminUrl = `https://conveyquote.uk/admin/?ref=${reference}`;
 
     const summaryRows = [
       row("Reference", reference),
