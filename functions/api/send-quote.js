@@ -500,9 +500,11 @@ export async function onRequestPost(context) {
       </html>
     `;
 
-    // Send notification email - non-blocking so DB save still succeeds
+    // Send notification email - awaited so failures are caught and reported
+    let emailSent = false;
+
     if (env.RESEND_API_KEY) {
-      fetch("https://api.resend.com/emails", {
+      const resendResponse = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -515,13 +517,24 @@ export async function onRequestPost(context) {
           subject: `New Quote - ${prettyType} - ${reference}`,
           html: internalHtml,
         }),
-      }).catch((err) => console.error("Email send error:", err));
+      });
+
+      const resendText = await resendResponse.text();
+
+      if (!resendResponse.ok) {
+        throw new Error(
+          `Resend email failed: ${resendResponse.status} ${resendText}`
+        );
+      }
+
+      emailSent = true;
     }
 
     return jsonResponse({
       success: true,
       reference,
       quote,
+      emailSent,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
