@@ -892,7 +892,7 @@ function App() {
   const [referrerSimpleForm, setReferrerSimpleForm] = useState({
     property_address: "", name: "", email: "", phone: "",
     type: "purchase", price: "", tenure: "freehold", negotiator_name: "",
-    mortgage: "yes", firstTimeBuyer: "no", additionalProperty: "no",
+    mortgage: "mortgage", firstTimeBuyer: "no", additionalProperty: "no",
     ukResidentForSdlt: "yes", newBuild: "no",
     saleMortgage: "no", managementCompany: "no",
   });
@@ -9165,24 +9165,46 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
               { label: "New build?", field: "newBuild", show: isPurchase },
               { label: "Has mortgage?", field: "mortgage", show: isPurchase },
               { label: "Sale has mortgage?", field: "saleMortgage", show: isSale },
-              { label: "Management company?", field: "managementCompany", show: true },
+              { label: "Management company?", field: "managementCompany", show: isSale },
             ].filter((f) => f.show).map((f) => (
               <label key={f.field} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer" }}>
-                <input type="checkbox"
-                  checked={form[f.field as keyof typeof form] === "yes"}
-                  onChange={(e) => {
-                    set(f.field, e.target.checked ? "yes" : "no");
-                    // Recalculate preview
-                    const updated = { ...form, [f.field]: e.target.checked ? "yes" : "no" };
-                    setPreview(buildQuoteData({
-                      type: updated.type, price: updated.price, tenure: updated.tenure,
-                      mortgage: updated.mortgage, firstTimeBuyer: updated.firstTimeBuyer,
-                      additionalProperty: updated.additionalProperty, ukResidentForSdlt: updated.ukResidentForSdlt,
-                      newBuild: updated.newBuild, saleMortgage: updated.saleMortgage,
-                      managementCompany: updated.managementCompany,
-                    }));
-                  }}
-                />
+              <input
+  type="checkbox"
+  checked={
+    f.field === "mortgage"
+      ? form.mortgage === "mortgage"
+      : form[f.field as keyof typeof form] === "yes"
+  }
+  onChange={(e) => {
+    const nextValue =
+      f.field === "mortgage"
+        ? e.target.checked
+          ? "mortgage"
+          : "cash"
+        : e.target.checked
+        ? "yes"
+        : "no";
+
+    set(f.field, nextValue);
+
+    const updated = { ...form, [f.field]: nextValue };
+
+    setPreview(
+      buildQuoteData({
+        type: updated.type,
+        price: updated.price,
+        tenure: updated.tenure,
+        mortgage: updated.mortgage,
+        firstTimeBuyer: updated.firstTimeBuyer,
+        additionalProperty: updated.additionalProperty,
+        ukResidentForSdlt: updated.ukResidentForSdlt,
+        newBuild: updated.newBuild,
+        saleMortgage: updated.saleMortgage,
+        managementCompany: updated.managementCompany,
+      })
+    );
+  }}
+/>
                 {f.label}
               </label>
             ))}
