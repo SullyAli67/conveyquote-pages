@@ -888,6 +888,7 @@ function App() {
   const [referrerUpdateMessage, setReferrerUpdateMessage] = useState("");
   const [referrerSubmitMessage, setReferrerSubmitMessage] = useState("");
   const [isSubmittingReferrerEnquiry, setIsSubmittingReferrerEnquiry] = useState(false);
+  const [clientEmailed, setClientEmailed] = useState(false);
   const [referrerQuotePreview, setReferrerQuotePreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
   const [referrerSimpleForm, setReferrerSimpleForm] = useState({
     property_address: "", name: "", email: "", phone: "",
@@ -9105,7 +9106,17 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
         <div style={{ fontSize: "52px", marginBottom: "16px" }}>✅</div>
         <h3 style={{ color: "var(--navy)", margin: "0 0 8px" }}>Referral submitted</h3>
         <p style={{ color: "var(--muted)", margin: "0 0 4px" }}>Reference: <strong>{resultRef}</strong></p>
-        {sendToClient && <p style={{ color: "var(--muted)", fontSize: "14px" }}>Quote emailed to your client.</p>}
+        {sendToClient && clientEmailed && (
+  <p style={{ color: "var(--muted)", fontSize: "14px" }}>
+    Quote emailed to your client.
+  </p>
+)}
+
+{sendToClient && !clientEmailed && (
+  <p style={{ color: "#b45309", fontSize: "14px" }}>
+    Referral saved, but the client email was not sent.
+  </p>
+)}
         <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "12px" }}>Returning to your dashboard…</p>
       </div>
     );
