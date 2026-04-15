@@ -234,17 +234,27 @@ export async function onRequestPost(context) {
   </div>
 </body></html>`;
 
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: "ConveyQuote <quotes@conveyquote.uk>",
-          to: [email],
-          reply_to: "info@conveyquote.uk",
-          subject: `Your Conveyancing Quote — ${reference}`,
-          html: clientHtml,
-        }),
-      }).then(() => { clientEmailed = true; }).catch((e) => console.error("Client quote email error:", e));
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${env.RESEND_API_KEY}`,
+  },
+  body: JSON.stringify({
+    from: "ConveyQuote <quotes@conveyquote.uk>",
+    to: [email],
+    reply_to: "info@conveyquote.uk",
+    subject: `Your Conveyancing Quote — ${reference}`,
+    html: clientHtml,
+  }),
+});
+
+if (!resendResponse.ok) {
+  const resendErrorText = await resendResponse.text();
+  console.error("Client quote email error:", resendErrorText);
+} else {
+  clientEmailed = true;
+}
     }
 
     return jsonResponse({ success: true, reference, quote, client_emailed: clientEmailed });
