@@ -9023,7 +9023,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
     price: "", tenure: "freehold",
     negotiator_name: "",
     // Hidden defaults fed into quote calc
-    mortgage: "yes", firstTimeBuyer: "no", additionalProperty: "no",
+    mortgage: "mortgage", firstTimeBuyer: "no", additionalProperty: "no",
     ukResidentForSdlt: "yes", newBuild: "no",
     saleMortgage: "no", managementCompany: "no",
   });
@@ -9077,14 +9077,20 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
           tenanted: "no",
         }),
       });
-      const result = await res.json() as { success: boolean; reference?: string; error?: string };
+      const result = await res.json() as { 
+        success: boolean; 
+        reference?: string; 
+        error?: string;
+        client_emailed?: boolean;
+      };
       if (result.success && result.reference) {
-        setResultRef(result.reference);
-        setStep("done");
-        setTimeout(onSuccess, 3500);
-      } else {
-        setError(result.error || "Failed to submit. Please try again.");
-      }
+      setClientEmailed(Boolean(result.client_emailed));
+      setResultRef(result.reference);
+      setStep("done");
+      setTimeout(onSuccess, 3500);
+    } else {
+      setError(result.error || "Failed to submit. Please try again.");
+    }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
