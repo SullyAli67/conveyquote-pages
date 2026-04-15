@@ -35,6 +35,30 @@ const getTransactionLabel = (type) => {
   return "Conveyancing Matter";
 };
 
+const getExistingEnquiryColumns = async (db) => {
+  const result = await db.prepare(`PRAGMA table_info(enquiries)`).all();
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  return new Set(rows.map((row) => String(row.name)));
+};
+
+const insertEnquiryRow = async (db, row) => {
+  const existingColumns = await getExistingEnquiryColumns(db);
+  const entries = Object.entries(row).filter(([key]) => existingColumns.has(key));
+
+  if (entries.length === 0) {
+    throw new Error("The enquiries table could not be inspected or has no matching columns.");
+  }
+
+  const columns = entries.map(([key]) => key);
+  const values = entries.map(([, value]) => value);
+  const placeholders = entries.map(() => "?").join(",");
+
+  await db
+    .prepare(`INSERT INTO enquiries (${columns.join(", ")}) VALUES (${placeholders})`)
+    .bind(...values)
+    .run();
+};
+
 export async function onRequestPost(context) {
   try {
     const { request, env } = context;
@@ -85,35 +109,44 @@ export async function onRequestPost(context) {
       transferMortgage: transferMortgage || "", ownersChanging: ownersChanging || "",
     });
 
-    // Insert enquiry with referrer_id
-    await env.DB.prepare(
-      `INSERT INTO enquiries (
-         reference, client_name, client_email, client_phone,
-         transaction_type, tenure, price, postcode,
-         property_address, negotiator_name,
-         mortgage, lender, ownership_type, first_time_buyer, new_build,
-         shared_ownership, help_to_buy, is_company, buy_to_let, gifted_deposit,
-         additional_property, uk_resident_for_sdlt, lifetime_isa,
-         sale_mortgage, management_company, tenanted, number_of_sellers,
-         additional_borrowing, remortgage_transfer, transfer_mortgage, owners_changing,
-         quote_json, status, referrer_id, referral_fee_payable, referral_fee_amount
-       ) VALUES (
-         ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-       )`
-    ).bind(
-      reference, name || null, email, phone || null,
-      type, tenure || null, price ? Number(price) : null, postcode || null,
-      property_address || null, negotiator_name || null,
-      mortgage || null, lender || null, ownershipType || null, firstTimeBuyer || null, newBuild || null,
-      sharedOwnership || null, helpToBuy || null, isCompany || null, buyToLet || null, giftedDeposit || null,
-      additionalProperty || null, ukResidentForSdlt || null, lifetimeIsa || null,
-      saleMortgage || null, managementCompany || null, tenanted || null, numberOfSellers || null,
-      additionalBorrowing || null, remortgageTransfer || null, transferMortgage || null, ownersChanging || null,
-      JSON.stringify(quote), "new",
-      referrerId,
-      Number(referrer.referral_fee) > 0 ? 1 : 0,
-      Number(referrer.referral_fee) || 0
-    ).run();
+        await insertEnquiryRow(env.DB, {
+      reference,
+      client_name: name || null,
+      client_email: email,
+      client_phone: phone || null,
+      transaction_type: type,
+      tenure: tenure || null,
+      price: price ? Number(price) : null,
+      postcode: postcode || null,
+      property_address: property_address || null,
+      negotiator_name: negotiator_name || null,
+      mortgage: mortgage || null,
+      lender: lender || null,
+      ownership_type: ownershipType || null,
+      first_time_buyer: firstTimeBuyer || null,
+      new_build: newBuild || null,
+      shared_ownership: sharedOwnership || null,
+      help_to_buy: helpToBuy || null,
+      is_company: isCompany || null,
+      buy_to_let: buyToLet || null,
+      gifted_deposit: giftedDeposit || null,
+      additional_property: additionalProperty || null,
+      uk_resident_for_sdlt: ukResidentForSdlt || null,
+      lifetime_isa: lifetimeIsa || null,
+      sale_mortgage: saleMortgage || null,
+      management_company: managementCompany || null,
+      tenanted: tenanted || null,
+      number_of_sellers: numberOfSellers || null,
+      additional_borrowing: additionalBorrowing || null,
+      remortgage_transfer: remortgageTransfer || null,
+      transfer_mortgage: transferMortgage || null,
+      owners_changing: ownersChanging || null,
+      quote_json: JSON.stringify(quote),
+      status: "new",
+      referrer_id: referrerId,
+      referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
+      referral_fee_amount: Number(referrer.referral_fee) || 0,
+    });
 
     const transactionLabel = getTransactionLabel(type);
     const adminUrl = `https://conveyquote.uk/admin/?ref=${encodeURIComponent(reference)}`;
