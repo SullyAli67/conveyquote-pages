@@ -334,6 +334,13 @@ function buildSaleQuote(input: {
       "Telegraphic transfer fee - balance to client",
       config.legalFees.telegraphicTransferFee
     );
+  } else {
+    // No mortgage: still need 1x TT to send net proceeds to the seller
+    addItem(
+      legalFees,
+      "Telegraphic transfer fee",
+      config.legalFees.telegraphicTransferFee
+    );
   }
 
   if (yes(input.managementCompany)) {
