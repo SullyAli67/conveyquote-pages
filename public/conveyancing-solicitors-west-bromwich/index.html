@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in West Bromwich – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in West Bromwich. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">West Bromwich &amp; Sandwell</div>
+    <h1>Conveyancing Solicitors in <span>West Bromwich</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A solicitor who knows West Bromwich's regenerating and value-driven property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>Buying or selling in West Bromwich – the legal side explained simply</h2>
+        <div class="divider"></div>
+        <p>Every property purchase and sale in England and Wales requires a solicitor or licensed conveyancer to manage the legal transfer of ownership. They search the title at HM Land Registry, raise enquiries with the local authority, review and exchange contracts, handle mortgage funds, and register the new owner once completion takes place. This process is called conveyancing, and in most cases it takes between ten and fourteen weeks from the point an offer is accepted.</p>
+        <p>West Bromwich sits at the administrative centre of the Sandwell metropolitan borough, and its property market reflects the area's ongoing transformation. The town centre has been the focus of significant regeneration investment, attracting new residential development alongside established terraced and semi-detached housing that makes the area one of the most affordable in the West Midlands. Its transport connections – direct Metro links into Birmingham city centre and ready access to Junction 1 of the M5 – make it an increasingly realistic option for buyers who want more space for their money without sacrificing accessibility. That growing demand brings its own legal complexities, and the conveyancing process here has specific characteristics that matter.</p>
+        <p>ConveyQuote gives buyers and sellers in West Bromwich a clearer, more reliable starting point. Every quote we produce is reviewed by a real person before it reaches you – meaning the figure reflects your actual transaction and not an automated estimate that changes once a solicitor looks at the file. Your costs are broken down clearly from day one, and your matter is placed with a solicitor from our regulated panel who has the right experience for your type of purchase or sale.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. A process built for clarity.</h2>
+    <div class="divider"></div>
+    <p>Online comparison tools generate a conveyancing quote in seconds without examining the specifics of your transaction. In West Bromwich, where former industrial land has become residential development, where ex-council stock is prevalent across the borough, and where coal authority searches are standard, the gap between a generic quote and an accurate one can be significant. ConveyQuote reviews every enquiry before issuing a figure – so what you are quoted is what you can plan around.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a member of our team before any quote is prepared. Your transaction details – property type, tenure, mortgage position, and any West Bromwich-specific factors – are considered properly, not processed by an algorithm.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are broken down separately in plain language. No file closure charges, no additions mid-transaction, and no estimates that shift once work is underway. The quote you receive is the price you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>Busy high-street firms can be slow to respond and slow to progress files. Our panel solicitors use dedicated conveyancing teams and digital communication systems that keep your transaction moving and keep you genuinely informed.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and chosen for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your transaction type – not whoever is next in the queue.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WEST BROMWICH LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in West Bromwich</div>
+    <h2>What buyers and sellers in West Bromwich need to know</h2>
+    <div class="divider"></div>
+    <p>West Bromwich is the largest town in the Sandwell metropolitan borough, and while it has historically sat in the shadow of its neighbours when it comes to residential desirability, that picture has shifted meaningfully in recent years. Improved Metro connectivity, town centre regeneration, and price differentials with Birmingham that make a genuine difference to what buyers can afford have all contributed to steadily increasing interest from buyers who might previously have looked elsewhere. The conveyancing landscape here is shaped by the area's industrial past, its significant council-built housing stock, and the specific search requirements that apply across Sandwell.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Coal mining legacy &amp; Sandwell searches</strong>
+        <p>West Bromwich sits within a former coalfield area, and a coal authority search is a standard and essential disbursement for the vast majority of properties in the Sandwell borough. This confirms whether the property is at risk from historical underground mining activity, disused shafts, or recorded tunnels. It must appear as a named line item on any properly prepared conveyancing quote for a West Bromwich property – not buried within a general search figure.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Former industrial land &amp; environmental searches</strong>
+        <p>West Bromwich's industrial heritage as a manufacturing town means that some of the residential development that has taken place over the past two decades has been built on land with a history of industrial use. For properties on these regenerated sites – particularly around the town centre and along the former industrial corridors – the environmental search result needs to be read carefully and its implications explained clearly by your solicitor, not simply forwarded without comment.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Ex-local authority housing stock</strong>
+        <p>Sandwell Metropolitan Borough Council built extensively across West Bromwich, Greets Green, Friar Park, and the surrounding areas from the 1940s through to the 1980s. A substantial number of these properties have passed into private ownership through Right to Buy and are now being bought and sold on the open market. Ex-council titles often carry restrictions from the original transfer deed that remain binding – limitations on subletting, requirements around structural alterations, or pre-emption rights in favour of the council that need to be reviewed before any purchase proceeds.</p>
+      </div>
+      <div class="local-chip">
+        <strong>West Bromwich Metro corridor &amp; new builds</strong>
+        <p>The West Midlands Metro runs through West Bromwich town centre and has been central to the area's regeneration story. Residential development close to the tram line – including apartment schemes around West Bromwich Central station and along the High Street corridor – has grown in recent years. These are predominantly leasehold properties in managed blocks, carrying the usual requirements: management pack review, service charge history checks, and for some of the earlier regeneration-era buildings, building safety documentation under post-Grenfell regulations that lenders now routinely require.</p>
+      </div>
+    </div>
+
+    <p>The Sandwell local authority search covers all West Bromwich properties and is submitted to Sandwell Metropolitan Borough Council. This is important for buyers to understand because West Bromwich sits very close to the Birmingham boundary, and some properties in the outer edges of the town – particularly near Handsworth Wood and Great Barr – can be mistakenly assumed to fall under Birmingham City Council. A solicitor who orders the wrong search has to start the process again, and the delay that causes can be significant. This is precisely the kind of boundary detail that a properly reviewed quote process flags at the outset.</p>
+
+    <p>West Bromwich also has an active first-time buyer market, driven by prices that remain substantially lower than comparable properties in south Birmingham. Shared ownership schemes, Help to Buy successor products, and gifted deposit arrangements are all common in this market, and each adds specific legal requirements to the conveyancing process that should be accounted for in any quote from the start.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in West Bromwich?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs consist of two components: the solicitor's legal fee for carrying out the work, and disbursements – third-party costs your solicitor pays on your behalf during the process and recovers from you. In West Bromwich, where the coal authority search is standard and where the variety of property types spans ex-council terraces to new build leaseholds, understanding the fee structure clearly before you commit matters. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. West Bromwich's generally affordable price point keeps these fees lower than in Birmingham's premium suburbs, making total conveyancing costs competitive. Where higher-value properties are involved – typically the more substantial semis in the outer residential areas – the registration fee and solicitor's professional risk both increase proportionally.</td>
+          </tr>
+          <tr>
+            <td class="factor">Coal authority search <span class="fees-badge">Standard across Sandwell</span></td>
+            <td>A coal authority search is a non-negotiable part of conveyancing across the Sandwell borough, including West Bromwich. It should appear as a named, separate disbursement on any properly prepared quote. The cost is modest, but the result needs to be read and explained by your solicitor – particularly if it flags any recorded mining activity in proximity to the property.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Relevant in town centre</span></td>
+            <td>Most West Bromwich transactions involve freehold properties. Leasehold transactions arise primarily in the apartment schemes developed around the Metro corridor and town centre regeneration area. These carry a higher fee to reflect the additional legal work: reviewing the lease terms, obtaining the management pack, checking service charge accounts, and advising on any building safety documentation the lender requires.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>Purchasing with a mortgage means your solicitor acts for both you and your lender, adding to the workload and the fee. Cash purchases are simpler. For ex-council properties, lenders often have specific additional requirements – confirming property type, checking whether the building is of a construction method the lender accepts – and these should be identified and confirmed early to avoid a late-stage mortgage offer issue.</td>
+          </tr>
+          <tr>
+            <td class="factor">Sandwell boundary awareness <span class="fees-badge">West Bromwich-specific</span></td>
+            <td>Properties near the Birmingham boundary require careful handling to ensure the local authority search is submitted to Sandwell Metropolitan Borough Council rather than Birmingham City Council. This is a straightforward check that should be made from the outset of every West Bromwich instruction, and it is one of the specific verifications built into the ConveyQuote review process before a quote is issued.</td>
+          </tr>
+          <tr>
+            <td class="factor">Shared ownership &amp; gifted deposit <span class="fees-badge">Common in West Bromwich</span></td>
+            <td>Shared ownership purchases involve a more complex legal structure – a lease, a shared ownership agreement, and specific lender requirements that differ from a standard purchase. Gifted deposits require source of funds verification for the mortgage lender. Both are common among first-time buyers in West Bromwich's accessible market, and both carry additional fees that should be disclosed on your quote from the outset rather than added later.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>The ConveyQuote process has been designed to take the guesswork out of conveyancing from the very start. You should not need to wonder whether your quote is accurate, whether your solicitor has begun work, or why things appear to have stalled. Here is what happens from the moment you get in touch.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Complete a short form covering the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage position. It takes around two minutes and costs nothing to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews your submission before a quote is produced. For West Bromwich transactions, this review confirms the correct local authority, checks whether the property type suggests specific additional search or title considerations, and ensures any shared ownership or gifted deposit elements are properly reflected in the pricing before it reaches you.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, with a Stamp Duty estimate based on your actual purchase price. No login required, no obligation to accept, and no hidden additions in the small print.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no pressure to commit before you are comfortable with what you have been offered.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel – selected for their experience with your specific transaction type. They will contact you promptly to open the file, complete identity verification, and begin work without delay.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your West Bromwich property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in West Bromwich</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in West Bromwich?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in West Bromwich, most transactions complete within ten to fourteen weeks from when an offer is accepted. Coal authority search results are typically returned quickly and rarely hold things up on their own. Where an environmental search result flags a concern on a former industrial site and requires a specialist follow-up report, this can add two to three weeks. Leasehold transactions in the Metro corridor apartment schemes can be delayed by slow managing agent responses when producing the management pack. Chain transactions, which are common across the borough's active family home market, add time at each link. Twelve weeks is a sensible working estimate for most straightforward freehold cases.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in West Bromwich?</div>
+        <p class="faq-a">West Bromwich's affordable property prices mean Land Registry fees are generally lower than in Birmingham's premium suburbs, which helps keep total conveyancing costs competitive. As a rough guide, a standard freehold purchase in West Bromwich might attract total costs – covering the solicitor's legal fee, local authority search, coal authority search, water and drainage search, Land Registry registration, and bank transfer fees – of between £1,100 and £1,700, depending on the purchase price and any additional complexity. Leasehold and shared ownership transactions cost more. Gifted deposit verification adds a modest additional fee. Stamp Duty is a separate cost and will be clearly estimated in your ConveyQuote quote based on your actual purchase price.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in West Bromwich or Sandwell?</div>
+        <p class="faq-a">No. Residential conveyancing in England and Wales is conducted almost entirely by email, post, and secure digital portals. In-person office visits are very rarely needed, and the solicitors on ConveyQuote's panel handle West Bromwich transactions without being based locally. What matters is not location but experience – a solicitor who understands coal authority search results, ex-local authority title restrictions, Sandwell boundary considerations, and the shared ownership structures common in this market is far more valuable than one who simply has a local address. One practical point: the local authority search for all West Bromwich properties must be submitted to Sandwell Metropolitan Borough Council. Solicitors unfamiliar with the area occasionally submit to Birmingham City Council by mistake, which requires the search to be reordered and causes avoidable delay.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What typically causes delays in West Bromwich property transactions?</div>
+        <p class="faq-a">The most common causes of delay are: environmental search results on former industrial sites that require a specialist follow-up before exchange can proceed; ex-council property title queries where a lender requests additional confirmation of construction type or imposes specific conditions before releasing the mortgage offer; chain-related hold-ups where a problem at any link in the sequence affects all connected buyers and sellers; and slow managing agent responses on leasehold transactions in the town centre apartment blocks. Boundary proximity to Birmingham occasionally catches out solicitors who submit searches to the wrong council, requiring the process to restart. Identifying these risks at the very start of a transaction – rather than when they surface weeks in – is one of the practical benefits of working with a solicitor whose file is reviewed from day one.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">I am buying a shared ownership property in West Bromwich. Does that affect the conveyancing?</div>
+        <p class="faq-a">Yes, and significantly. Shared ownership conveyancing is more complex than a standard freehold purchase in several respects. The property will be leasehold – you are buying a share of a long lease, not ownership of the bricks and mortar outright – which means all the usual leasehold considerations apply: lease review, management pack, service charge history. In addition, the shared ownership agreement itself needs to be reviewed, the housing association's specific requirements need to be met, and your mortgage lender will have their own conditions for lending on shared ownership that differ from standard purchase requirements. Not all solicitors are comfortable with shared ownership transactions, and choosing one who is not can cause significant delays once the file is underway. When you request a quote through ConveyQuote, shared ownership is one of the factors we ask about in the review process specifically so your matter can be matched to a solicitor with the right experience.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
