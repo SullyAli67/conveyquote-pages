@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Moseley – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Moseley. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Moseley &amp; South Birmingham</div>
+    <h1>Conveyancing Solicitors in <span>Moseley</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A solicitor who understands Moseley's premium and fast-moving property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>Buying or selling in Moseley – the legal side done properly</h2>
+        <div class="divider"></div>
+        <p>Every property purchase and sale in England and Wales requires a solicitor or licensed conveyancer to handle the legal transfer of ownership. That means searching the title at HM Land Registry, raising enquiries with Birmingham City Council, reviewing and exchanging contracts, managing mortgage funds, and registering the completed transaction once it has gone through. This process is conveyancing, and for most residential transactions it takes between ten and fourteen weeks from when an offer is accepted.</p>
+        <p>Moseley is one of the most consistently competitive residential markets in Birmingham. Its combination of large Victorian and Edwardian houses, a genuine village atmosphere, proximity to the city centre, and a catchment for well-regarded local schools makes it a perennial target for buyers, and the supply of good properties rarely keeps pace with demand. In that environment, a solicitor who moves slowly, fails to communicate clearly, or produces a quote that changes once the file is opened is not just an inconvenience – it can be the reason a transaction falls through. Sellers have been known to accept alternative offers from buyers whose solicitors were visibly more organised. It happens more often than people expect.</p>
+        <p>ConveyQuote gives you a stronger start. Every quote we issue is reviewed by a member of our team before it reaches you, so the figure reflects your actual transaction rather than an automated estimate that shifts as more details emerge. Your costs are broken down clearly from day one, and your matter is placed with a solicitor from our regulated panel who has appropriate experience for the type of purchase or sale you are dealing with in Moseley.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. A process that keeps pace with Moseley's market.</h2>
+    <div class="divider"></div>
+    <p>Automated comparison tools generate a conveyancing quote instantly. What they cannot do is assess whether that quote fits your actual transaction – the tenure, the leasehold complexity, the size of the deposit, or the converted Victorian property with an informal drainage arrangement shared with next door. In a market as active as Moseley, where transactions move quickly and buyers need their solicitors to be on the front foot, the gap between a generic quote and an accurate one matters from the first day of instruction.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a real person before any quote is prepared. The figure you receive reflects your actual transaction details – not a template number that gets revised once the file lands on a solicitor's desk.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are listed separately and in plain language. There are no file closure charges, no administration fees added mid-transaction, and no percentage-based additions buried in the small print. The quote you accept is the price you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>In Moseley's fast-moving market, a solicitor who takes days to acknowledge correspondence puts their client at a disadvantage. Our panel solicitors use dedicated conveyancing teams and digital-first systems that keep your file moving and keep you informed throughout.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and selected for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your transaction – whether that is a large Victorian family home, a leasehold flat conversion, or something with additional legal complexity.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MOSELEY LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Moseley</div>
+    <h2>What property buyers and sellers in Moseley need to understand</h2>
+    <div class="divider"></div>
+    <p>Moseley sits around three miles south of Birmingham city centre, and its property market has long attracted buyers who want genuine urban character without sacrificing space or community feel. The large Victorian and Edwardian houses on roads such as Oxford Road, Woodbridge Road, and Valentine Road are among the most desirable in south Birmingham, and the competition for them reflects that. At the same time, Moseley has a substantial leasehold flat market in converted houses and purpose-built blocks, a growing number of buyers drawn by the planned Metro extension, and a cohort of sellers who are deeply embedded in the local market and who choose their buyers – and their buyers' solicitors – with that in mind. Conveyancing in Moseley moves to its own rhythm, and understanding the legal landscape here is worth doing before you start.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Large Victorian &amp; Edwardian houses</strong>
+        <p>Moseley's most sought-after properties are the substantial semi-detached and detached Victorian and Edwardian houses on tree-lined roads off the village centre. These are typically freehold, but their age means title registers sometimes carry historical entries – old restrictive covenants from the original estate development, boundary features established informally when the streets were first built, and occasionally strips of land whose ownership has drifted over multiple changes of hands. A careful title read matters here more than it would on a new build.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Leasehold conversions &amp; flat clusters</strong>
+        <p>Moseley has a significant number of large Victorian houses that have been converted into leasehold flats, particularly around Moseley village, St Mary's Row, and the roads closer to the Kings Heath boundary. These conversions vary enormously in the quality of their legal documentation. Some have professional freehold management; others have informal arrangements between long leaseholders, absent freeholders, or leases that are approaching a length that triggers mortgage lender concerns. Every leasehold purchase in Moseley needs a proper lease review before any commitment is made.</p>
+      </div>
+      <div class="local-chip">
+        <strong>The Metro extension corridor</strong>
+        <p>The planned Birmingham Metro extension through Moseley – along the Alcester Road corridor towards Kings Heath and beyond – has been in development for a number of years and remains a live planning consideration. For properties situated close to the route, buyers should ensure their solicitor raises a specific planning and highways enquiry as part of the local authority search process. A search result that flags the route needs to be properly interpreted, not simply filed. This is an area where an experienced solicitor who reads results carefully adds real value.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Speed of market &amp; sealed bids</strong>
+        <p>Moseley sees sealed bid situations more regularly than most areas of Birmingham. When a well-presented property on a sought-after road comes to market at the right price, competing offers within days is not unusual. In this context, a buyer who has already requested a conveyancing quote, identified their solicitor, and signalled readiness to proceed is in a meaningfully stronger position than one who has not. Sellers and estate agents notice solicitor speed – and it can be the difference between an accepted offer and a disappointed one.</p>
+      </div>
+    </div>
+
+    <p>Conservation area restrictions apply to parts of Moseley, particularly around the village centre and some of the surrounding residential streets. Buyers of properties in designated areas should be aware that permitted development rights are more restricted than they would be on a standard residential title – external alterations that would be allowed elsewhere may require planning consent here. A local authority search will confirm conservation area status, and your solicitor should flag what that means practically for any works you are planning.</p>
+
+    <p>Moseley also sits adjacent to Balsall Heath to the east, and some properties with Moseley postal addresses or marketing descriptions actually fall closer to the Balsall Heath boundary. The distinction rarely affects the conveyancing process directly, but buyers should confirm the precise ward and any locally relevant planning designations from the title and search results rather than relying on the address alone. This is the kind of detail a reviewed quote process helps to account for from the outset.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Moseley?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs consist of the solicitor's legal fee and disbursements – third-party costs your solicitor pays on your behalf and recovers from you. In Moseley, where property values span a wide range and where both leasehold and freehold transactions are common, the cost of conveyancing varies significantly depending on what you are buying and how. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. Moseley's larger Victorian and Edwardian houses regularly reach price points where those registration fees are materially higher than on a more modestly priced property. A solicitor's legal fee may also scale slightly on higher-value instructions due to the increased professional liability involved.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Very common in Moseley</span></td>
+            <td>Leasehold transactions – particularly the converted Victorian flat market that makes up a significant part of Moseley's property offering – involve considerably more legal work than a straightforward freehold purchase. Reviewing the lease in detail, obtaining the management pack, checking service charge accounts, and advising on any ground rent concerns all take time and expertise. This additional work is reflected in the fee, and should be clearly shown on any properly reviewed quote from the outset.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>If you are buying with a mortgage, your solicitor acts for both you and your lender, which adds to the workload. Cash purchases are simpler and generally attract a lower fee. In Moseley's upper market – particularly for the larger detached family homes – cash transactions are more common than elsewhere in south Birmingham.</td>
+          </tr>
+          <tr>
+            <td class="factor">Conservation area searches <span class="fees-badge">Relevant in Moseley village</span></td>
+            <td>For properties within Moseley's designated conservation areas, a more detailed review of the local authority search result is warranted – particularly if you are planning any external works to the property after purchase. This is part of the standard local authority search and does not cost extra, but it does require a solicitor who interprets the result carefully rather than treating it as a box to tick.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold title complications</td>
+            <td>Older Moseley leasehold conversions sometimes have documentation issues – informal freehold management arrangements, missing insurance schedules, or ground rent clauses that modern lenders will not accept without a deed of variation. Where your solicitor identifies any of these, they will need to advise you on the options before exchange. Any additional work will be communicated to you clearly, and should not appear without warning on your final completion statement.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit</td>
+            <td>Where part of your deposit is a family gift, your solicitor must verify the source of funds for your mortgage lender. This is standard and carries a modest additional fee. In Moseley, where purchase prices can stretch buyer budgets, gifted contributions from family are not uncommon and should always be declared at the point of requesting a quote so the figure you receive accurately reflects the full scope of work.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>We have designed the ConveyQuote process to remove the uncertainty and opacity that makes conveyancing unnecessarily stressful. You should not need to wonder whether the quote is accurate, whether the solicitor has started work, or what is actually happening with your transaction. Here is what happens from the moment you reach out.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Fill in a short form covering the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage situation. It takes around two minutes and there is no charge to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews what you have submitted before a quote is produced. In Moseley's varied property market – freehold Victorian houses, leasehold flat conversions, conservation area properties, Metro-corridor purchases – this review step catches complexities that an automated system would not flag until it was too late to reflect them accurately in the pricing.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, Stamp Duty estimated on your actual purchase price. No login required, no obligation to accept, and no small print that changes anything you have been told.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no pressure to commit before you are satisfied with what you have been offered.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel – selected for their experience with your specific transaction type. They will contact you promptly to open the file, complete identity verification, and begin work without the delays that come from an overstretched traditional firm.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Moseley property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Moseley</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Moseley?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in Moseley, most transactions complete within ten to fourteen weeks from when an offer is accepted. Leasehold transactions – which are common given Moseley's converted flat market – tend to take longer, particularly where the freeholder or managing agent is slow to provide the management pack. In some of the older converted properties, documentation gaps or ground rent queries can add further time before exchange becomes possible. Chain transactions, which are the norm rather than the exception in Moseley's active family home market, add time at each link. Conservation area queries occasionally require follow-up once the local authority search is received. A working estimate of twelve weeks is reasonable for a straightforward freehold transaction, though your solicitor will give a more tailored view once they have seen the title and search results.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Moseley?</div>
+        <p class="faq-a">Costs vary depending on transaction type and property value. For a standard freehold purchase in Moseley, total conveyancing costs – including legal fees, local authority searches, water and drainage searches, Land Registry registration, and bank transfer fees – typically range from £1,300 to £2,000. Leasehold transactions attract a higher fee due to the additional legal work involved, and properties with complications – informal freehold arrangements, ground rent issues, or conservation area queries – may require additional work beyond what a standard quote covers. Stamp Duty is a separate cost that will be clearly estimated in your ConveyQuote quote based on your actual purchase price. The most reliable way to understand your costs is to request a reviewed quote that reflects your specific transaction.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Moseley or Birmingham?</div>
+        <p class="faq-a">No. Conveyancing in England and Wales is conducted almost entirely by email, post, and secure online portals. Physical office visits are very rarely required, and the firms on ConveyQuote's panel handle Moseley transactions without needing to be based locally. What matters far more than proximity is experience – a solicitor who understands Victorian leasehold title structures, conservation area restrictions, and the particular legal characteristics of Moseley's property stock is of considerably more practical value than one who simply has a local postcode.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What causes delays in Moseley property transactions?</div>
+        <p class="faq-a">The most common causes of delay in Moseley are: slow managing agent or freeholder responses when producing leasehold management packs, which is a persistent issue with some of the older converted properties in the area; chain-related delays where a problem at any other point in the sequence holds everything up; mortgage lender processing times; and – for leasehold properties – ground rent or lease length queries that require negotiation or a deed of variation before a lender will proceed. Properties near the proposed Metro extension corridor occasionally produce local authority search results that require further enquiry. Conservation area queries can also add a short wait. The most effective protection against avoidable delay is a solicitor who chases proactively and communicates what is actually happening rather than waiting to be asked.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">I am buying a leasehold flat in Moseley. What should I check before I commit?</div>
+        <p class="faq-a">Several things are worth investigating before your offer becomes binding. First, check the lease length – most mortgage lenders require at least 70 years remaining at the end of the mortgage term, and some require more. A short lease significantly reduces your future resale options and should be identified before you are committed. Second, understand the ground rent structure – leases with escalating or doubling ground rent clauses have caused significant problems for leaseholders in recent years, and some lenders now decline to lend on affected properties altogether. Third, ask about the service charge history and any planned major works – a large upcoming bill for roof repairs or external decoration falls on the owner at the time it is demanded, not the person who owned the property when the issue developed. Your solicitor should be requesting at least three years of service charge accounts and raising specific enquiries about known upcoming works as a matter of course. A properly reviewed ConveyQuote quote will include a solicitor with genuine leasehold experience who understands these issues.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
