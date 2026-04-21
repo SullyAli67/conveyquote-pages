@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Edgbaston – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Edgbaston. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Edgbaston &amp; Central Birmingham</div>
+    <h1>Conveyancing Solicitors in <span>Edgbaston</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. Solicitors who understand Edgbaston's distinctive property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>The legal process behind buying or selling in Edgbaston – explained plainly</h2>
+        <div class="divider"></div>
+        <p>When a property changes hands, the transfer of legal ownership has to be handled correctly. A solicitor or licensed conveyancer manages the process end to end – searching the title, raising enquiries with the local authority, reviewing contracts, handling mortgage funds, and registering the new owner with HM Land Registry. This is conveyancing, and for most residential transactions it takes between ten and sixteen weeks from the point an offer is accepted.</p>
+        <p>Edgbaston is one of Birmingham's most legally interesting property markets, and the conveyancing here reflects that. From the leasehold conversions of Victorian villas on Augustus Road to the purpose-built apartment blocks along Hagley Road, and from buy-to-let acquisitions near the University of Birmingham to owner-occupier purchases on the Calthorpe Estate, the range of transaction types – and the legal issues that can arise – is wider than in most suburban markets. Choosing a solicitor who recognises these differences, rather than one processing your file as a standard instruction, matters considerably.</p>
+        <p>The complaints we hear most often from buyers and sellers who have been through a difficult conveyancing experience are consistent ones: charges that appeared without warning, updates that came only when chased, and a general sense of having been kept at arm's length from a process that directly affects them. ConveyQuote was designed to fix this. Every quote we issue is reviewed before it reaches you, the pricing is broken down clearly, and your matter is placed with a solicitor from our regulated panel who has relevant experience for your specific transaction.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. A genuinely different approach.</h2>
+    <div class="divider"></div>
+    <p>Automated comparison tools produce quotes in seconds with no review of whether the figure actually applies to your situation. The nuances get missed, and the surprises emerge later. In a market as varied as Edgbaston – where a leasehold flat conversion and a freehold Victorian villa two streets apart involve entirely different legal processes – that matters more than most buyers initially appreciate.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a real person before any quote is produced. Your transaction details are considered properly – the property type, the tenure, the mortgage, and any additional complexities that an automated system would not recognise.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are presented separately and in plain language. No file closure charges, no administration extras, and no figures that change once the file is opened. What you are quoted is what you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A more efficient process</h3>
+        <p>High-street firms handling large volumes of files can be slow to respond and slow to chase the other side. Our panel solicitors use dedicated conveyancing systems and communicate digitally from the start – which makes a real difference to how quickly things move.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and chosen for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your transaction type – not whoever has capacity at that moment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EDGBASTON LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Edgbaston</div>
+    <h2>What buyers and sellers in Edgbaston need to understand</h2>
+    <div class="divider"></div>
+    <p>Edgbaston sits roughly two miles south-west of Birmingham city centre, but it feels – and transacts – quite differently from the surrounding suburbs. Its identity is shaped by the Calthorpe Estate, the University of Birmingham, the Queen Elizabeth Hospital complex, and a housing stock that spans Georgian terraces, grand Victorian villas, post-war purpose-built flats, and modern apartment developments along the Hagley Road corridor. No two conveyancing files in Edgbaston are quite the same, and the legal issues that surface depend heavily on which part of the area you are buying or selling in.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>The Calthorpe Estate – restrictive covenants</strong>
+        <p>A large proportion of Edgbaston's residential streets fall within the Calthorpe Estate, historically owned and managed by Calthorpe Enterprises. Properties on the estate are subject to specific restrictive covenants that limit use, alterations, and in some cases occupation. These covenants are registered against the title and must be reviewed carefully by any buyer. Sellers should be aware that undisclosed breaches – an extension built without estate consent, for example – can complicate a sale significantly.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Leasehold conversions of Victorian villas</strong>
+        <p>Edgbaston has a high concentration of large Victorian and Edwardian properties that have been divided into leasehold flats, particularly around Augustus Road, Westbourne Road, and Somerset Road. These conversions vary enormously in quality of legal documentation. Some have well-managed freeholds and up-to-date lease structures; others have informal arrangements, absent freeholders, or leases approaching a length that causes mortgage lender concern. A thorough lease review is essential before any offer becomes binding.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Buy-to-let &amp; HMO purchases near the university</strong>
+        <p>The proximity of the University of Birmingham and Queen Elizabeth Hospital makes Edgbaston a consistent draw for buy-to-let investors and HMO operators. Properties being purchased as HMOs, or those already tenanted, carry additional conveyancing considerations – planning history, HMO licensing status, and tenancy documentation all need to be reviewed. Solicitors unfamiliar with investor-led transactions can miss these checks, creating problems after completion.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Conservation areas &amp; planning history</strong>
+        <p>Several parts of Edgbaston are designated conservation areas, including much of the Calthorpe Estate and the streets around the Botanical Gardens. In conservation areas, even minor external alterations can require planning consent. Local authority searches will flag conservation area status, but buyers should ensure their solicitor raises specific enquiries about any works carried out to the property during the seller's ownership – permitted development rules are more restricted here than in standard residential streets.</p>
+      </div>
+    </div>
+
+    <p>The apartment developments along the Hagley Road and around Five Ways present their own conveyancing picture. These are predominantly leasehold properties within managed blocks, where service charges, building insurance, and management company responsiveness all need to be investigated as part of the purchase process. In some of the older blocks, cladding and building safety documentation has become a significant due diligence point following changes to lender requirements in recent years – this is an area where an experienced conveyancing solicitor is essential.</p>
+
+    <p>Edgbaston also has a notable medical professional buyer market, driven by the Queen Elizabeth Hospital and the medical school. Professionals purchasing with gifted deposits from family, or buying through a company structure, will find that these arrangements add specific legal requirements to the process. A quote that does not account for these from the outset will not reflect the true cost of the transaction.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Edgbaston?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs are made up of two elements: the solicitor's legal fee, and disbursements – the third-party costs your solicitor pays on your behalf during the process. In Edgbaston, the variety of transaction types means the range of fees is wide. A straightforward freehold purchase on the Calthorpe Estate and a leasehold flat acquisition in a managed Hagley Road block are very different exercises in terms of the legal work involved. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price, and Edgbaston's freehold and larger leasehold properties can carry significant registration fees as a result. Solicitors may also apply a modest scale to their legal fee on higher-value transactions due to the increased professional liability involved.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Very common in Edgbaston</span></td>
+            <td>Leasehold transactions – particularly the converted Victorian flats that define much of Edgbaston's inner residential streets – require considerably more legal work. Reviewing the lease in detail, obtaining management pack information, checking service charge accounts, and investigating lease length all take time and expertise. This is reflected in the fee, and rightly so.</td>
+          </tr>
+          <tr>
+            <td class="factor">Calthorpe Estate covenants <span class="fees-badge">Edgbaston-specific</span></td>
+            <td>If your property sits within the Calthorpe Estate, your solicitor must review the estate covenants as part of the purchase process. Where works have been carried out without the estate's consent, indemnity insurance may be required. This adds both time and a modest additional cost, and should be factored in from the outset.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>Purchasing with a mortgage means your solicitor acts for both you and your lender, adding to the workload. Cash purchases are simpler and typically attract a lower fee. Company purchases – common in Edgbaston's buy-to-let market – follow a different fee structure and require additional due diligence on the purchasing entity.</td>
+          </tr>
+          <tr>
+            <td class="factor">HMO &amp; tenanted properties <span class="fees-badge">Common near university</span></td>
+            <td>If you are purchasing a property that is already tenanted or operating as an HMO, your solicitor needs to review tenancy agreements, confirm licencing status, and advise on the transfer of deposits. These are not included in a standard conveyancing fee and should be confirmed upfront.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit</td>
+            <td>Where part of your deposit is a family gift – common where Edgbaston prices stretch buyer budgets – your solicitor must verify the source of funds for your mortgage lender. This is standard practice and carries a modest additional fee that should appear on your quote from the start.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>We have made the process as straightforward as possible. You do not need to ring around multiple firms, compare quotes you are not sure you can trust, or wonder whether the price will change once the solicitor actually looks at your file. Here is what happens from the moment you get in touch with ConveyQuote.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Fill in a short form with the key details of your transaction – whether you are buying, selling, or both; the property type; the approximate price; whether the property is leasehold or freehold; and your mortgage position. It takes around two minutes and costs nothing.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews what you have submitted before any quote is produced. In a market like Edgbaston, where the Calthorpe Estate, leasehold conversions, and buy-to-let arrangements are all common, this review step matters. It catches complexities that an automated system would simply miss.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, with a Stamp Duty estimate included. No account required, no obligation to accept, and no hidden extras waiting in the small print.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are satisfied with the quote and ready to proceed, you confirm your instruction. There is no charge for requesting a quote and no pressure to commit before you are ready.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel who has relevant experience for your transaction type. They will contact you promptly to open the file, complete identity checks, and begin work – without the delays that come from being passed between different members of staff at an overstretched high-street firm.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Edgbaston property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Edgbaston</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Edgbaston?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in Edgbaston, most transactions complete within ten to fourteen weeks from when an offer is accepted. Leasehold transactions – which are very common in this area, particularly the converted Victorian flats – tend to take longer, often sixteen weeks or more, depending on how responsive the freeholder or managing agent is when providing the management pack. Transactions involving Calthorpe Estate properties may also require additional time if estate consent queries need to be resolved. Chains, which are common across Edgbaston's owner-occupier market, add further time at each link. Twelve weeks is a realistic working estimate for a straightforward freehold case.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Edgbaston?</div>
+        <p class="faq-a">Costs vary considerably depending on the transaction type. A standard freehold purchase in Edgbaston might attract total conveyancing costs – including searches, Land Registry registration, and legal fees – of between £1,300 and £2,000. Leasehold transactions will typically run higher due to the additional legal work involved. Properties on the Calthorpe Estate or in managed apartment blocks may carry further costs depending on what the title review reveals. The most accurate way to understand your costs is to request a reviewed quote through ConveyQuote, which reflects your specific transaction rather than an average estimate.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Edgbaston or Birmingham?</div>
+        <p class="faq-a">No. Conveyancing in England and Wales is conducted almost entirely by email, post, and secure online portals. You will very rarely – if ever – need to attend your solicitor's office in person. The firms on ConveyQuote's panel are regulated across England and Wales and can handle your Edgbaston transaction fully remotely. What matters is not their location but their experience with the type of transaction you are dealing with – whether that is a leasehold conversion, a Calthorpe Estate freehold, or a buy-to-let investor purchase.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What tends to cause delays in Edgbaston property transactions?</div>
+        <p class="faq-a">The most common causes of delay in Edgbaston are: slow responses from managing agents or freeholders when obtaining management packs for leasehold properties; queries arising from Calthorpe Estate covenant reviews that need to be resolved with the estate before exchange; cladding and building safety documentation requests on apartment blocks that take time for sellers to compile; and chain delays where a hold-up elsewhere in the sequence stalls the whole transaction. Choosing a solicitor who chases proactively and flags issues early – rather than waiting for problems to land on their desk – is the most effective way to limit delays within your control.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">I am buying a leasehold flat in Edgbaston. What should I watch out for?</div>
+        <p class="faq-a">Several things are worth checking early. First, the lease length – most mortgage lenders require at least 70 years remaining at the end of the mortgage term, and some require more. A short lease can make a property difficult to finance and harder to sell in future. Second, the ground rent – leases with ground rents that double periodically have caused significant problems for leaseholders and some lenders now refuse to lend on them. Third, the service charge history – large, unexpected major works charges can arise after completion if the building has deferred maintenance. Your solicitor should be asking for three years of service charge accounts and raising specific enquiries about any known upcoming works. A reviewed ConveyQuote quote will include a solicitor with leasehold experience who understands these issues.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
