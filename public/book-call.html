@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book a Free Call — ConveyQuote</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f4f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 48px;
+    }
+
+    .logo-wrap { margin-bottom: 24px; }
+    .logo-wrap img { width: 100px; height: auto; display: block; }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      overflow: hidden;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+
+    .card-header { background: #0f2747; padding: 28px 32px; color: #fff; }
+    .card-header .eyebrow {
+      font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase;
+      color: rgba(255,255,255,0.65); margin-bottom: 8px;
+    }
+    .card-header h1 { font-size: 24px; line-height: 1.25; font-weight: 700; margin-bottom: 8px; }
+    .card-header p { font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+
+    .ref-badge {
+      display: none;
+      margin-top: 12px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.9);
+    }
+    .ref-badge span { font-weight: 700; color: #fff; }
+
+    .card-body { padding: 28px 32px; }
+
+    .trust-strip {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 24px; padding-bottom: 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .trust-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4b5563; }
+    .trust-item .icon { font-size: 15px; }
+
+    .field { margin-bottom: 18px; }
+    label {
+      display: block; font-size: 13px; font-weight: 700;
+      color: #0f2747; margin-bottom: 6px;
+    }
+    label .optional { font-weight: 400; color: #9ca3af; margin-left: 4px; }
+
+    input[type="text"], input[type="email"], input[type="tel"], textarea {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid #d1d5db; border-radius: 8px;
+      font-size: 14px; color: #111827; background: #fff;
+      transition: border-color 0.15s; font-family: inherit;
+    }
+    input:focus, textarea:focus {
+      outline: none; border-color: #0f2747;
+      box-shadow: 0 0 0 3px rgba(15,39,71,0.08);
+    }
+    textarea { resize: vertical; min-height: 90px; }
+
+    .time-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .time-option input[type="radio"] { display: none; }
+    .time-option label {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 14px 8px; border: 2px solid #e5e7eb; border-radius: 10px;
+      cursor: pointer; transition: all 0.15s; text-align: center;
+      margin: 0; font-weight: 400; color: #374151;
+    }
+    .time-option label .emoji { font-size: 22px; margin-bottom: 6px; display: block; }
+    .time-option label .time-label { font-size: 13px; font-weight: 700; color: #111827; display: block; margin-bottom: 2px; }
+    .time-option label .time-range { font-size: 11px; color: #6b7280; display: block; }
+    .time-option input[type="radio"]:checked + label {
+      border-color: #0f2747; background: #f0f4fa;
+    }
+    .time-option input[type="radio"]:checked + label .time-label { color: #0f2747; }
+
+    .submit-btn {
+      display: block; width: 100%; padding: 15px;
+      background: #0f2747; color: #fff; border: none;
+      border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+      transition: background 0.15s; font-family: inherit;
+    }
+    .submit-btn:hover { background: #1a3a60; }
+    .submit-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    .privacy-note {
+      font-size: 11px; color: #9ca3af;
+      text-align: center; margin-top: 12px; line-height: 1.6;
+    }
+
+    .success-state { display: none; text-align: center; padding: 40px 32px; }
+    .success-icon { font-size: 52px; margin-bottom: 16px; }
+    .success-state h2 { font-size: 22px; color: #0f2747; margin-bottom: 10px; }
+    .success-state p { font-size: 14px; color: #4b5563; line-height: 1.7; }
+    .success-ref-note {
+      display: none; margin-top: 16px;
+      background: #f0f4fa; border: 1px solid #c7d6ea;
+      border-radius: 8px; padding: 10px 18px;
+      font-size: 13px; color: #0f2747;
+    }
+
+    .error-banner {
+      display: none; background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 8px; padding: 12px 16px;
+      font-size: 13px; color: #991b1b; margin-bottom: 16px;
+    }
+    .error-banner a { color: #991b1b; }
+
+    .footer-note { margin-top: 24px; font-size: 12px; color: #9ca3af; text-align: center; }
+    .footer-note a { color: #0f2747; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <div class="logo-wrap">
+    <a href="https://conveyquote.uk">
+      <img src="https://conveyquote.uk/logo.png" alt="ConveyQuote" />
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="eyebrow">ConveyQuote &middot; Free Consultation</div>
+      <h1>Book a Free Call</h1>
+      <p>Not ready to accept yet? Let us walk you through your quote, answer any questions, and explain exactly what happens next &mdash; no obligation.</p>
+      <div class="ref-badge" id="refBadge">Regarding quote <span id="refDisplay"></span></div>
+    </div>
+
+    <div class="card-body">
+
+      <div class="trust-strip">
+        <div class="trust-item"><span class="icon">&#10003;</span> No obligation</div>
+        <div class="trust-item"><span class="icon">&#128274;</span> SRA-regulated firms</div>
+        <div class="trust-item"><span class="icon">&#8987;</span> 10 minutes</div>
+        <div class="trust-item"><span class="icon">&#128172;</span> Plain-English advice</div>
+      </div>
+
+      <div class="error-banner" id="errorBanner">
+        Sorry, something went wrong. Please try again or email us at
+        <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>.
+      </div>
+
+      <form id="bookingForm">
+        <div class="field">
+          <label for="clientName">Your name</label>
+          <input type="text" id="clientName" name="clientName" required placeholder="Full name" />
+        </div>
+
+        <div class="field">
+          <label for="clientEmail">Email address</label>
+          <input type="email" id="clientEmail" name="clientEmail" required placeholder="you@example.com" />
+        </div>
+
+        <div class="field">
+          <label for="clientPhone">Best phone number to reach you</label>
+          <input type="tel" id="clientPhone" name="clientPhone" required placeholder="07700 000000" />
+        </div>
+
+        <div class="field">
+          <label>Preferred time for a call</label>
+          <div class="time-options">
+            <div class="time-option">
+              <input type="radio" id="morning" name="preferredTime" value="Morning (9am-12pm)" />
+              <label for="morning">
+                <span class="emoji">&#127749;</span>
+                <span class="time-label">Morning</span>
+                <span class="time-range">9am &ndash; 12pm</span>
+              </label>
+            </div>
+            <div class="time-option">
+              <input type="radio" id="afternoon" name="preferredTime" value="Afternoon (12pm-5pm)" checked />
+              <label for="afternoon">
+                <span class="emoji">&#9728;&#65039;</span>
+                <span class="time-label">Afternoon</span>
+                <span class="time-range">12pm &ndash; 5pm</span>
+              </label>
+            </div>
+            <div class="time-option">
+              <input type="radio" id="evening" name="preferredTime" value="Evening (5pm-7pm)" />
+              <label for="evening">
+                <span class="emoji">&#127746;</span>
+                <span class="time-label">Evening</span>
+                <span class="time-range">5pm &ndash; 7pm</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="notes">Anything specific you would like to discuss? <span class="optional">(optional)</span></label>
+          <textarea id="notes" name="notes" placeholder="e.g. I have a question about the search costs, or I would like to understand the leasehold supplement..."></textarea>
+        </div>
+
+        <input type="hidden" id="quoteRef" name="quoteRef" />
+
+        <button type="submit" class="submit-btn" id="submitBtn">Request a Call Back</button>
+
+        <p class="privacy-note">
+          Your details are used only to arrange your call and will not be shared with third parties.
+          ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839).
+        </p>
+      </form>
+
+      <div class="success-state" id="successState">
+        <div class="success-icon">&#128222;</div>
+        <h2>Call request received!</h2>
+        <p>
+          Thank you &mdash; a member of our team will be in touch to confirm your call time.<br />
+          We will aim to contact you within one business day.
+        </p>
+        <div class="success-ref-note" id="successRef"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <p class="footer-note">
+    Prefer to email? <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a> &nbsp;&middot;&nbsp;
+    <a href="https://conveyquote.uk">conveyquote.uk</a>
+  </p>
+
+  <script>
+    const params    = new URLSearchParams(window.location.search);
+    const refParam  = params.get("ref")   || "";
+    const nameParam = params.get("name")  || "";
+    const emailParam= params.get("email") || "";
+
+    if (nameParam)  document.getElementById("clientName").value  = nameParam;
+    if (emailParam) document.getElementById("clientEmail").value = emailParam;
+    if (refParam) {
+      document.getElementById("quoteRef").value        = refParam;
+      document.getElementById("refDisplay").textContent = refParam;
+      document.getElementById("refBadge").style.display = "block";
+    }
+
+    document.getElementById("bookingForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      var btn         = document.getElementById("submitBtn");
+      var errorBanner = document.getElementById("errorBanner");
+      errorBanner.style.display = "none";
+      btn.disabled    = true;
+      btn.textContent = "Sending\u2026";
+
+      var payload = {
+        clientName:    document.getElementById("clientName").value.trim(),
+        clientEmail:   document.getElementById("clientEmail").value.trim(),
+        clientPhone:   document.getElementById("clientPhone").value.trim(),
+        preferredTime: document.querySelector('input[name="preferredTime"]:checked').value,
+        notes:         document.getElementById("notes").value.trim(),
+        quoteRef:      document.getElementById("quoteRef").value.trim(),
+      };
+
+      try {
+        var res  = await fetch("/api/request-call", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(payload),
+        });
+        var data = await res.json();
+
+        if (data.success) {
+          document.getElementById("bookingForm").style.display = "none";
+          document.getElementById("successState").style.display = "block";
+          if (payload.quoteRef) {
+            var refNote = document.getElementById("successRef");
+            refNote.textContent    = "Reference: " + payload.quoteRef;
+            refNote.style.display  = "block";
+          }
+        } else {
+          throw new Error(data.error || "Unknown error");
+        }
+      } catch (err) {
+        errorBanner.style.display = "block";
+        btn.disabled    = false;
+        btn.textContent = "Request a Call Back";
+      }
+    });
+  </script>
+
+</body>
+</html>
