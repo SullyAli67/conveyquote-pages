@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Leicester – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Leicester. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #062a63; --navy-mid: #0a3d6e; --teal: #0aa6b5; --teal-dark: #078e9b;
+    --text: #162033; --muted: #667085; --border: #d9e2ec; --bg: #f5f8fc;
+    --white: #ffffff; --shadow: 0 14px 40px rgba(6,42,99,0.09); --radius: 18px;
+  }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.7; color: var(--text); background: var(--bg); }
+  .site-nav { background: var(--navy); padding: 0 16px; position: sticky; top: 0; z-index: 100; }
+  .site-nav__inner { width: min(1120px, 100%); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; gap: 20px; }
+  .site-nav__logo { height: 36px; display: block; background: rgba(255,255,255,0.9); border-radius: 8px; padding: 4px 8px; }
+  .nav-cta { background: var(--teal); color: #fff; font-weight: 700; font-size: 0.88rem; padding: 8px 18px; border-radius: 8px; text-decoration: none; transition: background 0.15s; white-space: nowrap; }
+  .nav-cta:hover { background: var(--teal-dark); }
+  .hero { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%); padding: 64px 16px 56px; color: #fff; text-align: center; }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge { display: inline-block; background: rgba(10,166,181,0.2); border: 1px solid rgba(10,166,181,0.4); color: #7ee8f0; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 14px; border-radius: 20px; margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(1.85rem, 4.5vw, 3rem); font-weight: 700; line-height: 1.2; margin-bottom: 16px; }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub { font-size: 1.05rem; color: rgba(255,255,255,0.75); max-width: 540px; margin: 0 auto 32px; }
+  .hero__cta { display: inline-block; background: var(--teal); color: #fff; font-weight: 700; font-size: 1.05rem; padding: 14px 36px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.12s; }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust { margin-top: 28px; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; }
+  .hero__trust-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: rgba(255,255,255,0.6); }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+  .section-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--teal); margin-bottom: 8px; }
+  h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); font-weight: 700; color: var(--navy); line-height: 1.25; margin-bottom: 14px; }
+  h3 { font-size: 1.02rem; font-weight: 700; color: var(--navy); margin-bottom: 6px; line-height: 1.3; }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+  .divider { width: 40px; height: 3px; background: var(--teal); border-radius: 2px; margin-bottom: 24px; }
+  .intro-grid { display: grid; grid-template-columns: 1fr 310px; gap: 40px; align-items: start; }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+  .sidebar-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; position: sticky; top: 72px; }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta { display: block; background: var(--teal); color: #fff; font-weight: 700; font-size: 0.95rem; padding: 13px 18px; border-radius: 10px; text-decoration: none; text-align: center; margin-top: 18px; transition: background 0.15s; }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+  .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 28px; }
+  .why-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+  .why-card__icon { width: 40px; height: 40px; background: rgba(10,166,181,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 18px; color: var(--teal-dark); font-weight: 700; }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+  .local-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin: 28px 0; }
+  .local-chip { background: var(--white); border: 1px solid var(--border); border-top: 3px solid var(--teal); border-radius: 0 0 12px 12px; padding: 16px; box-shadow: 0 2px 8px rgba(6,42,99,0.05); }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+  .fees-wrap { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-top: 28px; }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th { background: var(--navy); color: #fff; padding: 12px 18px; text-align: left; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; }
+  .fees-table td { padding: 14px 18px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge { display: inline-block; background: rgba(10,166,181,0.1); color: var(--teal-dark); font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num { width: 42px; height: 42px; border-radius: 50%; background: var(--navy); color: var(--teal); font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+  .cta-section { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%); padding: 72px 16px; text-align: center; }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn { display: inline-block; background: var(--teal); color: #fff; font-weight: 700; font-size: 1.1rem; padding: 16px 44px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.12s; }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img { height: 32px; background: rgba(255,255,255,0.9); border-radius: 6px; padding: 3px 8px; margin-bottom: 10px; display: inline-block; }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+  @media (max-width: 600px) { section { padding: 40px 0; } .hero { padding: 44px 16px 40px; } .fees-table th, .fees-table td { padding: 10px 12px; } .fees-table { font-size: 0.82rem; } }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Leicester &amp; East Midlands</div>
+    <h1>Conveyancing Solicitors in <span>Leicester</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A solicitor who understands Leicester's varied and fast-moving property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>Buying or selling in Leicester – the legal process made clear</h2>
+        <div class="divider"></div>
+        <p>Every property purchase and sale in England and Wales requires a solicitor or licensed conveyancer to handle the legal transfer of ownership. They search the title at HM Land Registry, raise enquiries with Leicester City Council, review and exchange contracts, manage mortgage funds, and register the new owner once completion takes place. This is conveyancing, and for most residential transactions it takes between ten and fourteen weeks from the point an offer is accepted.</p>
+        <p>Leicester is one of the East Midlands' most diverse and active property markets. From the Victorian villas of Clarendon Park and Stoneygate to the leasehold apartments of the Waterside development along the River Soar, and from the expanding new build estates at Lubbesthorpe to the streets of Belgrave and Evington where extended family ownership arrangements are common – the range of transaction types here, and the legal considerations that come with each, is broader than in most comparable cities. Leicester also has a large student population at two universities, sustaining an active HMO and buy-to-let market, and specific archaeological sensitivities in the city centre that have had direct legal relevance since the rediscovery of Richard III in 2012.</p>
+        <p>ConveyQuote gives buyers and sellers in Leicester a more reliable starting point. Every quote we issue is reviewed by a real person before it reaches you – so the figure reflects your actual transaction rather than a generic estimate. Your costs are broken down clearly from day one, and your matter is placed with a solicitor from our regulated panel with the right experience for your specific purchase or sale.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. No automated guesswork.</h2>
+    <div class="divider"></div>
+    <p>Online comparison tools generate a conveyancing quote in seconds without examining what your transaction actually involves. In Leicester's varied market – where a leasehold Waterside apartment, an HMO terrace near De Montfort University, a Victorian villa in Stoneygate, and a new build in Lubbesthorpe all require quite different legal handling – a generic quote is rarely an accurate one. ConveyQuote reviews every enquiry before issuing a figure, so what you see is what you can plan around.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a real person before any quote is prepared. Your transaction details – property type, tenure, mortgage position, and Leicester-specific factors – are properly considered before a figure is produced.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are shown separately and in plain language. No file closure charges, no mid-transaction additions, and no estimates that shift once work is underway. The quote you receive is the price you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>Busy high-street firms can be slow to respond and slower to chase. Our panel solicitors use dedicated conveyancing teams and digital communication that keeps transactions moving and keeps you genuinely informed from instruction to completion.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and selected for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your specific transaction – not whoever happens to be available on the day.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEICESTER LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Leicester</div>
+    <h2>What buyers and sellers in Leicester need to know</h2>
+    <div class="divider"></div>
+    <p>Leicester is the largest city in the East Midlands and one of the most ethnically diverse in England – a fact that shapes its property market in ways that have direct legal implications. The city's well-established South Asian communities, concentrated particularly in areas such as Belgrave, Evington, and parts of Spinney Hills, create a consistent pattern of multi-generational and extended family property purchases that carry their own specific conveyancing requirements. The student population across the University of Leicester and De Montfort University sustains one of the Midlands' most active HMO markets in the streets of the West End, Clarendon Park, and along the Narborough Road. And beneath the city's streets, quite literally, lies a medieval heritage that has become a genuine legal consideration since one of archaeology's most remarkable discoveries was made here in 2012.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>City centre archaeology – the Richard III effect</strong>
+        <p>The 2012 discovery of Richard III's remains beneath a Leicester City Council car park on Greyfriars revealed something that property lawyers now account for: Leicester's city centre sits on significant medieval remains. New build developments and conversions in the city centre area can be subject to archaeological planning conditions, and local authority searches in certain parts of the centre may flag archaeological sensitivity designations that need careful review before exchange. This is a Leicester-specific consideration that arises nowhere else in this series.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Clarendon Park &amp; Stoneygate Victorian villas</strong>
+        <p>Clarendon Park and Stoneygate represent Leicester's most consistently sought-after residential streets – large Victorian and Edwardian semis and detached properties popular with professionals and families who value proximity to both universities and the city centre. These are predominantly freehold transactions at the upper end of the local market, but their age means title registers can carry old restrictive covenants, chancel repair liability entries, and boundary arrangements established informally when the streets were first developed.</p>
+      </div>
+      <div class="local-chip">
+        <strong>HMO market near the universities</strong>
+        <p>The streets of West End, Highfields, and parts of Clarendon Park have a dense concentration of Houses in Multiple Occupation serving Leicester's large student population. Investors purchasing existing HMOs – or buyers converting to HMO use – face additional conveyancing considerations: planning history checks, HMO licensing status with Leicester City Council, existing tenancy documentation, and deposit protection compliance all need reviewing. This is specialist work that solicitors inexperienced in investor transactions handle inadequately.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Belgrave &amp; Evington – multi-generational purchases</strong>
+        <p>Property transactions in Belgrave, Evington, and parts of Spinney Hills frequently involve more complex ownership arrangements than a standard purchase. Joint purchases between siblings, gifted equity transfers from parents to children, and properties being bought with contributions from multiple family members all add legal steps: additional ID verification for each party, lender source of funds checks, and in some cases a declaration of trust to record how ownership is split and what happens if one party later wishes to sell their share.</p>
+      </div>
+    </div>
+
+    <p>The Waterside development along the River Soar has added a substantial number of leasehold apartments to Leicester's housing stock, and residential development in the city centre regeneration area continues. These are managed block transactions requiring the full leasehold due diligence package: lease term review, service charge history, management pack from the freeholder or managing agent, building insurance confirmation, and – for blocks of a certain construction era – building safety documentation that mortgage lenders now routinely require before proceeding.</p>
+
+    <p>Leicester's boundary with Oadby and Wigston Borough Council is worth noting for buyers in the southern parts of the city. Oadby is a separate borough council from Leicester City Council, and properties in Oadby require a local authority search submitted to Oadby and Wigston Borough Council – not Leicester City Council. Solicitors unfamiliar with the area occasionally submit to the wrong authority, requiring the search to be reordered. Properties in the LE2 postcodes near the Oadby boundary are the ones most likely to be affected, and confirming the correct council from the outset is a simple but important early check.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Leicester?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs consist of the solicitor's legal fee and disbursements – the third-party costs paid on your behalf during the process. In Leicester, where the range of transaction types is wide and where certain purchases carry specific additional requirements, understanding the fee structure clearly from day one matters. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. Leicester spans a wide price range – from student-belt terraces to substantial detached homes in Stoneygate – and the registration fee varies accordingly. Solicitors may also scale their legal fee modestly on higher-value instructions due to the increased professional liability involved.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Common in city centre</span></td>
+            <td>Leasehold transactions – primarily the Waterside and city centre apartment market – require significantly more legal work than a standard freehold purchase. Lease review, management pack, service charge history checks, and building safety documentation for lenders all add time and cost. These should be clearly declared on any properly reviewed quote before you instruct.</td>
+          </tr>
+          <tr>
+            <td class="factor">HMO &amp; tenanted purchases <span class="fees-badge">Common near universities</span></td>
+            <td>Purchasing a property that is already operating as an HMO, or one with sitting tenants, requires additional legal steps – reviewing tenancy agreements, confirming HMO licensing status with Leicester City Council, checking deposit protection compliance, and advising on deposit transfer. These carry an additional fee that should be disclosed on your quote from the start.</td>
+          </tr>
+          <tr>
+            <td class="factor">Multi-party &amp; family purchases <span class="fees-badge">Common in Belgrave &amp; Evington</span></td>
+            <td>Joint purchases between multiple buyers may require a declaration of trust to record ownership shares, additional ID verification for each party, and source of funds checks for each contributor. Where a family gift also forms part of the deposit, a gifted deposit letter is required by the lender as well. Each element adds a modest additional fee that should be reflected in the quote upfront.</td>
+          </tr>
+          <tr>
+            <td class="factor">Archaeological search <span class="fees-badge">City centre only</span></td>
+            <td>For developments and conversions in Leicester's city centre, local authority search results may flag archaeological planning conditions arising from the area's known medieval remains. Reviewing what these mean and raising specific enquiries about any archaeological survey work carried out during the development is additional work beyond the standard bundle – and a consideration unique to certain parts of Leicester.</td>
+          </tr>
+          <tr>
+            <td class="factor">Chancel repair liability</td>
+            <td>Chancel repair liability – a historical obligation requiring some landowners to contribute to the cost of repairing certain church chancels – is more commonly recorded in Leicestershire than many other counties due to the area's medieval ecclesiastical history. A chancel repair search should be raised as standard, particularly for older residential areas. Where liability is found, indemnity insurance is typically the straightforward solution and represents a modest additional disbursement.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>The ConveyQuote process is designed to remove the uncertainty that makes conveyancing stressful. You should not need to wonder whether your quote is accurate, whether work has started, or what is actually happening with your file. Here is what happens from the moment you get in touch.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Complete a short form with the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage position. It takes around two minutes and costs nothing to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews your submission before a quote is prepared. For Leicester transactions, this review checks whether the property type, location, or disclosed details suggest specific considerations – HMO status, multi-party ownership, leasehold complexity, city centre archaeological sensitivity, or the Oadby boundary – that need to be reflected in the pricing before it reaches you.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, with a Stamp Duty estimate based on your actual purchase price. No login required, no obligation to accept, and no small print that alters what you have been told.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no pressure to commit before you are fully comfortable with what you have been offered.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel – selected for experience with your specific transaction type. They will contact you promptly to open the file, complete identity checks, and begin work without delay.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Leicester property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Leicester</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Leicester?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in Leicester, most transactions complete within ten to fourteen weeks from when an offer is accepted. Leasehold transactions in the Waterside and city centre apartment schemes can take longer if managing agents are slow to produce the management pack – this is a consistent issue with some blocks. Multi-party purchases involving extended family members in areas such as Belgrave or Evington can take additional time if ID and source of funds checks for several parties need to be completed in sequence. HMO purchases near the universities occasionally require follow-up enquiries about licensing status before exchange. Chain transactions, common across Leicester's family home market in Evington, Knighton, and Aylestone, add time at each link. Twelve weeks is a reasonable working estimate for most straightforward freehold cases.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Leicester?</div>
+        <p class="faq-a">For a standard freehold purchase in Leicester, total conveyancing costs – including the solicitor's legal fee, local authority search, water and drainage search, chancel repair search, Land Registry registration, and bank transfer fees – typically range from £1,200 to £1,900, depending on the purchase price and complexity. Leasehold transactions, HMO purchases, and multi-party ownership arrangements each carry higher fees due to the additional legal work involved. Stamp Duty is a separate cost and will be estimated clearly in your ConveyQuote quote based on your actual purchase price. The most accurate way to understand your specific costs is to request a reviewed quote.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Leicester?</div>
+        <p class="faq-a">No. Residential conveyancing in England and Wales is conducted almost entirely by email, post, and secure digital portals – in-person office visits are very rarely required. The solicitors on ConveyQuote's panel handle Leicester transactions without being based locally. What matters is experience: a solicitor who understands how to handle multi-party extended family purchases, HMO licensing enquiries with Leicester City Council, Waterside leasehold management packs, and the distinction between Leicester City Council and Oadby and Wigston Borough Council for search purposes is far more valuable than one who happens to have a city centre address. One practical point worth stating plainly: all Leicester city properties require a local authority search submitted to Leicester City Council; properties in Oadby and the surrounding villages require a separate search with Oadby and Wigston Borough Council. Submitting to the wrong authority means reordering – and avoidable delay.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What typically causes delays in Leicester property transactions?</div>
+        <p class="faq-a">The most common causes of delay in Leicester are: slow managing agent responses when producing leasehold management packs for Waterside and city centre apartment schemes; multi-party verification delays where several buyers or family contributors need to complete ID and source of funds checks in sequence; chain-related hold-ups where a problem at any link affects all connected parties; and mortgage lender processing times. HMO purchases near the universities can be delayed if licensing status needs to be confirmed with Leicester City Council before exchange – particularly where a licence is due for renewal. Buyers purchasing near the Oadby boundary who have had the search submitted to the wrong council face reordering and a wait. A solicitor who identifies the likely complications at the start of a transaction rather than when they arise mid-process makes a material difference to how smoothly things progress.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">We are buying a property jointly with family members. How does that affect the conveyancing?</div>
+        <p class="faq-a">Joint purchases are common in Leicester – between couples, siblings, or groups of family members contributing to a purchase together – and they are straightforward in principle but involve more legal steps than a single-buyer transaction. Every party to the purchase needs to go through identity verification, and each contributor of funds needs to have their source of funds checked by the solicitor as part of their anti-money laundering obligations. Where different parties are contributing different amounts – or where the intention is to hold the property in unequal shares – a declaration of trust should be prepared to record how the ownership is split and what happens if one party later wishes to sell their share. Where a family gift is forming part of the deposit as well as ownership contributions, the mortgage lender also requires a gifted deposit letter. None of this is an obstacle, but all of it needs to be disclosed at the point of requesting a quote so the solicitor can plan the work and the fee reflects the full scope of what is involved from the start.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
