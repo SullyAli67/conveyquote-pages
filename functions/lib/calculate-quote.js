@@ -3,6 +3,12 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getSellerCount(value) {
+  if (value === "2") return 2;
+  if (value === "3") return 3;
+  return 1;
+}
+
 function addItem(items, label, amount, note) {
   if (amount > 0) {
     items.push({ label, amount, note });
@@ -247,6 +253,7 @@ function buildPurchaseQuote(input) {
 function buildSaleQuote(input) {
   const legalFees = [];
   const disbursements = [];
+  const sellerCount = getSellerCount(input.numberOfSellers);
 
   addItem(legalFees, "Sale legal fee", 995);
 
@@ -273,7 +280,11 @@ function buildSaleQuote(input) {
   }
 
   addItem(disbursements, "Office copy entries", 12);
-  addItem(disbursements, "ID checks", 14.4);
+  addItem(
+    disbursements,
+    sellerCount > 1 ? `ID checks (x${sellerCount})` : "ID checks",
+    14.4 * sellerCount
+  );
 
   return finaliseQuote({
     legalFees,
