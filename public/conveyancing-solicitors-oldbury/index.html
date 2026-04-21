@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Oldbury – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Oldbury. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Oldbury &amp; Sandwell</div>
+    <h1>Conveyancing Solicitors in <span>Oldbury</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A solicitor who understands the specific legal landscape of Oldbury's property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>Buying or selling in Oldbury – the legal side explained plainly</h2>
+        <div class="divider"></div>
+        <p>Every property purchase and sale in England and Wales requires a solicitor or licensed conveyancer to handle the legal transfer of ownership. They search the title at HM Land Registry, raise enquiries with the relevant local authority, review and exchange contracts, manage mortgage funds, and register the new owner once completion takes place. This is conveyancing, and for most residential transactions it takes between ten and fourteen weeks from when an offer is accepted.</p>
+        <p>Oldbury sits at the heart of the Sandwell metropolitan borough, and its property market is one of the most genuinely accessible in the West Midlands. That affordability has made it an increasingly attractive prospect for first-time buyers and investors alike – particularly since the M5 at Junction 2 offers fast access to both Birmingham and the wider motorway network. But Oldbury's industrial history is not just a footnote: it shapes the conveyancing process here in concrete ways. The town was home to major chemical manufacturing operations for over a century, and some of the land on which residential development has since taken place carries an environmental legacy that a standard conveyancing quote from an automated system will not reflect. Getting the legal work right from the outset – rather than discovering complications once you are already committed – is not a nice-to-have. It is essential.</p>
+        <p>ConveyQuote gives buyers and sellers in Oldbury a more reliable starting point. Every quote we issue is reviewed by a real person before it reaches you, so the figure reflects your actual transaction and not a generic estimate. Your costs are broken down clearly from day one, and your matter is matched to a solicitor from our regulated panel with the right experience for your specific purchase or sale.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. No shortcuts on the detail.</h2>
+    <div class="divider"></div>
+    <p>Automated comparison tools produce a conveyancing quote in seconds without ever looking at the specifics of your transaction. In Oldbury, where environmental search results can flag former chemical industry contamination, where coal authority searches are standard across Sandwell, and where canal-adjacent properties carry their own title considerations, the difference between a quote that reflects your situation and one that does not can be the difference between a smooth transaction and a costly mid-process surprise. Every ConveyQuote enquiry is reviewed before a figure is issued – so what you see is what you can plan around.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a real person before any quote is prepared. Oldbury-specific factors – environmental search requirements, canal proximity, coal authority searches, ex-council title restrictions – are considered at the quote stage, not discovered once the file is open.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are shown separately and in plain language. No file closure charges, no additions mid-transaction, and no estimates that change once your solicitor starts work. The quote you receive is the price you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>High-street firms carrying large caseloads are a common source of frustration across the Black Country. Our panel solicitors use dedicated conveyancing systems and digital communication that keeps your file moving and keeps you genuinely informed throughout.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and selected for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your specific transaction type – not whoever has capacity on the day.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OLDBURY LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Oldbury</div>
+    <h2>What buyers and sellers in Oldbury need to understand</h2>
+    <div class="divider"></div>
+    <p>Oldbury's identity has been shaped by industry in a way that few Black Country towns can match. For well over a century it was home to some of Britain's most significant chemical manufacturing operations – most notably on the site of what was once Albright &amp; Wilson's phosphorus and chemicals works, one of the largest of its kind in the world. That industrial legacy has left a physical mark on parts of the town's land, and while the residential areas of Oldbury are not uniformly affected, the environmental search process here requires a more careful read than it would in a straightforward residential suburb. This is not a reason to avoid the area – far from it – but it is a reason to choose a solicitor who interprets search results rather than simply files them.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Environmental searches &amp; chemical industry legacy</strong>
+        <p>Oldbury's long history of chemical manufacturing means that environmental searches for some properties in the town – particularly those in proximity to former industrial sites – can return results that require careful interpretation or a follow-up specialist report. Where an environmental search flags a concern, your solicitor should explain the implications clearly, advise on whether further investigation is needed before exchange, and confirm how the lender is likely to view the result. This is not automatic and depends entirely on the solicitor taking the result seriously.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Coal mining legacy &amp; Sandwell searches</strong>
+        <p>In common with the rest of the Sandwell metropolitan borough, Oldbury sits within a former coalfield area. A coal authority search is a standard and non-negotiable disbursement for the vast majority of properties in the area. It should appear as a named, separate line item on any properly prepared Oldbury conveyancing quote. The result needs to be read and explained by your solicitor – not simply forwarded as part of a search bundle without comment.</p>
+      </div>
+      <div class="local-chip">
+        <strong>The Oldbury canal network &amp; Titford Pools</strong>
+        <p>The Titford Canal and Oldbury Loop form part of the canal network running through the town, and the Titford Pools – a well-known local landmark – sit adjacent to a number of residential streets in the Causeway Green and Langley areas. Properties whose boundaries abut or run close to the canal system require a careful title review to confirm what is included within the registered ownership and what obligations, if any, attach to the boundary. The Canal &amp; River Trust owns the canal bed and towpaths, and boundary ambiguity here needs resolving before exchange.</p>
+      </div>
+      <div class="local-chip">
+        <strong>First-time buyers &amp; M5 commuter demand</strong>
+        <p>Oldbury's proximity to Junction 2 of the M5 – providing fast access to Birmingham, the Black Country, and onwards to the M6 and M42 – makes it a genuinely practical location for commuters who need road connectivity. This has driven a consistent first-time buyer market across the area, particularly in the more residential parts of Langley, Londonderry, and Brandhall. Buyers in this market frequently use gifted deposits and mortgage products that carry their own specific legal requirements, all of which should be accounted for in the conveyancing quote from the outset.</p>
+      </div>
+    </div>
+
+    <p>Oldbury also has a significant stock of ex-local authority housing from Sandwell Metropolitan Borough Council's extensive building programme across Causeway Green, Rood End, and Whiteheath. These properties have been passing through private ownerships since the Right to Buy era and carry the same considerations as ex-council stock across the wider Sandwell borough: original transfer deed restrictions that may remain binding on subsequent owners, and specific lender requirements – particularly for certain flat construction types – that need to be confirmed before a mortgage application proceeds too far.</p>
+
+    <p>The Langley area, occupying the eastern side of Oldbury towards the Smethwick boundary, tends to attract a slightly different buyer profile to other parts of the town – more established family homes on residential streets that were developed in the post-war period and have seen successive private ownership. These are generally freehold properties with uncomplicated titles, but the Smethwick boundary means the local authority search must still be submitted to Sandwell Metropolitan Borough Council, and this is worth confirming from the outset of any instruction.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Oldbury?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs consist of the solicitor's legal fee and disbursements – the third-party costs your solicitor pays on your behalf during the process. In Oldbury, where environmental searches require careful handling and where coal authority and canal considerations can add steps to the process, understanding the fee structure clearly at the outset is more important than it might be in a more straightforward residential market. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. Oldbury's generally affordable pricing means these fees are lower than in Birmingham's premium suburbs for most transactions, keeping total conveyancing costs competitive. At the upper end of the local market, the registration fee and the solicitor's legal fee both increase proportionally with the professional risk involved.</td>
+          </tr>
+          <tr>
+            <td class="factor">Environmental search &amp; follow-up <span class="fees-badge">Significant in Oldbury</span></td>
+            <td>A standard environmental search is included in the disbursement bundle for every transaction. Where the result flags a concern linked to Oldbury's former industrial land use, a specialist follow-up report from a qualified environmental consultant may be required before your lender will proceed. This additional report is an extra cost that should be disclosed clearly once the search result is received – not presented as a surprise on the completion statement.</td>
+          </tr>
+          <tr>
+            <td class="factor">Coal authority search <span class="fees-badge">Standard across Sandwell</span></td>
+            <td>A coal authority search is a standard, named disbursement for the vast majority of properties in the Sandwell borough. It should appear as a separate line item on every Oldbury conveyancing quote. The search is not expensive, but the result needs to be read and explained rather than simply passed on without context.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold</td>
+            <td>Most Oldbury transactions involve freehold properties. Where leasehold arises – primarily in some ex-local authority flat blocks or purpose-built apartment schemes – the additional legal work of reviewing the lease, obtaining the management pack, and checking service charge accounts is reflected in a higher fee. This should be clearly stated on the quote before you instruct.</td>
+          </tr>
+          <tr>
+            <td class="factor">Canal boundary queries <span class="fees-badge">Relevant near Titford Canal</span></td>
+            <td>For properties whose boundary abuts or runs close to the Titford Canal or the Oldbury Loop, a title review needs to confirm precisely what is within the registered ownership and whether any Canal &amp; River Trust access rights or obligations affect the property. Where the title is unclear, additional enquiries may be needed before exchange. This is an additional piece of legal work that should be flagged early if the property location suggests it is relevant.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit &amp; first-time buyer products <span class="fees-badge">Common in Oldbury</span></td>
+            <td>Gifted deposits are common among first-time buyers in Oldbury's accessible market, requiring source of funds verification from the mortgage lender. Shared ownership and other first-time buyer products add further legal complexity. Both should be disclosed when requesting a quote so the fee accurately reflects the full scope of the work from the outset.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>We have designed the ConveyQuote process to remove uncertainty from conveyancing at every stage. You should not need to wonder whether your quote is accurate, whether your solicitor has started work, or what is happening with your transaction. Here is what happens from the moment you get in touch.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Complete a short form covering the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage position. It takes around two minutes and costs nothing to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews your submission before a quote is prepared. For Oldbury transactions, this review is where we assess whether the property location, type, or any other disclosed detail suggests that Oldbury-specific considerations – environmental search requirements, canal proximity, ex-council title restrictions – need to be factored into the pricing before it reaches you.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, with a Stamp Duty estimate based on your actual purchase price. No login required, no obligation to accept, and no additions in the small print that change what you have been told.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no pressure to commit before you are comfortable with what you have been offered.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel – selected for their experience with your specific transaction type and any considerations relevant to the Oldbury area. They will contact you promptly to open the file, complete identity checks, and begin work without delay.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Oldbury property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Oldbury</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Oldbury?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in Oldbury, most transactions complete within ten to fourteen weeks from when an offer is accepted. The main variable specific to Oldbury is the environmental search – where the result flags a concern linked to former industrial land use and a specialist follow-up report is required, this can add two to four weeks to the process depending on report turnaround times. Coal authority searches are typically returned quickly and rarely cause delay on their own. Chain transactions, which are common across the Sandwell market, add time at each link. Twelve weeks is a reasonable planning estimate for most straightforward freehold cases where no environmental follow-up is required.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Oldbury?</div>
+        <p class="faq-a">Oldbury's affordable price point means Land Registry fees are lower than in Birmingham's premium suburbs, which keeps total conveyancing costs competitive for most buyers. As a rough guide, a standard freehold purchase in Oldbury might attract total costs – covering the solicitor's legal fee, local authority search, coal authority search, environmental search, water and drainage search, Land Registry registration, and bank transfer fees – of between £1,100 and £1,700, depending on the purchase price and complexity. Where an environmental search result requires a specialist follow-up report, this is an additional disbursement that will be communicated clearly at the point it arises – not presented as a surprise at completion. Stamp Duty is a separate cost and will be estimated on your actual purchase price in your ConveyQuote quote.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Oldbury?</div>
+        <p class="faq-a">No. Residential conveyancing in England and Wales is conducted almost entirely by email, post, and secure digital portals. In-person office visits are very rarely required, and the solicitors on ConveyQuote's panel handle Oldbury transactions without being based locally. What matters is not proximity but experience – a solicitor who understands how to read an environmental search result in the context of Oldbury's industrial history, how to handle a coal authority search result, and how to raise the right enquiries when a title abuts the canal network is of considerably more practical value than one who simply has a local postcode. All Oldbury properties fall within the Sandwell Metropolitan Borough, so the local authority search must be submitted to Sandwell Metropolitan Borough Council regardless of where your solicitor is based.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What typically causes delays in Oldbury property transactions?</div>
+        <p class="faq-a">The most Oldbury-specific source of delay is the environmental search result. Where the initial search flags a concern on a property near a former industrial site, a specialist report is required before the lender will proceed, and obtaining that report takes time. Beyond this, the common causes of delay in Oldbury mirror those across the Black Country: chain-related hold-ups where a problem at any link in the sequence affects all connected buyers and sellers; mortgage lender processing times; slow responses to solicitors' enquiries from the other side; and, for ex-local authority properties, lender queries about construction type that require additional confirmation before the mortgage offer is released. Canal boundary queries occasionally add a short but unavoidable wait while the Canal &amp; River Trust responds to enquiries. Choosing a solicitor who identifies potential complications early – and communicates clearly when something requires your attention – is the most effective step you can take to keep your transaction on track.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">My environmental search has come back with a flag. What happens next?</div>
+        <p class="faq-a">An environmental search result that flags a concern does not automatically mean there is a problem with the property or that the transaction cannot proceed. It means the result has identified something – former industrial land use nearby, a recorded contamination entry, or a ground stability flag – that requires further investigation before your solicitor can advise you properly and before your lender will be in a position to proceed. The next step is usually to commission a specialist environmental consultant's report, which examines the specific flag in more detail and concludes whether the risk is acceptable, whether any remediation has taken place, or whether further site investigation is recommended. Your solicitor should explain the result to you clearly, advise on whether a report is necessary, and obtain an estimate for the report cost before you commit to it. This is exactly the kind of situation where having a solicitor who reads and explains search results – rather than simply forwarding them – makes a real difference to how confidently you can proceed.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
