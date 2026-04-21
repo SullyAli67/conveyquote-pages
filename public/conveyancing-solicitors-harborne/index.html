@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Harborne – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Harborne. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Harborne &amp; South-West Birmingham</div>
+    <h1>Conveyancing Solicitors in <span>Harborne</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A solicitor who understands Harborne's competitive property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>The legal process behind buying or selling in Harborne – made straightforward</h2>
+        <div class="divider"></div>
+        <p>When you buy or sell a property, the change of legal ownership cannot happen informally. A solicitor or licensed conveyancer must manage the transfer – searching the title at HM Land Registry, raising enquiries with Birmingham City Council, reviewing contracts, handling mortgage funds, and ensuring the new ownership is registered correctly once the transaction completes. This is conveyancing, and in most cases it takes between ten and fourteen weeks from the point an offer is accepted.</p>
+        <p>Harborne is one of the most consistently in-demand residential areas in Birmingham, and its property market moves accordingly. When good homes come to market – particularly the Victorian and Edwardian terraces and semis that define its residential streets – they attract multiple interested buyers quickly, and sellers occasionally accept sealed bids. In that environment, an avoidable delay caused by a slow solicitor, a vague quote that changes once the file is opened, or a firm that is hard to reach when you need an update can have real consequences. We hear these complaints regularly from buyers and sellers who have experienced them firsthand.</p>
+        <p>ConveyQuote was designed to give you a better foundation. Every quote we produce is reviewed by a real person before it reaches you, so the figure reflects your actual transaction rather than a system-generated estimate. You see a clear breakdown of what you are paying and why, and your matter is matched to a solicitor from our regulated panel with appropriate experience for your purchase or sale in Harborne.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. A process that keeps you in control.</h2>
+    <div class="divider"></div>
+    <p>Automated comparison tools can produce a conveyancing quote in under a minute. What they cannot do is check whether that quote actually reflects your transaction. The details that matter – the tenure, the mortgage position, a gifted deposit, an environmental flag on the title – are the things an automated system misses and a reviewer catches. In Harborne's competitive market, finding out about hidden complexity after you have committed to a purchase is exactly the kind of setback you want to avoid.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every ConveyQuote enquiry is reviewed by a member of our team before a quote is produced. The figure you receive accounts for the specifics of your transaction – not a generic approximation that changes once the solicitor opens the file.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are shown separately and in plain terms from the outset. No file closure charges, no mid-transaction additions, and no percentage-based fees disguised as standard practice. The quote you receive is what you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>High-street firms juggling large caseloads are often the source of the delays buyers and sellers find most frustrating. Our panel solicitors work with dedicated teams and digital systems that keep your transaction moving and keep you informed.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and selected for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your specific transaction type – not allocated to whoever has capacity.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HARBORNE LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Harborne</div>
+    <h2>What property buyers and sellers in Harborne need to know</h2>
+    <div class="divider"></div>
+    <p>Harborne has cultivated a distinct identity within Birmingham that its residents guard with some pride – the village high street, the strong sense of community, and the relative calm of its residential streets set it apart from many surrounding areas despite being just three miles from the city centre. Its appeal to professionals – particularly those working at the Queen Elizabeth Hospital and University of Birmingham – means demand for property here has remained strong through various market cycles, and the profile of buyers and sellers reflects that. Conveyancing in Harborne has its own specific patterns that are worth understanding before you commit to a transaction.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Victorian &amp; Edwardian terraces and semis</strong>
+        <p>The majority of Harborne's housing stock consists of Victorian and Edwardian terraces and semi-detached homes, particularly around streets such as Serpentine Road, Wentworth Road, and the roads off Albany Road. These properties are freehold in most cases and highly sought after, but their age means title registers can occasionally carry historical complications – old restrictive covenants, chancel repair liability entries, and boundary arrangements that were documented informally when the properties were first built.</p>
+      </div>
+      <div class="local-chip">
+        <strong>High demand &amp; competitive offers</strong>
+        <p>Harborne consistently sits among the most competitive sub-markets in Birmingham. Properties at the right price in the right streets regularly attract multiple offers within days of coming to market, and sealed bid situations are not uncommon. This pace makes solicitor responsiveness critical. A buyer whose solicitor takes two weeks to acknowledge instructions while another buyer's solicitor has already begun searches risks losing the property entirely – even after an offer has been accepted.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Medical professional buyers &amp; gifted deposits</strong>
+        <p>The proximity of the Queen Elizabeth Hospital and the University of Birmingham medical school creates a consistent pipeline of professional buyers in Harborne – junior doctors, registrars, and academic staff who are often purchasing their first home in the area. This group frequently purchases with a gifted deposit contribution from family, or through shared ownership schemes, both of which add specific legal requirements that a standard conveyancing quote may not account for unless the enquiry is properly reviewed.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Environmental searches &amp; the Walkway</strong>
+        <p>The Harborne Walkway – the former railway line converted into a green corridor running through the area – is a much-loved local feature, but properties backing onto or close to the old railway embankment benefit from a careful environmental search. Ground contamination from former railway use, Japanese knotweed in embankment vegetation, and drainage arrangements from properties with rear access onto the walkway are all things a thorough search will flag and your solicitor should advise on clearly.</p>
+      </div>
+    </div>
+
+    <p>Harborne's leasehold market is smaller than neighbouring Edgbaston but it exists – mainly in purpose-built flat developments around the High Street and on some of the roads closer to the Hagley Road boundary. Buyers of leasehold properties here should expect the usual additional legal work: reviewing the lease terms, obtaining the management pack from the freeholder, checking service charge accounts, and confirming that no significant works are planned for the building that will affect the service charge in the near future.</p>
+
+    <p>Chain transactions are the norm in Harborne rather than the exception. The village attracts a strong internal market – buyers who already live nearby and want to upsize, downsize, or simply move to a better street within the same area. This means many transactions involve sellers who are simultaneously purchasing within Harborne or the surrounding area, creating chains where everyone is invested in the same outcome and where a delay at any point causes frustration across the board. Solicitor speed and communication are not just convenient here – they are essential.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Harborne?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs have two components: the solicitor's legal fee for the work they carry out, and disbursements – the third-party costs they pay on your behalf during the process. In Harborne, where most transactions involve period freehold properties and a competitive market dynamic, the fee structure is generally straightforward – but certain circumstances add to it. Here is what to expect.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. Harborne properties at the upper end – particularly the larger detached homes on Harborne Park Road and Ravenhurst Road – attract higher registration fees as a result. Solicitors may also scale their legal fee modestly on higher-value instructions due to the increased professional liability involved.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold</td>
+            <td>Most Harborne transactions involve freehold properties, which are simpler and less expensive to convey. Where a leasehold property is involved – typically a flat in a purpose-built block near the High Street or the Hagley Road boundary – expect a higher fee to reflect the additional work of reviewing the lease, obtaining the management pack, and advising on service charge history.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>Buying with a mortgage means your solicitor also acts for your lender, adding to the workload and the fee. Cash buyers pay less as a result. Where professionals are purchasing in Harborne with a combination of savings and a family gift, the gifted deposit element adds a further specific requirement – see below.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit <span class="fees-badge">Common in Harborne</span></td>
+            <td>Where part of your deposit is a gift from a parent or relative – common among younger professional buyers in Harborne where prices stretch first-time buyer budgets – your solicitor must verify the source of funds for your mortgage lender and complete the appropriate documentation. This carries a modest additional fee that should be declared on any properly reviewed quote.</td>
+          </tr>
+          <tr>
+            <td class="factor">Shared ownership</td>
+            <td>Some buyers in Harborne purchase through shared ownership schemes, particularly those associated with housing associations active in south-west Birmingham. These transactions involve a more complex legal structure – a lease, a shared ownership agreement, and lender requirements that differ from a standard purchase – and require solicitors with specific experience in this area.</td>
+          </tr>
+          <tr>
+            <td class="factor">Environmental &amp; additional searches</td>
+            <td>For properties close to the Harborne Walkway or backing onto the former railway embankment, a coal or contaminated land search may be recommended in addition to the standard search bundle. Your solicitor should advise on this once they have reviewed the property location and initial search results. Any additional search cost will be shown as a separate disbursement.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>The process has been designed to remove the uncertainty that makes conveyancing stressful for most people. You do not need to ring around, compare quotes you cannot verify, or hope that the figure you have accepted accurately reflects what you will pay. Here is exactly what happens from the moment you contact ConveyQuote.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Fill in a short form with the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage situation. It takes around two minutes and there is no charge to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews what you have submitted before any quote is produced. This is not automated. The review step is where we check whether anything in your transaction – a gifted deposit, a shared ownership structure, an environmental consideration – needs to be reflected in the pricing before it reaches you.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You will receive a clear, itemised quote directly to your inbox – legal fees and disbursements shown separately, with a Stamp Duty estimate based on your actual purchase price. No login required, no obligation to accept, and no pressure to respond immediately.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no obligation to commit before you are comfortable doing so.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your transaction is assigned to a regulated solicitor from our panel, chosen for their experience with your transaction type. They will contact you promptly to open your file, carry out identity verification, and begin work – without the delays that come from an overstretched firm passing your file between staff.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Harborne property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Harborne</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Harborne?</div>
+        <p class="faq-a">For a standard freehold transaction in Harborne – which covers the majority of purchases and sales in the area – most cases complete within ten to fourteen weeks from the point an offer is accepted. Chain transactions, which are common in Harborne's active local market, add time at each link in the sequence and can push the overall timeline out to sixteen weeks or more in longer chains. Leasehold transactions take longer still if managing agents are slow to provide the management pack. Environmental searches on properties near the Harborne Walkway occasionally require a follow-up search that adds a few days. A reasonable planning estimate for most Harborne transactions is twelve weeks, though your solicitor will give a more specific view once they have seen the draft contract and search results.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Harborne?</div>
+        <p class="faq-a">For a standard freehold purchase in Harborne, total conveyancing costs – covering legal fees, local authority searches, water and drainage searches, Land Registry registration, and any bank transfer fees – typically fall between £1,300 and £2,000, depending on the purchase price and any additional complexities. Leasehold transactions cost more due to the additional legal work involved. Shared ownership purchases have their own fee structure. Stamp Duty is a separate cost that falls outside the solicitor's fee but will be clearly estimated in your ConveyQuote quote. Requesting a reviewed quote is the most accurate way to understand your total costs for your specific transaction.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Harborne or Birmingham?</div>
+        <p class="faq-a">No. In England and Wales, residential conveyancing is conducted almost entirely by email, post, and secure online portals. Physical office visits are very rarely necessary, and the solicitors on ConveyQuote's panel can handle your Harborne transaction fully from wherever they are based. What matters is not location but experience – a solicitor who knows how to handle period freehold titles, gifted deposit documentation, or shared ownership structures is of far more practical value than one who happens to be based on the High Street.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What tends to cause delays in Harborne property transactions?</div>
+        <p class="faq-a">The most common sources of delay in Harborne transactions are chain-related – a buyer or seller elsewhere in the sequence experiencing a problem that holds up everyone else. Beyond that, slow mortgage lender processing times, incomplete responses to solicitors' enquiries from the other side, and – for leasehold properties – slow managing agent responses when producing the management pack are all frequent causes. Properties near the Harborne Walkway occasionally require an additional environmental search following initial results, which adds a short but unavoidable wait. The best defence against avoidable delays is a solicitor who chases proactively rather than waiting for updates to arrive, and who communicates clearly when something requires your attention.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">I am a first-time buyer in Harborne using a gifted deposit. Does that affect my conveyancing?</div>
+        <p class="faq-a">Yes, and it should be disclosed from the outset so that it is reflected in your quote. When part of your deposit is a gift from a family member rather than your own savings, your mortgage lender requires your solicitor to verify the source of funds – typically through a signed gifted deposit letter from the donor, and sometimes supporting bank statements. This is standard practice and does not complicate the transaction significantly, but it does add a step to the process and a modest additional fee. It is one of the most common things that automated conveyancing quotes fail to account for, and one of the reasons ConveyQuote reviews every enquiry before issuing a figure.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
