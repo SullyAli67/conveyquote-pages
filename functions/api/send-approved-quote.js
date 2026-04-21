@@ -238,6 +238,19 @@ export async function onRequestPost(context) {
       safe(quoteReference)
     )}`;
 
+    // Quote expiry — 14 days from today
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 14);
+    const expiryFormatted = expiryDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+    // Book a call — passes client name, email and quote reference so the form pre-fills
+    const bookACallUrl = `https://conveyquote.uk/book-call?ref=${encodeURIComponent(safe(quoteReference))}&name=${encodeURIComponent(safe(name))}&email=${encodeURIComponent(safe(email))}`;
+    const feesGuideUrl = "https://conveyquote.uk/conveyancing-fees/";
+
     const formattedNextSteps = formatMultilineHtml(
       nextSteps ||
         "If you would like to proceed, please click Accept Quote below. Once we receive your instruction, we will move your matter to the next stage, which may include referral to one of our selected panel solicitor firms. If you do not wish to proceed, you may click Decline Quote. If you have any questions before deciding, please contact us at info@conveyquote.uk."
@@ -487,13 +500,34 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
 
+                        <!-- Quote expiry notice -->
                         <tr>
-                          <td align="center" style="padding:28px 28px 12px 28px;">
+                          <td style="padding:0 28px 20px 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fef3f2;border:1px solid #fca5a5;border-radius:8px;">
+                              <tr>
+                                <td style="padding:12px 16px;font-size:13px;line-height:1.6;color:#991b1b;text-align:center;">
+                                  ⏳ <strong>This quote is valid until ${expiryFormatted}.</strong>
+                                  After this date the quote may be subject to review.
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+
+                        <!-- Action buttons -->
+                        <tr>
+                          <td align="center" style="padding:0 28px 12px 28px;">
                             <a
                               href="${acceptUrl}"
                               style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;margin:0 8px 12px 8px;"
                             >
                               Accept Quote
+                            </a>
+                            <a
+                              href="${bookACallUrl}"
+                              style="display:inline-block;background:#1d6f42;color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;margin:0 8px 12px 8px;"
+                            >
+                              📞 Book a Free Call
                             </a>
                             <a
                               href="${rejectUrl}"
@@ -504,15 +538,36 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
 
+                        <!-- Reassurance under buttons -->
                         <tr>
-                          <td style="padding:0 28px 28px 28px;">
-                            <div style="font-size:14px;line-height:1.8;color:#4b5563;text-align:center;">
-                              If you have any questions before deciding, please contact us at
-                              <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">info@conveyquote.uk</a>.
+                          <td style="padding:0 28px 24px 28px;">
+                            <div style="font-size:13px;line-height:1.8;color:#6b7280;text-align:center;">
+                              Not ready to accept yet? We are happy to answer any questions — no obligation.<br />
+                              <a href="${bookACallUrl}" style="color:#0f2747;text-decoration:none;font-weight:600;">Book a free 10-minute call</a>
+                              &nbsp;·&nbsp;
+                              <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">Email us</a>
                             </div>
                           </td>
                         </tr>
 
+                        <!-- Fees guide -->
+                        <tr>
+                          <td style="padding:0 28px 24px 28px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;">
+                              <tr>
+                                <td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#1e3a5f;text-align:center;">
+                                  <strong>Want to understand what these fees cover?</strong><br />
+                                  Our guide walks through every item in plain English — what it is, why it is charged, and what to expect at each stage of your transaction.<br />
+                                  <a href="${feesGuideUrl}" style="display:inline-block;margin-top:10px;color:#0f2747;font-weight:700;text-decoration:underline;">
+                                    Read our conveyancing fees guide →
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+
+                        <!-- Footer legal note -->
                         <tr>
                           <td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
                             This estimate is provided for information only and does not create a solicitor-client retainer until you are formally onboarded and we confirm instructions.
