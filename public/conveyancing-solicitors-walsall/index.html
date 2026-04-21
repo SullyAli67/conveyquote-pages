@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Walsall – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Walsall. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+<link rel="icon" href="/logo.png">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 540px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header { background: var(--navy); padding: 20px 22px; }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="/logo.png" alt="ConveyQuote"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'" />
+      <span style="display:none;color:#fff;font-weight:700;font-size:1.1rem">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Walsall &amp; The Black Country</div>
+    <h1>Conveyancing Solicitors in <span>Walsall</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. The right solicitor for Walsall's varied and value-conscious property market.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>Buying or selling in Walsall – the legal process made clear</h2>
+        <div class="divider"></div>
+        <p>Every property purchase and sale in England and Wales requires a solicitor or licensed conveyancer to manage the legal transfer of ownership. They search the title at HM Land Registry, raise enquiries with the local authority, review and exchange contracts, handle mortgage funds, and register the new owner once completion takes place. This is conveyancing, and in most cases it takes between ten and fourteen weeks from the point an offer is accepted.</p>
+        <p>Walsall's property market has its own characteristics that shape the conveyancing process here. The borough encompasses a wide range of housing – from the terraced streets of Bloxwich and Willenhall, to the more substantial semis of Aldridge and Streetly, to the new build developments pushing outward from the town centre. Its position as a former industrial town at the northern edge of the Black Country means that mining legacy searches, former industrial land searches, and ex-local authority title considerations all arise more regularly here than in many other parts of the West Midlands. A solicitor who understands these local nuances is not just a convenience – they are a material safeguard against delays and unexpected complications.</p>
+        <p>ConveyQuote gives buyers and sellers in Walsall a cleaner, more reliable starting point. Every quote we issue is reviewed by a real person before it reaches you – so the figure reflects your actual transaction, not an automated estimate that shifts once the file is examined. Your costs are broken down clearly from the outset, and your matter is placed with a solicitor from our regulated panel with the right experience for your type of purchase or sale.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CONVEYQUOTE -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. No unwelcome surprises.</h2>
+    <div class="divider"></div>
+    <p>Automated conveyancing comparison tools produce a quote in seconds without reviewing whether that figure reflects your specific situation. In Walsall's varied market – where a coal authority search is standard, where ex-council properties have specific lender requirements, and where some new build sites sit on former industrial land – the difference between a generic quote and an accurate one can be considerable. ConveyQuote reviews every enquiry before issuing a figure, so what you see is what you can plan around.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry submitted through ConveyQuote is checked by a member of our team before any quote is prepared. Transaction details – property type, tenure, mortgage position, and any factors specific to the Walsall market – are considered properly rather than processed automatically.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>Legal fees and disbursements are shown separately and in plain language from the outset. No file closure charges, no mid-transaction additions, and no vague estimates that change once work begins. The quote you receive is the price you pay.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more responsive process</h3>
+        <p>Overstretched local firms juggling large caseloads are a frequent source of frustration for buyers and sellers across the Black Country. Our panel solicitors use dedicated conveyancing systems and digital-first communication that keeps files moving without you having to chase.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Every firm we work with is SRA-regulated and selected for genuine residential conveyancing experience. Your matter is matched to a solicitor suited to your transaction type – not whoever happens to have capacity at that moment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WALSALL LOCAL SECTION -->
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Walsall</div>
+    <h2>What property buyers and sellers in Walsall need to know</h2>
+    <div class="divider"></div>
+    <p>Walsall is a metropolitan borough of considerable variety. Its town centre has been the focus of sustained regeneration investment, while its outer areas span some of the most affordable family housing in the West Midlands alongside pockets of more affluent owner-occupier territory in Aldridge, Streetly, and Great Barr. That range means the conveyancing landscape in Walsall is not uniform – the legal considerations for a first-time buyer purchasing a terrace in Bloxwich are quite different from those for a buyer acquiring a four-bedroom detached in Streetly, and both differ again from someone purchasing a flat in one of the newer town centre developments. Understanding which issues apply to your transaction is part of what a properly reviewed quote process is designed to address.</p>
+
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Coal mining legacy searches</strong>
+        <p>Walsall sits within a former coalfield area, and a coal authority search is a standard and non-negotiable part of the conveyancing process for the vast majority of properties in the borough. The search establishes whether the property is at risk from historical underground mining activity – subsidence, disused shafts, or recorded tunnels – and whether any future mining operations are planned. Any properly prepared Walsall conveyancing quote should include this as a named disbursement, not bundled anonymously into a general search figure.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Ex-local authority properties</strong>
+        <p>A substantial portion of Walsall's housing stock was built by the former Walsall Metropolitan Borough Council and transferred into private ownership through Right to Buy from the 1980s onwards. These properties appear throughout Bloxwich, Willenhall, Blakenall, and Bentley. The original transfer deed from the council sale can carry restrictions that remain binding on subsequent owners – limitations on subletting, requirements to offer the property back before selling on, or conditions relating to structural alterations. Lenders also have specific requirements for ex-council properties, particularly certain flat types, and these need to be confirmed early.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Aldridge &amp; Streetly – higher-value freehold</strong>
+        <p>At the eastern and southern edges of the borough, the character of the housing stock shifts noticeably. Aldridge and Streetly offer larger detached and semi-detached family homes that attract buyers from across the wider West Midlands, often drawn by the combination of Walsall Wood and the Green Belt proximity, good road links, and schools. These transactions tend to be freehold and more straightforward in terms of title, but the higher values mean Land Registry fees and solicitor professional risk both increase proportionally.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Town centre new builds &amp; regeneration</strong>
+        <p>Walsall town centre has seen a sustained programme of residential regeneration, including apartment schemes around the Waterfront and along the ring road corridors. These are predominantly leasehold properties in managed blocks, and they carry the usual suite of leasehold considerations: management pack delays from managing agents, service charge history reviews, and – for some of the earlier regeneration-era buildings – building safety documentation requirements under post-Grenfell regulations. New build purchases in these schemes involve developer exchange deadlines and housebuilder-specific documentation that requires solicitors with experience in that format.</p>
+      </div>
+    </div>
+
+    <p>Walsall also has a notable residential offering in Great Barr – an area that sits administratively within Walsall Metropolitan Borough but is geographically and culturally closer to the Perry Barr and Handsworth Wood end of Birmingham. Properties here are predominantly 1930s and post-war semis on freehold titles, popular with families and consistent in demand. Buyers should note that the local authority search for Great Barr properties is raised with Walsall Council rather than Birmingham City Council – a distinction that matters for solicitors ordering searches and one that occasionally catches out firms less familiar with the borough's boundaries.</p>
+
+    <p>The Walsall canal network, which runs through several parts of the borough, occasionally creates specific title or drainage questions for properties backing onto or near the waterway. British Waterways (now Canal &amp; River Trust) owns the canal bed and towpaths, and where a property's boundary abuts the canal, the title deeds need to be read carefully to confirm what is and is not included within the registered ownership.</p>
+  </div>
+</section>
+
+<!-- FEES -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees in Walsall?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing costs consist of the solicitor's legal fee and disbursements – third-party costs paid on your behalf during the process. In Walsall, where the borough spans a wide range of property types and price points, and where specific local searches add to the standard bundle, understanding the fee structure clearly at the outset matters considerably. Here is what drives the main variables.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>Land Registry fees scale with the purchase price. Walsall's more affordable terraced and semi-detached market keeps these fees competitive for most buyers. At the higher end – Aldridge, Streetly, and parts of Great Barr – the registration fee and, in some cases, the solicitor's legal fee increases to reflect the higher value and the corresponding increase in professional liability.</td>
+          </tr>
+          <tr>
+            <td class="factor">Coal authority search <span class="fees-badge">Standard across Walsall</span></td>
+            <td>A coal authority search is a standard disbursement for the vast majority of Walsall properties given the borough's position within a former coalfield. It should appear as a named, separate line item on any properly prepared conveyancing quote. The search itself is not expensive, but the result needs to be read and explained carefully by your solicitor – not simply passed on without comment.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Relevant in town centre</span></td>
+            <td>Most Walsall transactions involve freehold properties – the terraced and semi-detached housing that dominates the borough's residential stock. Leasehold transactions arise primarily in town centre apartment schemes and some ex-local authority blocks. These carry a higher fee to reflect the additional legal work: reviewing the lease, obtaining the management pack, checking service charge accounts, and advising on any building safety documentation requirements.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>If you are buying with a mortgage, your solicitor acts for both you and your lender, adding to the workload and the fee. Cash purchases are simpler and generally attract a lower fee. For ex-council properties, lenders often have additional confirmation requirements that add a step to the process and should be identified and flagged at the earliest stage of the transaction.</td>
+          </tr>
+          <tr>
+            <td class="factor">Canal proximity <span class="fees-badge">Relevant in parts of Walsall</span></td>
+            <td>For properties whose boundary abuts or runs near the Walsall canal network, the title deeds need careful review to confirm the precise boundary and any riparian obligations or rights of access. Where the title is unclear, additional enquiries may need to be raised with the Canal &amp; River Trust. This is an additional piece of legal work that should be identified and costed at the outset rather than emerging as a surprise once the file is underway.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit</td>
+            <td>Where part of your deposit is a family gift – common among younger buyers in Walsall's first-time buyer market where prices remain accessible but mortgage requirements can still stretch savings – your solicitor must verify the source of funds for your mortgage lender. This is standard and carries a modest additional fee that should appear on your quote from the outset.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>We have designed the ConveyQuote process to remove as much uncertainty from conveyancing as possible. You should not have to wonder whether your quote is accurate, whether your solicitor has started work, or what is actually happening with your file. Here is what happens from the moment you get in touch.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Complete a short form covering the key details of your transaction – whether you are buying, selling, or both; the property type and tenure; the approximate price; and your mortgage position. It takes around two minutes and there is no charge to enquire.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>A member of our team reviews what you have submitted before a quote is produced. For Walsall transactions, this includes checking whether the property type or location suggests that specific additional considerations – a coal authority search result, an ex-council title, canal proximity, or a town centre leasehold – need to be reflected in the pricing before it reaches you.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You receive a clear, itemised quote to your inbox – legal fees and disbursements shown separately, Stamp Duty estimated on your actual purchase price. No login required, no obligation to accept, and no small print that changes the figure you have been given.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>When you are ready to proceed, you confirm your instruction. There is no fee for requesting a quote and no pressure to commit before you are comfortable with the outcome.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor</h3>
+          <p>Your file is assigned to a regulated solicitor from our panel – selected for experience with your specific transaction type. They will contact you promptly to open the file, complete identity checks, and begin work without delay.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Walsall property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost to you.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Walsall</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Walsall?</div>
+        <p class="faq-a">For a standard freehold purchase or sale in Walsall, most transactions complete within ten to fourteen weeks from when an offer is accepted. Coal authority search results are typically returned quickly and rarely cause delay on their own, though where the result requires clarification or a follow-up from the Coal Authority, this can add time. Ex-council property purchases occasionally take longer if the lender raises additional requirements when reviewing the title. Leasehold transactions in the town centre apartment schemes can be delayed by slow managing agent responses when producing the management pack. Chain transactions – common across Walsall's family home market – add time at each link. Twelve weeks is a reasonable planning estimate for most straightforward freehold cases.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Walsall?</div>
+        <p class="faq-a">Walsall's generally affordable property prices mean Land Registry fees are lower than in Birmingham's premium suburbs, which helps keep total conveyancing costs competitive. As a rough guide, a standard freehold purchase in Walsall might attract total costs – covering the solicitor's legal fee, local authority search, coal authority search, water and drainage search, Land Registry registration, and bank transfer fees – of between £1,100 and £1,700, depending on the purchase price and any additional complexities. Leasehold and new build transactions will cost more. Gifted deposit verification and ex-council title work carry modest additional fees that should appear on your quote from the outset. The most accurate way to understand your costs is to request a reviewed quote that reflects your specific transaction rather than a general estimate.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Do I need a solicitor based in Walsall?</div>
+        <p class="faq-a">No. Residential conveyancing in England and Wales is conducted almost entirely by email, post, and secure digital portals. In-person office visits are very rarely required, and the solicitors on ConveyQuote's panel handle Walsall transactions without being based locally. What matters is not location but experience – a solicitor who understands coal authority search results, ex-local authority title restrictions, canal boundary considerations, and the administrative quirks of Walsall's borough boundaries is of far more practical value than one who simply has a local address. One example of those quirks worth noting: properties in Great Barr sit within Walsall Metropolitan Borough, meaning local authority searches must be raised with Walsall Council rather than Birmingham City Council – a distinction that solicitors unfamiliar with the area occasionally get wrong.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What typically causes delays in Walsall property transactions?</div>
+        <p class="faq-a">The most common sources of delay in Walsall transactions are: chain-related hold-ups where a problem at any link in the sequence affects all connected buyers and sellers; slow responses to solicitors' enquiries from the other side; mortgage lender processing times; and – for leasehold properties in the town centre schemes – slow managing agent responses when producing management packs. Ex-council property purchases can be delayed if a lender raises queries about construction type or requires additional confirmation before releasing the mortgage offer. Canal proximity occasionally generates a boundary or drainage query that needs follow-up before exchange can proceed. A solicitor who flags likely complications early and communicates clearly when they arise is the most effective protection against avoidable delays.</p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">The property I am buying in Walsall is in Great Barr. Does that affect my conveyancing?</div>
+        <p class="faq-a">Great Barr is one of those boundary areas that can catch out solicitors unfamiliar with the Walsall metropolitan borough. Despite carrying a Birmingham postcode in some cases and feeling geographically connected to north Birmingham, Great Barr is administratively within Walsall Metropolitan Borough. This means the local authority search must be submitted to Walsall Council – not Birmingham City Council. A solicitor who submits it to the wrong authority will receive results that do not cover the property, which requires the search to be reordered and causes a delay. When you request a quote through ConveyQuote, this kind of detail is exactly what the review step is designed to catch before work begins rather than after.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="/logo.png" alt="ConveyQuote"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='inline';this.nextElementSibling.style.color='rgba(255,255,255,0.7)'" />
+    <span style="display:none">ConveyQuote</span>
+  </a>
+  <p style="margin-top:8px">ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
