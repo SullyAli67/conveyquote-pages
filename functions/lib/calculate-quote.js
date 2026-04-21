@@ -254,8 +254,14 @@ function buildSaleQuote(input) {
     addItem(legalFees, "Leasehold supplement", 300);
   }
 
+  // Telegraphic transfer fee: always 1x to send net sale proceeds to seller.
+  // A second fee is added if there is a mortgage to redeem (funds must also
+  // be wired to the lender to discharge the charge).
+  addItem(legalFees, "Telegraphic transfer fee", 45);
+
   if (input.saleMortgage === "yes") {
     addItem(legalFees, "Mortgage redemption supplement", 50);
+    addItem(legalFees, "Telegraphic transfer fee (mortgage redemption)", 45);
   }
 
   if (input.managementCompany === "yes") {
