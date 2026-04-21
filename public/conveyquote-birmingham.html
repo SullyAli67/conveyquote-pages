@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conveyancing Solicitors in Birmingham – Fixed Fee Quotes | ConveyQuote</title>
+<meta name="description" content="Get a clear, fixed fee conveyancing quote in Birmingham. No hidden extras, reviewed quotes, and access to a panel of experienced solicitors. Request your quote today.">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:      #062a63;
+    --navy-mid:  #0a3d6e;
+    --teal:      #0aa6b5;
+    --teal-dark: #078e9b;
+    --text:      #162033;
+    --muted:     #667085;
+    --border:    #d9e2ec;
+    --bg:        #f5f8fc;
+    --white:     #ffffff;
+    --shadow:    0 14px 40px rgba(6,42,99,0.09);
+    --radius:    18px;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .site-nav {
+    background: var(--navy);
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .site-nav__inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    gap: 20px;
+  }
+  .site-nav__logo {
+    height: 36px;
+    display: block;
+    background: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 4px 8px;
+  }
+  .nav-cta {
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .nav-cta:hover { background: var(--teal-dark); }
+
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #0c7a87 100%);
+    padding: 64px 16px 56px;
+    color: #fff;
+    text-align: center;
+  }
+  .hero__inner { max-width: 740px; margin: 0 auto; }
+  .hero__badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.2);
+    border: 1px solid rgba(10,166,181,0.4);
+    color: #7ee8f0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(1.85rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--teal); }
+  .hero__sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 520px;
+    margin: 0 auto 32px;
+  }
+  .hero__cta {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 36px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .hero__cta:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .hero__trust {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero__trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.6);
+  }
+  .hero__trust-item::before { content: '✓'; color: var(--teal); font-weight: 700; }
+
+  .container { width: min(900px, calc(100% - 32px)); margin: 0 auto; }
+  section { padding: 60px 0; }
+  section.alt-bg { background: var(--white); }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: clamp(1.45rem, 3vw, 2.1rem);
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.25;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  p { margin-bottom: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .divider {
+    width: 40px;
+    height: 3px;
+    background: var(--teal);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 310px;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .intro-grid { grid-template-columns: 1fr; } }
+
+  .sidebar-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-card__header {
+    background: var(--navy);
+    padding: 20px 22px;
+  }
+  .sidebar-card__header h3 { color: #fff; margin-bottom: 0; }
+  .sidebar-card__body { padding: 20px 22px; }
+  .sidebar-list { list-style: none; }
+  .sidebar-list li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+  }
+  .sidebar-list li:last-child { border-bottom: none; }
+  .sidebar-list li::before { content: '✓'; color: var(--teal); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sidebar-cta {
+    display: block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  .sidebar-cta:hover { background: var(--teal-dark); }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .why-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .why-card__icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(10,166,181,0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 18px;
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .why-card p { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+  .local-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .local-chip {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--teal);
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(6,42,99,0.05);
+  }
+  .local-chip strong { display: block; color: var(--navy); font-size: 0.92rem; margin-bottom: 6px; }
+  .local-chip p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.6; }
+
+  .fees-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 28px;
+  }
+  .fees-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .fees-table th {
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 18px;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .fees-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .fees-table tr:last-child td { border-bottom: none; }
+  .fees-table tr:nth-child(even) td { background: var(--bg); }
+  .fees-table .factor { font-weight: 700; color: var(--navy); }
+  .fees-badge {
+    display: inline-block;
+    background: rgba(10,166,181,0.1);
+    color: var(--teal-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .process-steps { margin-top: 32px; }
+  .process-step { display: flex; gap: 20px; margin-bottom: 8px; align-items: flex-start; }
+  .step-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-content { padding-top: 8px; }
+  .step-content h3 { font-size: 1rem; margin-bottom: 4px; }
+  .step-content p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .step-line { width: 2px; height: 22px; background: var(--border); margin-left: 20px; margin-bottom: 8px; }
+
+  .cta-section {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #0c7a87 100%);
+    padding: 72px 16px;
+    text-align: center;
+  }
+  .cta-section h2 { color: #fff; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+  .cta-section p { color: rgba(255,255,255,0.7); font-size: 1.05rem; margin: 14px 0 32px; }
+  .cta-btn {
+    display: inline-block;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 16px 44px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.12s;
+  }
+  .cta-btn:hover { background: var(--teal-dark); transform: translateY(-1px); }
+  .cta-sub { margin-top: 16px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; }
+
+  .faq-list { margin-top: 32px; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 22px 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q { font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+  .faq-a { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+
+  footer { background: var(--navy); padding: 28px 16px; text-align: center; }
+  footer img {
+    height: 32px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  footer p { color: rgba(255,255,255,0.35); font-size: 0.78rem; }
+
+  @media (max-width: 600px) {
+    section { padding: 40px 0; }
+    .hero { padding: 44px 16px 40px; }
+    .fees-table th, .fees-table td { padding: 10px 12px; }
+    .fees-table { font-size: 0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav__inner">
+    <a href="https://conveyquote.uk">
+      <img class="site-nav__logo" src="https://conveyquote.uk/logo.png" alt="ConveyQuote" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><span style="display:none;color:#fff;font-weight:700;font-size:1.1rem;letter-spacing:0.01em">ConveyQuote</span>
+    </a>
+    <a href="#get-quote" class="nav-cta">Get a Free Quote</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">Birmingham &amp; West Midlands</div>
+    <h1>Conveyancing Solicitors in <span>Birmingham</span><br>– Fixed Fee Quotes</h1>
+    <p class="hero__sub">Clear pricing. Reviewed quotes. A smoother path to your next property.</p>
+    <a href="#get-quote" class="hero__cta">Request Your Free Quote →</a>
+    <div class="hero__trust">
+      <div class="hero__trust-item">No hidden fees</div>
+      <div class="hero__trust-item">Quotes reviewed before issue</div>
+      <div class="hero__trust-item">SRA-regulated panel firms</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <div class="section-label">What is conveyancing?</div>
+        <h2>The legal work behind your property move – explained simply</h2>
+        <div class="divider"></div>
+        <p>When you buy or sell a property, ownership cannot simply change hands on a handshake. A solicitor or licensed conveyancer must handle the legal transfer – searching for issues with the land, reviewing contracts, managing mortgage funds, and registering the new ownership with HM Land Registry. This process is called <strong>conveyancing</strong>, and in most cases it takes somewhere between eight and sixteen weeks from the point an offer is accepted.</p>
+        <p>Choosing the right conveyancing solicitor in Birmingham matters more than many buyers and sellers realise. It is not just about the headline price. A firm that is slow to respond, unclear on costs, or overstretched can turn a straightforward purchase into weeks of chasing and uncertainty. In a city as active as Birmingham – with long chains, leasehold complications, and busy developers – the quality of your solicitor makes a real difference.</p>
+        <p>The most common complaints we hear are simple ones: unexpected charges appearing on the final bill, weeks passing without a meaningful update, and a sense of having no control over something that matters enormously. ConveyQuote was built to address exactly these issues. Every quote we issue is reviewed before it reaches you, so the price you see reflects your actual transaction – not a generic estimate that gets revised later. You get clear, fixed pricing from day one, and a solicitor matched to your specific situation.</p>
+      </div>
+      <div>
+        <div class="sidebar-card">
+          <div class="sidebar-card__header">
+            <h3>What your quote includes</h3>
+          </div>
+          <div class="sidebar-card__body">
+            <ul class="sidebar-list">
+              <li>Fixed legal fee – no hourly billing</li>
+              <li>Disbursements itemised separately</li>
+              <li>Stamp Duty estimate where applicable</li>
+              <li>Land Registry fee included</li>
+              <li>Local authority &amp; water search fees</li>
+              <li>No referral fee hidden in your price</li>
+            </ul>
+            <a href="#get-quote" class="sidebar-cta">Get My Free Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Why ConveyQuote</div>
+    <h2>Reviewed quotes. Transparent pricing. A better experience.</h2>
+    <div class="divider"></div>
+    <p>Most online conveyancing comparison tools do one thing: generate an automated quote instantly and step back. The number you see may not reflect your actual situation – and the surprises come later. ConveyQuote works differently.</p>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-card__icon">✔</div>
+        <h3>Reviewed before they reach you</h3>
+        <p>Every enquiry is checked before a quote is issued. The price you receive reflects your actual transaction – property type, tenure, mortgage, and any additional complexities – not a generic automated estimate.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">£</div>
+        <h3>Transparent, fixed-fee pricing</h3>
+        <p>You will see exactly what you are paying for, broken into legal fees and disbursements. No administration charges, no file closure fees, and no percentage-of-sale additions buried in the small print.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚡</div>
+        <h3>A faster, more efficient process</h3>
+        <p>Traditional high-street firms often juggle hundreds of files at once. Our panel solicitors work with dedicated conveyancing teams and digital-first communication built in from the start.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-card__icon">⚖</div>
+        <h3>Regulated panel solicitors</h3>
+        <p>Your matter is placed with a firm from our curated panel – SRA-regulated, experienced in residential property, and matched to your transaction type. Not just the next available desk.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="section-label">Conveyancing in Birmingham</div>
+    <h2>What buyers and sellers in Birmingham need to know</h2>
+    <div class="divider"></div>
+    <p>Birmingham's property market has its own distinct character, and conveyancing here can involve complications that simply would not arise in a quieter or more uniform market. Whether you are buying a two-up two-down terrace in Erdington, a new-build apartment in Digbeth, or selling a semi-detached family home in Kings Heath or Harborne, the legal journey varies significantly depending on what you are buying, how it is held, and what the local searches uncover.</p>
+    <div class="local-grid">
+      <div class="local-chip">
+        <strong>Leasehold flats</strong>
+        <p>Birmingham's city centre and inner-city regeneration areas have a high concentration of leasehold apartments – particularly around the Jewellery Quarter, Broad Street, and the growing Digbeth and Southside districts. Leasehold adds complexity: management company accounts, service charge histories, ground rent structures, and lease length all need careful review before exchange.</p>
+      </div>
+      <div class="local-chip">
+        <strong>New builds &amp; regeneration</strong>
+        <p>Post-Commonwealth Games development at Perry Barr, HS2-corridor schemes, and Eastside regeneration projects have brought significant new build activity to the city. New build conveyancing comes with tight developer exchange deadlines, shared ownership structures, and the need for solicitors experienced in dealing with national housebuilders.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Chain-heavy transactions</strong>
+        <p>Birmingham's market moves at considerable volume, and chains of three, four, or five properties are common – particularly in Moseley, Stirchley, Sutton Coldfield, and Northfield. A delay anywhere in the chain affects everyone below it. A proactive solicitor who communicates regularly is not just preferable – it is essential.</p>
+      </div>
+      <div class="local-chip">
+        <strong>Management company delays</strong>
+        <p>Many Birmingham flats – from converted Victorian buildings to purpose-built developments – are managed by third-party companies. These organisations are often slow to respond to solicitors' enquiries, and it is one of the primary causes of delay in the city's flat transactions. An experienced firm will know how to manage this effectively.</p>
+      </div>
+    </div>
+    <p>Birmingham also has a substantial first-time buyer market, particularly in areas well-served by the metro and rail network. Shared ownership schemes, Right to Buy purchases, and buy-to-let acquisitions add further complexity and require solicitors with specific experience in those transaction types. Having a solicitor who understands Birmingham's local authority, Land Registry region, and common title issues makes a material difference to how your transaction progresses.</p>
+  </div>
+</section>
+
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Understanding costs</div>
+    <h2>What affects your conveyancing fees?</h2>
+    <div class="divider"></div>
+    <p>Conveyancing fees are made up of two parts: the solicitor's legal fee and disbursements. Disbursements are third-party costs – things like Land Registry fees, local authority searches, and drainage searches – that the solicitor pays on your behalf and passes on to you. Both should be clear from the outset. Here is what typically affects the total.</p>
+    <div class="fees-wrap">
+      <table class="fees-table">
+        <thead>
+          <tr>
+            <th style="width:32%">Factor</th>
+            <th>What it means for your fees</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="factor">Property price</td>
+            <td>The higher the price, the higher the Land Registry fee. Solicitors may also scale their legal fee slightly on higher-value properties due to increased professional risk.</td>
+          </tr>
+          <tr>
+            <td class="factor">Leasehold vs freehold <span class="fees-badge">Common in Birmingham</span></td>
+            <td>Leasehold transactions require significantly more legal work – reviewing the lease, raising enquiries with the management company or freeholder, and checking service charge accounts. Expect a higher fee for leasehold.</td>
+          </tr>
+          <tr>
+            <td class="factor">Mortgage or cash</td>
+            <td>If you are buying with a mortgage, your solicitor also acts for your lender – which adds legal work. Cash buyers generally pay slightly less. Remortgages are priced separately and are typically more straightforward.</td>
+          </tr>
+          <tr>
+            <td class="factor">Gifted deposit</td>
+            <td>If part of your deposit is a gift from a parent or relative, your solicitor must verify the source of funds for your lender. This normally carries a modest additional fee.</td>
+          </tr>
+          <tr>
+            <td class="factor">Shared ownership <span class="fees-badge">Common in Birmingham</span></td>
+            <td>Buying a shared ownership property involves a more complex legal structure and a separate lease to review. Not all solicitors handle these – your ConveyQuote match will have appropriate experience.</td>
+          </tr>
+          <tr>
+            <td class="factor">New build <span class="fees-badge">Common in Birmingham</span></td>
+            <td>Developer exchange deadlines, collateral warranties, and housebuilder contract requirements all add to the workload and the fee. This should be clearly disclosed up front – and it will be on your ConveyQuote quote.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From enquiry to completion – five clear steps</h2>
+    <div class="divider"></div>
+    <p>We have designed the process to be as simple as possible. No need to call around, compare confusing quotes, or wonder whether the price is accurate. Here is exactly what happens from the moment you reach out.</p>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Submit your enquiry online</h3>
+          <p>Fill in a short form with the key details – whether you are buying, selling, or both; the property type; the approximate price; and your mortgage situation. It takes around two minutes and costs nothing.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Your enquiry is reviewed before any quote is issued</h3>
+          <p>This is where ConveyQuote differs from automated comparison tools. A member of our team reviews your enquiry to ensure the quote accurately reflects your situation – including property type, tenure, and any complexities.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Your quote is sent by email</h3>
+          <p>You will receive a clear, itemised quote directly to your inbox. No login required, no hidden extras, no pressure to accept immediately. Everything is broken down so you can see exactly what you are paying and why.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>You accept and confirm your instruction</h3>
+          <p>If you are happy with the quote and ready to proceed, you simply confirm your instruction. There is no obligation to accept and no fee for requesting a quote.</p>
+        </div>
+      </div>
+      <div class="step-line"></div>
+      <div class="process-step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Your matter is placed with a suitable solicitor firm</h3>
+          <p>Your transaction is assigned to a regulated solicitor from our panel – selected for experience with your transaction type. They will contact you to open your file, verify your identity, and begin work.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section" id="get-quote">
+  <div class="container" style="text-align:center">
+    <div class="section-label" style="color:rgba(10,166,181,0.7)">Ready to get started?</div>
+    <h2>Get a clear conveyancing quote for your Birmingham property today</h2>
+    <p>No hidden extras. No automated guesswork. A reviewed quote, sent to your inbox, at no cost.</p>
+    <a href="https://conveyquote.uk" class="cta-btn">Request My Free Quote →</a>
+    <div class="cta-sub">Takes around 2 minutes &nbsp;·&nbsp; No obligation &nbsp;·&nbsp; No account required</div>
+  </div>
+</section>
+
+<section class="alt-bg">
+  <div class="container">
+    <div class="section-label">Common questions</div>
+    <h2>Frequently asked questions about conveyancing in Birmingham</h2>
+    <div class="divider"></div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <div class="faq-q">How long does conveyancing take in Birmingham?</div>
+        <p class="faq-a">For a straightforward freehold purchase or sale, most Birmingham transactions complete within ten to fourteen weeks of an offer being accepted. Leasehold transactions – particularly those involving management companies – often take sixteen weeks or more, depending on how responsive the freeholder or managing agent is. Chain transactions add time at each link, and new build purchases can be subject to developer-driven timescales. A realistic expectation for most cases is twelve weeks, though your solicitor will advise once they have reviewed your specific circumstances.</p>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How much does conveyancing cost in Birmingham?</div>
+        <p class="faq-a">Costs vary depending on transaction type and property value. As a rough guide, a standard freehold purchase in Birmingham might attract a total conveyancing cost – including searches, Land Registry fees, and legal fees – of between £1,200 and £2,000. Leasehold purchases typically run higher, from around £1,500 upwards, due to the additional legal work involved. New build and shared ownership transactions carry their own fee structures. We recommend requesting a reviewed quote through ConveyQuote to get an accurate figure for your specific situation.</p>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Do I need a local Birmingham solicitor?</div>
+        <p class="faq-a">No – and this is a common misconception. In England and Wales, conveyancing is handled almost entirely by post, email, and secure digital portals. There is rarely any need to attend a physical office. The solicitors on ConveyQuote's panel are regulated across England and Wales and can handle your Birmingham property transaction efficiently regardless of where they are based. What matters is experience, communication, and the right expertise for your transaction type – not proximity to your postcode.</p>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What causes delays in Birmingham property transactions?</div>
+        <p class="faq-a">The most common causes of delay in Birmingham are slow management company responses on leasehold properties, long chains where a problem at one end stalls everyone else, mortgage lender processing times, and slow responses to solicitors' enquiries from the other side. In Birmingham's new build market, delays can also arise from developers pushing back completion dates. Having a proactive solicitor who chases regularly and communicates clearly is the single biggest factor within your control when it comes to keeping things moving.</p>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What is a disbursement, and why does it appear on my quote?</div>
+        <p class="faq-a">A disbursement is a third-party cost that your solicitor pays on your behalf during the conveyancing process, then recovers from you. Common disbursements include local authority searches (raised with Birmingham City Council), water and drainage searches, environmental searches, Land Registry registration fees, and any lender-specific costs if you are buying with a mortgage. These are payments made to external bodies, not solicitor profit. On a ConveyQuote quote, disbursements are always itemised separately so you can see exactly where every pound is going.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="https://conveyquote.uk">
+    <img src="https://conveyquote.uk/logo.png" alt="ConveyQuote" />
+  </a>
+  <p>ConveyQuote is a trading name of Essentially Law Limited (Co. 14625839), registered in England and Wales.<br>
+  We introduce conveyancing enquiries to regulated solicitor firms. We are not a law firm and do not provide legal advice.</p>
+</footer>
+
+</body>
+</html>
