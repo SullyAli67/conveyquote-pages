@@ -4,15 +4,21 @@
 //
 // Generates a quote for an enquiry using a specific firm's own configured
 // legal fees from `firm_fee_configs`. Disbursements are pass-through and
-// always come from central defaults defined below. SDLT uses the same
-// calculator the central Type 1 engine uses (single source of truth for
-// HMRC tax math — reused via export from functions/lib/calculate-quote.js).
+// always come from central named constants — never duplicated here.
+// Office copies are tenure-based and come from the shared
+// `disbursement-constants.js` module that the customer-facing TS engine
+// also consumes. SDLT uses the same calculator the central Type 1
+// engine uses (single source of truth for HMRC tax math — reused via
+// export from `functions/lib/calculate-quote.js`).
 //
-// This endpoint is fully independent of the customer-facing quote rail:
-// it never reads central legal-fee pricing, and the customer-facing
-// pipeline (send-quote.js / send-approved-quote.js / calculate-quote.js)
-// is not modified by Phase 1. The two rails share only the SDLT helper,
-// which is HMRC policy and is the same for both products.
+// Pricing isolation: this endpoint never reads central legal-fee
+// pricing. Legal fees come 100% from `firm_fee_configs`. The customer-
+// facing pipeline (send-quote.js / send-approved-quote.js /
+// calculate-quote.js's buildQuoteData) is not modified by Phase 1. The
+// two rails share only:
+//   • Pass-through disbursement amounts (HMLR, search providers, etc.)
+//   • The SDLT calculator (HMRC tax policy is the same for both products)
+// Nothing about firm legal-fee pricing crosses the rails.
 
 import {
   getTokenFromRequest,
@@ -20,24 +26,22 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
-import { calculateSdlt } from "../lib/calculate-quote.js";
+import {
+  calculateSdlt,
+  SEARCH_PACK_FEE,
+  LAND_REGISTRY_FEE,
+  ID_CHECKS_PER_BUYER,
+  OS1_SEARCH_FEE,
+  BANKRUPTCY_SEARCH_PER_BUYER,
+  SDLT_SUBMISSION_FEE,
+  AP1_SUBMISSION_FEE,
+} from "../lib/calculate-quote.js";
+import { getOfficeCopyEntriesAmount } from "../lib/disbursement-constants.js";
 
-// ── Disbursement defaults (Phase 1 — central, not firm-configurable) ──
-//
-// Per the Phase 1 spec, disbursements are pass-through costs and not
-// firm-configurable. These values match the central Type 1 engine where
-// they overlap; Office Copy Entries differs (£6 here vs £12 in
-// calculate-quote.js) — see PR description for the call.
-const DEFAULTS = {
-  searchPack: 350,
-  landRegistryFee: 150,       // flat — neither rail implements an HMLR sliding scale yet
-  idChecksPerBuyer: 14.4,
-  os1Search: 8.8,
-  bankruptcyPerBuyer: 7.6,
-  sdltSubmission: 6,
-  ap1Submission: 6,
-  officeCopyEntries: 6,
-};
+// Disbursements are pass-through costs and not firm-configurable.
+// The amounts are sourced from the central engine so the two product
+// rails can never drift. To change a disbursement, edit it in
+// functions/lib/calculate-quote.js once.
 
 const VAT_RATE = 0.2;
 
@@ -249,11 +253,12 @@ export async function onRequestPost(context) {
     // buyer is actually buying. Remortgages, sales, and transfers don't
     // typically need a search pack — match calculate-quote.js behaviour.
     if (transactionType === "purchase" || transactionType === "sale_purchase") {
-      disbursements.push({ label: "Search pack", amount: DEFAULTS.searchPack });
+      disbursements.push({ label: "Search pack", amount: SEARCH_PACK_FEE });
     }
 
-    // Land Registry registration fee — flat £150 (the central engine uses
-    // the same flat value; HMLR sliding scale not currently modelled).
+    // Land Registry registration fee — flat across both rails (no HMLR
+    // sliding scale modelled yet; if we add one, update the central
+    // export and both rails pick it up together).
     if (
       transactionType === "purchase" ||
       transactionType === "sale_purchase" ||
@@ -263,14 +268,14 @@ export async function onRequestPost(context) {
     ) {
       disbursements.push({
         label: "Land Registry fee",
-        amount: DEFAULTS.landRegistryFee,
+        amount: LAND_REGISTRY_FEE,
       });
     }
 
     // ID checks scale with buyer count.
     disbursements.push({
       label: perPersonLabel("ID checks", buyerCount),
-      amount: round2(DEFAULTS.idChecksPerBuyer * buyerCount),
+      amount: round2(ID_CHECKS_PER_BUYER * buyerCount),
     });
 
     // OS1 search applies only when there's a property acquisition / interest
@@ -281,7 +286,7 @@ export async function onRequestPost(context) {
       transactionType === "remortgage" ||
       transactionType === "remortgage_transfer"
     ) {
-      disbursements.push({ label: "OS1 search", amount: DEFAULTS.os1Search });
+      disbursements.push({ label: "OS1 search", amount: OS1_SEARCH_FEE });
     }
 
     // Bankruptcy search scales with buyer count, required wherever there's
@@ -289,7 +294,7 @@ export async function onRequestPost(context) {
     if (transactionType !== "sale") {
       disbursements.push({
         label: perPersonLabel("Bankruptcy search", buyerCount),
-        amount: round2(DEFAULTS.bankruptcyPerBuyer * buyerCount),
+        amount: round2(BANKRUPTCY_SEARCH_PER_BUYER * buyerCount),
       });
     }
 
@@ -305,7 +310,7 @@ export async function onRequestPost(context) {
     ) {
       disbursements.push({
         label: "SDLT submission",
-        amount: DEFAULTS.sdltSubmission,
+        amount: SDLT_SUBMISSION_FEE,
       });
     }
 
@@ -319,14 +324,15 @@ export async function onRequestPost(context) {
     ) {
       disbursements.push({
         label: "AP1 submission",
-        amount: DEFAULTS.ap1Submission,
+        amount: AP1_SUBMISSION_FEE,
       });
     }
 
-    // Office copy entries — always.
+    // Office copy entries — always, tenure-based estimate. Sourced from
+    // the shared module that the customer-facing engine also consumes.
     disbursements.push({
       label: "Office copy entries",
-      amount: DEFAULTS.officeCopyEntries,
+      amount: getOfficeCopyEntriesAmount(tenure),
     });
 
     const disbursementsTotal = round2(

@@ -1,5 +1,25 @@
 import { getOfficeCopyEntriesAmount } from "./disbursement-constants.js";
 
+// Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
+// engine can source the same values — these costs must not diverge
+// between the two product rails. To change a disbursement, edit it here
+// once and both rails pick it up.
+//
+// Office copy entries is intentionally NOT here — it's a tenure-based
+// function exported from ./disbursement-constants.js. Both engines call
+// getOfficeCopyEntriesAmount(tenure) directly.
+//
+// Land Registry: currently a flat fee. When/if we model the real HMLR
+// sliding scale, replace this constant with a function that takes price
+// and update both consumers together.
+export const SEARCH_PACK_FEE = 350;
+export const LAND_REGISTRY_FEE = 150;
+export const ID_CHECKS_PER_BUYER = 14.4;
+export const OS1_SEARCH_FEE = 8.8;
+export const BANKRUPTCY_SEARCH_PER_BUYER = 7.6;
+export const SDLT_SUBMISSION_FEE = 6;
+export const AP1_SUBMISSION_FEE = 6;
+
 function toNumber(value) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
@@ -298,15 +318,15 @@ function buildPurchaseQuote(input, options = {}) {
     addItem(legalFees, "Lifetime ISA admin fee", 50);
   }
 
-  addItem(disbursements, "Search pack", 350);
-  addItem(disbursements, "Land Registry fee", 150);
-  addItem(disbursements, perPersonLabel("ID checks", buyerCount), 14.4 * buyerCount);
-  addItem(disbursements, "OS1 search", 8.8);
-  addItem(disbursements, perPersonLabel("Bankruptcy search", buyerCount), 7.6 * buyerCount);
+  addItem(disbursements, "Search pack", SEARCH_PACK_FEE);
+  addItem(disbursements, "Land Registry fee", LAND_REGISTRY_FEE);
+  addItem(disbursements, perPersonLabel("ID checks", buyerCount), ID_CHECKS_PER_BUYER * buyerCount);
+  addItem(disbursements, "OS1 search", OS1_SEARCH_FEE);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", buyerCount), BANKRUPTCY_SEARCH_PER_BUYER * buyerCount);
 
   if (price > 0) {
-    addItem(disbursements, "SDLT submission", 6);
-    addItem(disbursements, "AP1 submission", 6);
+    addItem(disbursements, "SDLT submission", SDLT_SUBMISSION_FEE);
+    addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
   }
 
   // Office copy entries: tenure-based estimate, single line per matter.
@@ -418,9 +438,9 @@ function buildRemortgageQuote(input) {
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.tenure)
   );
-  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on remortgage
-  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
 
   return finaliseQuote({
     legalFees,
@@ -459,10 +479,10 @@ function buildTransferQuote(input) {
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.tenure)
   );
-  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on transfer of equity
-  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
-  addItem(disbursements, "AP1 submission", 6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
     legalFees,
@@ -508,10 +528,10 @@ function buildRemortgageTransferQuote(input) {
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.remortgageTransferTenure)
   );
-  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required
-  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
-  addItem(disbursements, "AP1 submission", 6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
     legalFees,
