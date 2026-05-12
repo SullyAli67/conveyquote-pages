@@ -27,14 +27,20 @@ export async function onRequestPost(context) {
     const disabledFlag = disabled === 1 || disabled === true ? 1 : 0;
 
     const result = await env.DB.prepare(
-      `UPDATE enquiries SET followups_disabled = ? WHERE reference = ?`
+      `UPDATE followup_state SET followups_disabled = ? WHERE enquiry_reference = ?`
     )
       .bind(disabledFlag, reference)
       .run();
 
+    // Zero rows changed means there's no followup_state row yet — the
+    // quote hasn't been sent, so there's nothing to pause/resume.
     if (!result.meta || result.meta.changes === 0) {
       return jsonResponse(
-        { success: false, error: "Enquiry not found." },
+        {
+          success: false,
+          error:
+            "Follow-up tracking not yet active — toggle becomes available after the quote is sent.",
+        },
         404
       );
     }

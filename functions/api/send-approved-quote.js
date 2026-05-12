@@ -651,22 +651,22 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, data }, 500);
     }
 
-    // Mark quote_sent_at + reset followup_stage now that email confirmed delivered.
-    // This is the start of the 14-day follow-up clock (see run-followups.js).
-    // Wrapped so a DB failure here doesn't undo a successful customer send.
+    // Start (or reset) the 14-day follow-up clock now that the email is out.
+    // Lives in followup_state because enquiries is at D1's column ceiling.
+    // INSERT OR REPLACE so re-sending the quote (e.g. after an admin amends
+    // and re-emails) restarts the sequence from stage 0. Wrapped so a DB
+    // failure here doesn't undo a successful customer send.
     try {
-      const sentIso = new Date().toISOString();
       await env.DB.prepare(
-        `UPDATE enquiries
-           SET quote_sent_at = ?,
-               followup_stage = 0,
-               last_followup_at = NULL
-         WHERE reference = ?`
+        `INSERT OR REPLACE INTO followup_state
+           (enquiry_reference, quote_sent_at, followup_stage,
+            last_followup_at, followups_disabled)
+         VALUES (?, datetime('now'), 0, NULL, 0)`
       )
-        .bind(sentIso, quoteReference)
+        .bind(quoteReference)
         .run();
     } catch (followupErr) {
-      console.error("quote_sent_at update failed", followupErr);
+      console.error("followup_state insert failed", followupErr);
     }
 
     return jsonResponse({ success: true, data });

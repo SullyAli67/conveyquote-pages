@@ -1,13 +1,15 @@
 -- Tracks the three-stage follow-up nudge sequence on outstanding quotes.
--- All columns nullable / safely defaulted; existing rows are unaffected.
---
--- NOTE: quote_sent_at already exists on production D1 (confirmed via
--- PRAGMA table_info — column index 74). It was added ad-hoc during batch 4
--- setup but never migrated formally. The first ALTER below is commented out
--- to reflect that. If you're applying this to a fresh DB that does NOT have
--- quote_sent_at yet, uncomment the first line.
+-- Lives in a separate table because enquiries has hit D1's per-table
+-- column ceiling. One row per enquiry that has had a quote sent.
 
--- ALTER TABLE enquiries ADD COLUMN quote_sent_at TEXT;
-ALTER TABLE enquiries ADD COLUMN followup_stage INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE enquiries ADD COLUMN last_followup_at TEXT;
-ALTER TABLE enquiries ADD COLUMN followups_disabled INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS followup_state (
+  enquiry_reference TEXT PRIMARY KEY,
+  quote_sent_at TEXT,
+  followup_stage INTEGER NOT NULL DEFAULT 0,
+  last_followup_at TEXT,
+  followups_disabled INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (enquiry_reference) REFERENCES enquiries(reference)
+);
+
+CREATE INDEX IF NOT EXISTS idx_followup_state_stage
+  ON followup_state(followup_stage, quote_sent_at);

@@ -51,10 +51,6 @@ export async function onRequestGet(context) {
         e.target_completion_date,
         e.fall_through_reason,
         e.decline_reason,
-        e.quote_sent_at,
-        e.followup_stage,
-        e.last_followup_at,
-        e.followups_disabled,
         e.created_at,
         e.referred_at,
         r.referrer_name

@@ -310,22 +310,25 @@ function checkAuth(request, env) {
 async function fetchEligible(env) {
   const statusPlaceholders = TERMINAL_STATUSES.map(() => "?").join(",");
   const casePlaceholders = TERMINAL_CASE_STATUSES.map(() => "?").join(",");
+  // INNER JOIN: no followup_state row means no quote_sent_at to compute
+  // against, so those enquiries are correctly excluded.
   const sql = `
-    SELECT reference,
-           client_name,
-           client_email,
-           transaction_type,
-           quote_sent_at,
-           followup_stage,
-           approved_quote_amount
-      FROM enquiries
-     WHERE status NOT IN (${statusPlaceholders})
-       AND (case_status IS NULL OR case_status NOT IN (${casePlaceholders}))
-       AND quote_sent_at IS NOT NULL
-       AND followups_disabled = 0
-       AND followup_stage < 3
-       AND quote_sent_at > datetime('now', '-15 days')
-     ORDER BY quote_sent_at ASC
+    SELECT e.reference,
+           e.client_name,
+           e.client_email,
+           e.transaction_type,
+           e.approved_quote_amount,
+           fs.quote_sent_at,
+           COALESCE(fs.followup_stage, 0) AS followup_stage
+      FROM enquiries e
+      INNER JOIN followup_state fs ON fs.enquiry_reference = e.reference
+     WHERE e.status NOT IN (${statusPlaceholders})
+       AND (e.case_status IS NULL OR e.case_status NOT IN (${casePlaceholders}))
+       AND fs.quote_sent_at IS NOT NULL
+       AND fs.followups_disabled = 0
+       AND fs.followup_stage < 3
+       AND fs.quote_sent_at > datetime('now', '-15 days')
+     ORDER BY fs.quote_sent_at ASC
      LIMIT ${MAX_PER_RUN}
   `;
   const result = await env.DB.prepare(sql)
@@ -455,10 +458,10 @@ async function runFollowups(context, { dryRun }) {
       }
 
       await env.DB.prepare(
-        `UPDATE enquiries
+        `UPDATE followup_state
             SET followup_stage = ?,
                 last_followup_at = datetime('now')
-          WHERE reference = ?`
+          WHERE enquiry_reference = ?`
       )
         .bind(nextStage, row.reference)
         .run();

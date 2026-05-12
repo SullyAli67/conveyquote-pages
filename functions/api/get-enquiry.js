@@ -17,8 +17,19 @@ export async function onRequestGet(context) {
       );
     }
 
+    // LEFT JOIN followup_state so follow-up tracking fields come back alongside
+    // the enquiry. Aliased with fs_ prefix to avoid colliding with the vestigial
+    // enquiries.quote_sent_at column that still exists on prod from batch 4.
     const enquiry = await env.DB.prepare(
-      `SELECT * FROM enquiries WHERE reference = ? LIMIT 1`
+      `SELECT e.*,
+              fs.quote_sent_at      AS fs_quote_sent_at,
+              fs.followup_stage     AS fs_followup_stage,
+              fs.last_followup_at   AS fs_last_followup_at,
+              fs.followups_disabled AS fs_followups_disabled
+         FROM enquiries e
+         LEFT JOIN followup_state fs ON fs.enquiry_reference = e.reference
+        WHERE e.reference = ?
+        LIMIT 1`
     )
       .bind(reference)
       .first();
@@ -56,11 +67,25 @@ export async function onRequestGet(context) {
     // adminQuote prefers the saved approved version; falls back to base quote if not yet approved
     const authoritative = parsedApprovedQuote || parsedQuote;
 
-    const { quote_json, approved_quote_json, ...enquiryWithoutRawQuote } = enquiry;
+    const {
+      quote_json,
+      approved_quote_json,
+      fs_quote_sent_at,
+      fs_followup_stage,
+      fs_last_followup_at,
+      fs_followups_disabled,
+      ...enquiryWithoutRawQuote
+    } = enquiry;
 
     const mergedEnquiry = {
       ...(parsedQuote && typeof parsedQuote === "object" ? parsedQuote : {}),
       ...enquiryWithoutRawQuote,
+      // Follow-up tracking lives in the followup_state table; override the
+      // vestigial enquiries.quote_sent_at with the canonical value.
+      quote_sent_at: fs_quote_sent_at ?? null,
+      followup_stage: fs_followup_stage ?? 0,
+      last_followup_at: fs_last_followup_at ?? null,
+      followups_disabled: fs_followups_disabled ?? 0,
       quote: authoritative,
       // Expose whether an approved quote exists so frontend can show correct state
       has_approved_quote: Boolean(parsedApprovedQuote),
