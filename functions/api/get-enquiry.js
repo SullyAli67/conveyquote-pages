@@ -17,11 +17,46 @@ export async function onRequestGet(context) {
       );
     }
 
+    // Explicit column list — SELECT e.* against the 100+ column enquiries
+    // table joined with followup_state was exceeding D1's per-query column
+    // ceiling and breaking admin loads. Columns below match every field the
+    // admin UI consumes via LoadedEnquiry, plus the two *_quote_json columns
+    // we parse and strip below.
+    //
     // LEFT JOIN followup_state so follow-up tracking fields come back alongside
     // the enquiry. Aliased with fs_ prefix to avoid colliding with the vestigial
     // enquiries.quote_sent_at column that still exists on prod from batch 4.
     const enquiry = await env.DB.prepare(
-      `SELECT e.*,
+      `SELECT e.reference, e.status, e.client_name, e.client_email, e.client_phone,
+              e.transaction_type, e.consent_to_panel,
+              e.decline_reason, e.decline_reason_text,
+              e.quote_json, e.approved_quote_json,
+              e.tenure, e.price, e.postcode,
+              e.mortgage, e.lender, e.ownership_type, e.first_time_buyer,
+              e.new_build, e.shared_ownership, e.help_to_buy, e.is_company,
+              e.buy_to_let, e.gifted_deposit, e.additional_property,
+              e.uk_resident_for_sdlt, e.lifetime_isa, e.right_to_buy,
+              e.sale_mortgage, e.management_company, e.tenanted, e.number_of_sellers,
+              e.current_lender, e.new_lender, e.additional_borrowing,
+              e.remortgage_transfer, e.transfer_mortgage, e.owners_changing,
+              e.sale_tenure, e.sale_price, e.sale_postcode,
+              e.sale_mortgage_combined, e.management_company_combined,
+              e.tenanted_combined, e.number_of_sellers_combined,
+              e.purchase_tenure, e.purchase_price, e.purchase_postcode,
+              e.purchase_mortgage, e.purchase_lender, e.purchase_ownership_type,
+              e.purchase_first_time_buyer, e.purchase_new_build,
+              e.purchase_shared_ownership, e.purchase_help_to_buy,
+              e.purchase_is_company, e.purchase_buy_to_let,
+              e.purchase_gifted_deposit, e.purchase_additional_property,
+              e.purchase_uk_resident_for_sdlt, e.purchase_lifetime_isa,
+              e.remortgage_transfer_tenure, e.remortgage_transfer_price,
+              e.remortgage_transfer_postcode,
+              e.remortgage_transfer_current_lender,
+              e.remortgage_transfer_new_lender,
+              e.remortgage_transfer_additional_borrowing,
+              e.remortgage_transfer_has_mortgage,
+              e.remortgage_transfer_owners_changing,
+              e.remortgage_transfer_ownership_type,
               fs.quote_sent_at      AS fs_quote_sent_at,
               fs.followup_stage     AS fs_followup_stage,
               fs.last_followup_at   AS fs_last_followup_at,
