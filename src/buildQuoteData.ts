@@ -1,4 +1,12 @@
-import { PRICE_CONFIG, VAT_RATE } from "./priceConfig";
+import {
+  PRICE_CONFIG,
+  VAT_RATE,
+  getPurchaseBaseFee,
+  getSaleBaseFee,
+  getRemortgageBaseFee,
+  getTransferBaseFee,
+  getBespokeNote,
+} from "./priceConfig";
 
 type TransactionType =
   | "sale"
@@ -296,6 +304,7 @@ function finaliseQuote(
 }
 
 function buildSaleQuote(input: {
+  price?: string;
   tenure?: string;
   saleMortgage?: string;
   managementCompany?: string;
@@ -307,8 +316,9 @@ function buildSaleQuote(input: {
   const disbursements: QuoteItem[] = [];
 
   const sellerCount = getSellerCount(input.numberOfSellers);
+  const price = toNumber(input.price);
 
-  addItem(legalFees, "Sale legal fee", config.legalFees.baseLegalFee);
+  addItem(legalFees, "Sale legal fee", getSaleBaseFee(price));
 
   if (input.tenure === "leasehold") {
     addItem(
@@ -370,10 +380,18 @@ function buildSaleQuote(input: {
     config.disbursements.idChecks * sellerCount
   );
 
-  return finaliseQuote(legalFees, disbursements);
+  const bespoke = getBespokeNote(price);
+
+  return finaliseQuote(
+    legalFees,
+    disbursements,
+    undefined,
+    bespoke ? [bespoke] : undefined
+  );
 }
 
 function buildPurchaseQuote(input: {
+  price?: string;
   tenure?: string;
   mortgage?: string;
   ownershipType?: string;
@@ -393,8 +411,9 @@ function buildPurchaseQuote(input: {
   const disbursements: QuoteItem[] = [];
 
   const buyerCount = getBuyerCount(input.ownershipType);
+  const price = toNumber(input.price);
 
-  addItem(legalFees, "Purchase legal fee", config.legalFees.baseLegalFee);
+  addItem(legalFees, "Purchase legal fee", getPurchaseBaseFee(price));
 
   if (input.tenure === "leasehold") {
     addItem(
@@ -546,17 +565,20 @@ function buildPurchaseQuoteWithPrice(input: {
     helpToBuy: input.helpToBuy,
   });
 
+  const bespoke = getBespokeNote(toNumber(input.price));
+
   return finaliseQuote(
     base.legalFees,
     base.disbursements,
     undefined,
-    undefined,
+    bespoke ? [bespoke] : undefined,
     sdlt.sdltAmount,
     sdlt.sdltNote
   );
 }
 
 function buildRemortgageQuote(input: {
+  price?: string;
   tenure?: string;
   additionalBorrowing?: string;
   remortgageTransfer?: string;
@@ -567,8 +589,9 @@ function buildRemortgageQuote(input: {
   const disbursements: QuoteItem[] = [];
 
   const partyCount = getBuyerCount(input.ownershipType);
+  const propertyValue = toNumber(input.price);
 
-  addItem(legalFees, "Remortgage legal fee", config.legalFees.baseLegalFee);
+  addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
 
   if (input.tenure === "leasehold") {
     addItem(
@@ -626,10 +649,18 @@ function buildRemortgageQuote(input: {
     config.disbursements.ap1SubmissionFee
   );
 
-  return finaliseQuote(legalFees, disbursements);
+  const bespoke = getBespokeNote(propertyValue);
+
+  return finaliseQuote(
+    legalFees,
+    disbursements,
+    undefined,
+    bespoke ? [bespoke] : undefined
+  );
 }
 
 function buildTransferQuote(input: {
+  price?: string;
   tenure?: string;
   transferMortgage?: string;
   ownersChanging?: string;
@@ -639,8 +670,9 @@ function buildTransferQuote(input: {
   const disbursements: QuoteItem[] = [];
 
   const partyCount = getOwnersChangingCount(input.ownersChanging);
+  const propertyValue = toNumber(input.price);
 
-  addItem(legalFees, "Transfer legal fee", config.legalFees.baseLegalFee);
+  addItem(legalFees, "Transfer legal fee", getTransferBaseFee(propertyValue));
 
   if (input.tenure === "leasehold") {
     addItem(
@@ -695,11 +727,13 @@ function buildTransferQuote(input: {
     config.disbursements.ap1SubmissionFee
   );
 
+  const bespoke = getBespokeNote(propertyValue);
+
   return finaliseQuote(
     legalFees,
     disbursements,
     undefined,
-    undefined,
+    bespoke ? [bespoke] : undefined,
     undefined,
     "SDLT subject to review if chargeable consideration applies."
   );
@@ -751,6 +785,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "sale") {
     return buildSaleQuote({
+      price: form.price,
       tenure: form.tenure,
       saleMortgage: form.saleMortgage,
       managementCompany: form.managementCompany,
@@ -780,6 +815,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "remortgage") {
     return buildRemortgageQuote({
+      price: form.price,
       tenure: form.tenure,
       additionalBorrowing: form.additionalBorrowing,
       remortgageTransfer: form.remortgageTransfer,
@@ -789,6 +825,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "transfer") {
     return buildTransferQuote({
+      price: form.price,
       tenure: form.tenure,
       transferMortgage: form.transferMortgage,
       ownersChanging: form.ownersChanging,
@@ -797,6 +834,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "sale_purchase") {
     const sale = buildSaleQuote({
+      price: form.salePrice,
       tenure: form.saleTenure,
       saleMortgage: form.saleMortgageCombined,
       managementCompany: form.managementCompanyCombined,
@@ -821,14 +859,22 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       lifetimeIsa: form.purchaseLifetimeIsa,
     });
 
+    const combinedBespoke =
+      getBespokeNote(toNumber(form.salePrice)) ||
+      getBespokeNote(toNumber(form.purchasePrice));
+
+    const saleAndPurchaseNotes = [
+      "This combined estimate includes the sale and purchase legal work only.",
+      "This quote is based on the information currently provided and some fees may change if further information comes to light.",
+    ];
+
     return mergeQuotes(
       "SALE & PURCHASE",
       sale,
       purchase,
-      [
-        "This combined estimate includes the sale and purchase legal work only.",
-        "This quote is based on the information currently provided and some fees may change if further information comes to light.",
-      ],
+      combinedBespoke
+        ? [combinedBespoke, ...saleAndPurchaseNotes]
+        : saleAndPurchaseNotes,
       purchase.sdltAmount,
       purchase.sdltNote
     );
@@ -836,6 +882,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
 
   if (type === "remortgage_transfer") {
     const remortgage = buildRemortgageQuote({
+      price: form.remortgageTransferPrice,
       tenure: form.remortgageTransferTenure,
       additionalBorrowing: form.remortgageTransferAdditionalBorrowing,
       remortgageTransfer: "yes",
@@ -843,15 +890,29 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
     });
 
     const transfer = buildTransferQuote({
+      price: form.remortgageTransferPrice,
       tenure: form.remortgageTransferTenure,
       transferMortgage: form.remortgageTransferHasMortgage,
       ownersChanging: form.remortgageTransferOwnersChanging,
     });
 
-    return mergeQuotes("REMORTGAGE & TRANSFER OF EQUITY", remortgage, transfer, [
+    const remortgageTransferBespoke = getBespokeNote(
+      toNumber(form.remortgageTransferPrice)
+    );
+
+    const remortgageTransferNotes = [
       "This combined estimate is for a remortgage and transfer of equity on the same property.",
       "This quote is based on the information currently provided and some fees may change if further information comes to light.",
-    ]);
+    ];
+
+    return mergeQuotes(
+      "REMORTGAGE & TRANSFER OF EQUITY",
+      remortgage,
+      transfer,
+      remortgageTransferBespoke
+        ? [remortgageTransferBespoke, ...remortgageTransferNotes]
+        : remortgageTransferNotes
+    );
   }
 
   return finaliseQuote([], [], "QUOTE NOT AVAILABLE", [

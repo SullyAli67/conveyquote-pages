@@ -23,6 +23,57 @@ function formatMoney(value) {
   return `£${value.toFixed(2)}`;
 }
 
+// MUST STAY IN SYNC with the other pricing file — see src/priceConfig.ts.
+// Changing pricing requires editing both files.
+function getPurchaseBaseFee(price) {
+  const value = Number(price) || 0;
+  if (value <= 0) return 995;
+  if (value < 200000) return 795;
+  if (value < 400000) return 995;
+  if (value < 750000) return 1195;
+  return 1395;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see src/priceConfig.ts.
+// Changing pricing requires editing both files.
+function getSaleBaseFee(price) {
+  const value = Number(price) || 0;
+  if (value <= 0) return 895;
+  if (value < 200000) return 775;
+  if (value < 400000) return 895;
+  if (value < 750000) return 995;
+  return 1195;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see src/priceConfig.ts.
+// Changing pricing requires editing both files.
+function getRemortgageBaseFee(propertyValue) {
+  const value = Number(propertyValue) || 0;
+  if (value <= 0) return 695;
+  if (value < 200000) return 595;
+  if (value < 400000) return 695;
+  if (value < 750000) return 795;
+  return 895;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see src/priceConfig.ts.
+// Changing pricing requires editing both files.
+function getTransferBaseFee(propertyValue) {
+  const value = Number(propertyValue) || 0;
+  if (value <= 0) return 550;
+  if (value < 200000) return 495;
+  if (value < 400000) return 550;
+  if (value < 750000) return 625;
+  return 725;
+}
+
+const BESPOKE_PRICING_NOTE =
+  "Properties over £1.5m may be subject to bespoke pricing — please contact us to confirm.";
+
+function getBespokeNote(value) {
+  return (Number(value) || 0) >= 1500000 ? BESPOKE_PRICING_NOTE : null;
+}
+
 function calculateStandardSdlt(price) {
   let tax = 0;
 
@@ -159,10 +210,13 @@ function finaliseQuote(args) {
       ? Number((grandTotal + args.sdltAmount).toFixed(2))
       : undefined;
 
-  const disclaimerLines = args.disclaimerLines ?? [
+  const baseDisclaimerLines = args.disclaimerLines ?? [
     "This estimate is based on the information currently available.",
     "If further information comes to light or the matter is more complex than expected, costs may change.",
   ];
+  const disclaimerLines = args.bespokeNote
+    ? [args.bespokeNote, ...baseDisclaimerLines]
+    : baseDisclaimerLines;
 
   const feeBreakdown = buildFeeBreakdown({
     legalFees: args.legalFees,
@@ -199,7 +253,7 @@ function buildPurchaseQuote(input) {
   const disbursements = [];
   const price = toNumber(input.price);
 
-  addItem(legalFees, "Purchase legal fee", 1195);
+  addItem(legalFees, "Purchase legal fee", getPurchaseBaseFee(price));
 
   if (input.tenure === "leasehold") {
     addItem(legalFees, "Leasehold supplement", 350);
@@ -246,6 +300,7 @@ function buildPurchaseQuote(input) {
     disbursements,
     sdltAmount: sdlt.sdltAmount,
     sdltNote: sdlt.sdltNote,
+    bespokeNote: getBespokeNote(price),
     breakdownTitle: "PURCHASE QUOTE",
   });
 }
@@ -254,8 +309,9 @@ function buildSaleQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const sellerCount = getSellerCount(input.numberOfSellers);
+  const price = toNumber(input.price);
 
-  addItem(legalFees, "Sale legal fee", 995);
+  addItem(legalFees, "Sale legal fee", getSaleBaseFee(price));
 
   if (input.tenure === "leasehold") {
     addItem(legalFees, "Leasehold supplement", 300);
@@ -289,6 +345,7 @@ function buildSaleQuote(input) {
   return finaliseQuote({
     legalFees,
     disbursements,
+    bespokeNote: getBespokeNote(price),
     breakdownTitle: "SALE QUOTE",
   });
 }
@@ -296,8 +353,9 @@ function buildSaleQuote(input) {
 function buildRemortgageQuote(input) {
   const legalFees = [];
   const disbursements = [];
+  const propertyValue = toNumber(input.price);
 
-  addItem(legalFees, "Remortgage legal fee", 595);
+  addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
 
   if (input.tenure === "leasehold") {
     addItem(legalFees, "Leasehold supplement", 250);
@@ -319,6 +377,7 @@ function buildRemortgageQuote(input) {
   return finaliseQuote({
     legalFees,
     disbursements,
+    bespokeNote: getBespokeNote(propertyValue),
     breakdownTitle: "REMORTGAGE QUOTE",
   });
 }
@@ -326,8 +385,9 @@ function buildRemortgageQuote(input) {
 function buildTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
+  const propertyValue = toNumber(input.price);
 
-  addItem(legalFees, "Transfer of equity legal fee", 650);
+  addItem(legalFees, "Transfer of equity legal fee", getTransferBaseFee(propertyValue));
 
   if (input.tenure === "leasehold") {
     addItem(legalFees, "Leasehold supplement", 250);
@@ -354,6 +414,7 @@ function buildTransferQuote(input) {
   return finaliseQuote({
     legalFees,
     disbursements,
+    bespokeNote: getBespokeNote(propertyValue),
     breakdownTitle: "TRANSFER OF EQUITY QUOTE",
   });
 }
@@ -361,8 +422,9 @@ function buildTransferQuote(input) {
 function buildRemortgageTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
+  const propertyValue = toNumber(input.price);
 
-  addItem(legalFees, "Remortgage legal fee", 595);
+  addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
   addItem(legalFees, "Transfer of equity supplement", 350);
 
   if (input.remortgageTransferTenure === "leasehold") {
@@ -390,11 +452,12 @@ function buildRemortgageTransferQuote(input) {
   return finaliseQuote({
     legalFees,
     disbursements,
+    bespokeNote: getBespokeNote(propertyValue),
     breakdownTitle: "REMORTGAGE AND TRANSFER OF EQUITY QUOTE",
   });
 }
 
-function combineQuotes(title, first, second, sdltFromSecond = false) {
+function combineQuotes(title, first, second, sdltFromSecond = false, bespokeNote) {
   const legalFees = [...first.legalFees, ...second.legalFees];
   const disbursements = [...first.disbursements, ...second.disbursements];
   const sdltAmount = sdltFromSecond ? second.sdltAmount : undefined;
@@ -405,6 +468,7 @@ function combineQuotes(title, first, second, sdltFromSecond = false) {
     disbursements,
     sdltAmount,
     sdltNote,
+    bespokeNote,
     breakdownTitle: title,
     disclaimerLines: [
       "This is a combined estimate based on the information currently available.",
@@ -466,7 +530,17 @@ export function buildQuoteData(input) {
       lifetimeIsa: input.purchaseLifetimeIsa,
     });
 
-    return combineQuotes("SALE AND PURCHASE QUOTE", saleQuote, purchaseQuote, true);
+    const combinedBespokeNote =
+      getBespokeNote(toNumber(input.salePrice)) ||
+      getBespokeNote(toNumber(input.purchasePrice));
+
+    return combineQuotes(
+      "SALE AND PURCHASE QUOTE",
+      saleQuote,
+      purchaseQuote,
+      true,
+      combinedBespokeNote
+    );
   }
 
   return finaliseQuote({
