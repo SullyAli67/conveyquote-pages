@@ -293,180 +293,54 @@ export async function onRequestPost(context) {
 
     await insertEnquiryRow(env.DB, enquiryRow);
 
-    const adminUrl = `https://conveyquote.uk/admin/?ref=${reference}`;
+    const adminUrl = `https://conveyquote.uk/admin/?ref=${encodeURIComponent(reference)}`;
+
+    // Concise summary for the internal notification email. The full
+    // breakdown is one tap away via the "Review Quote in Admin" deep link.
+    let priceLabel;
+    let priceValue;
+    let lenderLabel;
+
+    if (type === "sale_purchase") {
+      priceLabel = "Property price";
+      priceValue = `Sale ${formatMoney(salePrice)} | Purchase ${formatMoney(purchasePrice)}`;
+      lenderLabel = purchaseMortgage === "mortgage" ? safe(purchaseLender) : "Cash";
+    } else if (type === "remortgage") {
+      priceLabel = "Property value";
+      priceValue = formatMoney(price);
+      lenderLabel = safe(newLender);
+    } else if (type === "remortgage_transfer") {
+      priceLabel = "Property value";
+      priceValue = formatMoney(remortgageTransferPrice);
+      lenderLabel = safe(remortgageTransferNewLender);
+    } else if (type === "transfer") {
+      priceLabel = "Property value";
+      priceValue = formatMoney(price);
+      lenderLabel = String(transferMortgage || "").toLowerCase() === "yes" ? "Mortgage on property" : "Cash";
+    } else if (type === "sale") {
+      priceLabel = "Property price";
+      priceValue = formatMoney(price);
+      lenderLabel = "—";
+    } else {
+      // purchase
+      priceLabel = "Property price";
+      priceValue = formatMoney(price);
+      lenderLabel = mortgage === "mortgage" ? safe(lender) : "Cash";
+    }
 
     const summaryRows = [
       row("Reference", reference),
-      row("Transaction type", prettyType),
       row("Client", safe(name)),
-      row("Email", safe(email)),
-      row("Phone", safe(phone)),
-      row("Consent to panel", consentToPanel ? "Yes" : "No"),
-      row(
-        "Estimated legal + disbursement total",
-        formatMoney(quote.grandTotal)
-      ),
-      ...(typeof quote.sdltAmount === "number"
-        ? [row("Estimated SDLT", formatMoney(quote.sdltAmount))]
-        : quote.sdltNote
-        ? [row("SDLT", quote.sdltNote)]
-        : []),
-      ...(typeof quote.totalIncludingSdlt === "number"
-        ? [row("Total including SDLT", formatMoney(quote.totalIncludingSdlt))]
-        : []),
+      row("Transaction type", prettyType),
+      row(priceLabel, priceValue),
+      row("Lender", lenderLabel),
+      row("System-generated total", formatMoney(quote.grandTotal)),
     ];
-
-    let matterSections = "";
-
-    if (type === "purchase") {
-      matterSections += sectionTable("Purchase Details", [
-        row("Tenure", prettifyValue(tenure)),
-        row("Price", formatMoney(price)),
-        row("Postcode", safe(postcode)),
-        row("Mortgage or cash", prettifyValue(mortgage)),
-        row(
-          "Lender",
-          mortgage === "mortgage" ? safe(lender) : "Not applicable"
-        ),
-        row("Buyer type", prettifyValue(ownershipType)),
-        row("First time buyer", prettifyValue(firstTimeBuyer)),
-        row("Additional property", prettifyValue(additionalProperty)),
-        row("UK resident for SDLT", prettifyValue(ukResidentForSdlt)),
-        row("Buy to let", prettifyValue(buyToLet)),
-        row("New build", prettifyValue(newBuild)),
-        row("Shared ownership", prettifyValue(sharedOwnership)),
-        row("Help to Buy / scheme", prettifyValue(helpToBuy)),
-        row("Buying via company", prettifyValue(isCompany)),
-        row("Gifted deposit", prettifyValue(giftedDeposit)),
-        row("Lifetime ISA", prettifyValue(lifetimeIsa)),
-        row("Right to Buy", prettifyValue(rightToBuy)),
-      ]);
-    }
-
-    if (type === "sale") {
-      matterSections += sectionTable("Sale Details", [
-        row("Tenure", prettifyValue(tenure)),
-        row("Price", formatMoney(price)),
-        row("Postcode", safe(postcode)),
-        row("Mortgage to redeem", prettifyValue(saleMortgage)),
-        row(
-          "Management company / service charge",
-          prettifyValue(managementCompany)
-        ),
-        row("Number of sellers", prettifyValue(numberOfSellers)),
-        row("Tenanted", prettifyValue(tenanted)),
-      ]);
-    }
-
-    if (type === "sale_purchase") {
-      matterSections += sectionTable("Sale Details", [
-        row("Sale tenure", prettifyValue(saleTenure)),
-        row("Sale price", formatMoney(salePrice)),
-        row("Sale postcode", safe(salePostcode)),
-        row("Mortgage to redeem", prettifyValue(saleMortgageCombined)),
-        row(
-          "Management company / service charge",
-          prettifyValue(managementCompanyCombined)
-        ),
-        row("Number of sellers", prettifyValue(numberOfSellersCombined)),
-        row("Tenanted", prettifyValue(tenantedCombined)),
-      ]);
-
-      matterSections += sectionTable("Purchase Details", [
-        row("Purchase tenure", prettifyValue(purchaseTenure)),
-        row("Purchase price", formatMoney(purchasePrice)),
-        row("Purchase postcode", safe(purchasePostcode)),
-        row("Mortgage or cash", prettifyValue(purchaseMortgage)),
-        row(
-          "Purchase lender",
-          purchaseMortgage === "mortgage"
-            ? safe(purchaseLender)
-            : "Not applicable"
-        ),
-        row("Buyer type", prettifyValue(purchaseOwnershipType)),
-        row("First time buyer", prettifyValue(purchaseFirstTimeBuyer)),
-        row("Additional property", prettifyValue(purchaseAdditionalProperty)),
-        row(
-          "UK resident for SDLT",
-          prettifyValue(purchaseUkResidentForSdlt)
-        ),
-        row("Buy to let", prettifyValue(purchaseBuyToLet)),
-        row("New build", prettifyValue(purchaseNewBuild)),
-        row("Shared ownership", prettifyValue(purchaseSharedOwnership)),
-        row("Help to Buy / scheme", prettifyValue(purchaseHelpToBuy)),
-        row("Buying via company", prettifyValue(purchaseIsCompany)),
-        row("Gifted deposit", prettifyValue(purchaseGiftedDeposit)),
-        row("Lifetime ISA", prettifyValue(purchaseLifetimeIsa)),
-      ]);
-    }
-
-    if (type === "remortgage") {
-      matterSections += sectionTable("Remortgage Details", [
-        row("Tenure", prettifyValue(tenure)),
-        row("Property value", formatMoney(price)),
-        row("Postcode", safe(postcode)),
-        row("Current lender", safe(currentLender)),
-        row("New lender", safe(newLender)),
-        row("Additional borrowing", prettifyValue(additionalBorrowing)),
-        row(
-          "Transfer of equity at same time",
-          prettifyValue(remortgageTransfer)
-        ),
-        row("Ownership type", prettifyValue(ownershipType)),
-      ]);
-    }
-
-    if (type === "transfer") {
-      matterSections += sectionTable("Transfer of Equity Details", [
-        row("Tenure", prettifyValue(tenure)),
-        row("Property value", formatMoney(price)),
-        row("Postcode", safe(postcode)),
-        row("Mortgage on property", prettifyValue(transferMortgage)),
-        row("Owners changing", prettifyValue(ownersChanging)),
-      ]);
-    }
-
-    if (type === "remortgage_transfer") {
-      matterSections += sectionTable("Property Details", [
-        row("Tenure", prettifyValue(remortgageTransferTenure)),
-        row("Property value", formatMoney(remortgageTransferPrice)),
-        row("Postcode", safe(remortgageTransferPostcode)),
-      ]);
-
-      matterSections += sectionTable("Remortgage Details", [
-        row("Current lender", safe(remortgageTransferCurrentLender)),
-        row("New lender", safe(remortgageTransferNewLender)),
-        row(
-          "Additional borrowing",
-          prettifyValue(remortgageTransferAdditionalBorrowing)
-        ),
-        row(
-          "Ownership type",
-          prettifyValue(remortgageTransferOwnershipType)
-        ),
-      ]);
-
-      matterSections += sectionTable("Transfer of Equity Details", [
-        row(
-          "Mortgage on property",
-          prettifyValue(remortgageTransferHasMortgage)
-        ),
-        row(
-          "Owners changing",
-          prettifyValue(remortgageTransferOwnersChanging)
-        ),
-      ]);
-    }
-
-    const feeBreakdownHtml = escapeHtml(quote.feeBreakdown || "").replace(
-      /\n/g,
-      "<br>"
-    );
 
     const internalHtml = `
       <html>
         <body style="font-family:Arial,Helvetica,sans-serif;background:#f4f6f8;padding:24px;color:#10233f;">
-          <div style="max-width:860px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dfe5ec;">
+          <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dfe5ec;">
             <div style="padding:24px 28px;background:#10233f;color:#ffffff;">
               <h2 style="margin:0 0 8px 0;">New Quote Enquiry</h2>
               <p style="margin:0;font-size:14px;">Reference: ${escapeHtml(
@@ -475,12 +349,9 @@ export async function onRequestPost(context) {
             </div>
 
             <div style="padding:24px 28px;">
-              <p style="margin-top:0;">
-                A new enquiry has been submitted and saved. Use the admin link
-                below to review and approve the client-facing quote.
-              </p>
+              ${sectionTable("Summary", summaryRows)}
 
-              <p style="margin:18px 0 24px 0;">
+              <p style="margin:18px 0 0 0;">
                 <a
                   href="${escapeHtml(adminUrl)}"
                   style="display:inline-block;padding:12px 18px;background:#10233f;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;"
@@ -488,15 +359,6 @@ export async function onRequestPost(context) {
                   Review Quote in Admin
                 </a>
               </p>
-
-              ${sectionTable("Enquiry Summary", summaryRows)}
-
-              ${matterSections}
-
-              <h3 style="margin:24px 0 10px 0;color:#0f2747;">System Quote Breakdown</h3>
-              <div style="padding:16px;border:1px solid #d9d9d9;background:#fbfbfb;white-space:normal;line-height:1.6;">
-                ${feeBreakdownHtml}
-              </div>
             </div>
           </div>
         </body>
