@@ -21,6 +21,7 @@ export async function onRequestPost(context) {
       quoteReference,
       feeBreakdown,
       nextSteps,
+      additionalNotes,
       quoteData,
     } = body;
 
@@ -115,6 +116,13 @@ export async function onRequestPost(context) {
       </div>
     `;
 
+    const formatMoneyWithSign = (value) => {
+      const number = Number(value || 0);
+      if (!Number.isFinite(number)) return "£0.00";
+      if (number < 0) return `−£${formatMoney(Math.abs(number))}`;
+      return `£${formatMoney(number)}`;
+    };
+
     const buildRowsHtml = (items = []) =>
       items
         .map((item, index) => {
@@ -141,7 +149,7 @@ export async function onRequestPost(context) {
                 text-align:right;
                 white-space:nowrap;
               ">
-                £${escapeHtml(formatMoney(item.amount || 0))}
+                ${escapeHtml(formatMoneyWithSign(item.amount || 0))}
               </td>
             </tr>
           `;
@@ -173,7 +181,28 @@ export async function onRequestPost(context) {
     const legalFeesSubtotal = sumItems(legalFees);
     const legalFeesTotal = legalFeesSubtotal + vatAmount;
     const disbursementTotal = sumItems(disbursements);
-    const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
+
+    // Manual adjustment applied flat against the grand total AFTER VAT.
+    // It does NOT enter the VAT base. Treated as no-op when amount is 0.
+    const rawAdjustment = quoteData?.manualAdjustment;
+    const adjustment =
+      rawAdjustment &&
+      Number.isFinite(Number(rawAdjustment.amount)) &&
+      Number(rawAdjustment.amount) !== 0
+        ? {
+            amount: Number(rawAdjustment.amount),
+            reason: String(rawAdjustment.reason || ""),
+          }
+        : null;
+    const adjustmentAmount = adjustment ? adjustment.amount : 0;
+    const adjustmentLabel = adjustment
+      ? adjustment.amount < 0
+        ? "Discount"
+        : "Adjustment"
+      : "";
+
+    const calculatedGrandTotal =
+      legalFeesTotal + disbursementTotal + adjustmentAmount;
 
     const finalQuoteAmountValue =
       quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
@@ -215,8 +244,18 @@ export async function onRequestPost(context) {
     const totalRows = [
       {
         label: "Legal fees and disbursements",
-        amount: calculatedGrandTotal,
+        amount: legalFeesTotal + disbursementTotal,
       },
+      ...(adjustment
+        ? [
+            {
+              label: adjustment.reason
+                ? `${adjustmentLabel} – ${adjustment.reason}`
+                : adjustmentLabel,
+              amount: adjustment.amount,
+            },
+          ]
+        : []),
       ...(sdltAmount !== null
         ? [
             {
@@ -257,6 +296,20 @@ export async function onRequestPost(context) {
       nextSteps ||
         "If you would like to proceed, please click Accept Quote below. Once we receive your instruction, we will open your file and allocate your matter to an SRA-regulated panel firm within one working day. If you have any questions before deciding, please reply to this email or call us on 07592 654 666."
     );
+
+    const trimmedAdditionalNotes = String(additionalNotes || "").trim();
+    const additionalNotesHtml = trimmedAdditionalNotes
+      ? `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Additional Notes</h2>
+              <div style="font-size:14px;line-height:1.7;color:#4b5563;">
+                ${formatMultilineHtml(trimmedAdditionalNotes)}
+              </div>
+            </td>
+          </tr>
+        `
+      : "";
 
     const logoUrl = "https://conveyquote.uk/logo.png";
 
@@ -495,6 +548,8 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
 
+                        ${additionalNotesHtml}
+
                         <tr>
                           <td style="padding:0 28px 0 28px;">
                             <h2 style="margin:0 0 12px 0;font-size:20px;color:#0f2747;">Next Steps</h2>
@@ -614,6 +669,8 @@ export async function onRequestPost(context) {
       approvedTotal: finalQuoteAmountValue,
       feeBreakdown: feeBreakdown || "",
       nextSteps: nextSteps || "",
+      additionalNotes: trimmedAdditionalNotes,
+      manualAdjustment: adjustment || undefined,
     };
 
     const nowIso = new Date().toISOString();

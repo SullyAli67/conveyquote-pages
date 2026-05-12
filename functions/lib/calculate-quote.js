@@ -9,6 +9,26 @@ function getSellerCount(value) {
   return 1;
 }
 
+// Buyers / borrowers count for per-person disbursements. Joint = 2,
+// otherwise individual / company / sole = 1.
+function getBuyerCount(ownershipType) {
+  return ownershipType === "joint" ? 2 : 1;
+}
+
+// Owners involved in a transfer of equity. "two" → 2, "more" → 3.
+function getOwnersChangingCount(value) {
+  if (value === "two") return 2;
+  if (value === "more") return 3;
+  return 1;
+}
+
+// Per-person disbursements scale linearly with the number of buyers /
+// borrowers / parties on the matter. Label includes the multiplier so the
+// admin can see at a glance what's been applied.
+function perPersonLabel(base, count) {
+  return count > 1 ? `${base} (${count} buyers)` : base;
+}
+
 function addItem(items, label, amount, note) {
   if (amount > 0) {
     items.push({ label, amount, note });
@@ -252,6 +272,7 @@ function buildPurchaseQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const price = toNumber(input.price);
+  const buyerCount = getBuyerCount(input.ownershipType);
 
   addItem(legalFees, "Purchase legal fee", getPurchaseBaseFee(price));
 
@@ -277,9 +298,9 @@ function buildPurchaseQuote(input) {
 
   addItem(disbursements, "Search pack", 350);
   addItem(disbursements, "Land Registry fee", 150);
-  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, perPersonLabel("ID checks", buyerCount), 14.4 * buyerCount);
   addItem(disbursements, "OS1 search", 8.8);
-  addItem(disbursements, "Bankruptcy search", 7.6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", buyerCount), 7.6 * buyerCount);
 
   if (price > 0) {
     addItem(disbursements, "SDLT submission", 6);
@@ -354,6 +375,7 @@ function buildRemortgageQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
+  const partyCount = getBuyerCount(input.ownershipType);
 
   addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
 
@@ -370,9 +392,9 @@ function buildRemortgageQuote(input) {
   }
 
   addItem(disbursements, "Office copy entries", 12);
-  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required on remortgage
-  addItem(disbursements, "Bankruptcy search", 7.6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
 
   return finaliseQuote({
     legalFees,
@@ -386,6 +408,7 @@ function buildTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
+  const partyCount = getOwnersChangingCount(input.ownersChanging);
 
   addItem(legalFees, "Transfer of equity legal fee", getTransferBaseFee(propertyValue));
 
@@ -406,9 +429,9 @@ function buildTransferQuote(input) {
   }
 
   addItem(disbursements, "Office copy entries", 12);
-  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required on transfer of equity
-  addItem(disbursements, "Bankruptcy search", 7.6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
   addItem(disbursements, "AP1 submission", 6);
 
   return finaliseQuote({
@@ -423,6 +446,13 @@ function buildRemortgageTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
+  // Use the larger of the two party counts so disbursements aren't
+  // under-charged when more owners are being added than the remortgage
+  // ownership type suggests.
+  const partyCount = Math.max(
+    getBuyerCount(input.remortgageTransferOwnershipType),
+    getOwnersChangingCount(input.remortgageTransferOwnersChanging)
+  );
 
   addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
   addItem(legalFees, "Transfer of equity supplement", 350);
@@ -444,9 +474,9 @@ function buildRemortgageTransferQuote(input) {
   }
 
   addItem(disbursements, "Office copy entries", 12);
-  addItem(disbursements, "ID checks", 14.4);
+  addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required
-  addItem(disbursements, "Bankruptcy search", 7.6);
+  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
   addItem(disbursements, "AP1 submission", 6);
 
   return finaliseQuote({
