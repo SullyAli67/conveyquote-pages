@@ -24,7 +24,8 @@ export async function onRequestGet(context) {
          active, panel_terms_accepted, panel_terms_accepted_at,
          handles_purchase, handles_sale, handles_remortgage,
          handles_transfer, handles_leasehold, handles_new_build,
-         handles_company_buyers, notes, created_at
+         handles_company_buyers, notes, created_at,
+         is_panel_firm, is_saas_firm
        FROM panel_firms
        WHERE id = ?
        LIMIT 1`
