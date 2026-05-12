@@ -1,3 +1,5 @@
+import { buildUnsubUrl } from "../lib/unsub.js";
+
 export async function onRequestPost(context) {
   const jsonResponse = (payload, status = 200) =>
     new Response(JSON.stringify(payload), {
@@ -257,6 +259,8 @@ export async function onRequestPost(context) {
     );
 
     const logoUrl = "https://conveyquote.uk/logo.png";
+
+    const unsubUrl = await buildUnsubUrl(quoteReference, env);
 
     const legalFeesHtml =
       legalFeeRows.length > 0
@@ -562,6 +566,14 @@ export async function onRequestPost(context) {
                           </td>
                         </tr>
 
+                        <!-- Reminder opt-out -->
+                        <tr>
+                          <td style="text-align:center;padding:16px 28px 0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                            Prefer not to receive reminders about this quote?
+                            <a href="${unsubUrl}" style="color:#6b7280;text-decoration:underline;">Skip reminder emails</a>
+                          </td>
+                        </tr>
+
                         <!-- Footer legal note -->
                         <tr>
                           <td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
@@ -642,6 +654,12 @@ export async function onRequestPost(context) {
         reply_to: "info@conveyquote.uk",
         subject: emailSubject,
         html: clientHtml,
+        // RFC 8058 one-click unsubscribe — Gmail / Yahoo / Outlook surface
+        // a native button. Same URL as the in-body link.
+        headers: {
+          "List-Unsubscribe": `<${unsubUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       }),
     });
 
@@ -653,15 +671,20 @@ export async function onRequestPost(context) {
 
     // Start (or reset) the 14-day follow-up clock now that the email is out.
     // Lives in followup_state because enquiries is at D1's column ceiling.
-    // INSERT OR REPLACE so re-sending the quote (e.g. after an admin amends
-    // and re-emails) restarts the sequence from stage 0. Wrapped so a DB
-    // failure here doesn't undo a successful customer send.
+    // ON CONFLICT preserves followups_disabled — so if the customer
+    // unsubscribed earlier (creating a stub row), a quote re-send doesn't
+    // silently reactivate reminders. Wrapped so a DB failure here doesn't
+    // undo a successful customer send.
     try {
       await env.DB.prepare(
-        `INSERT OR REPLACE INTO followup_state
+        `INSERT INTO followup_state
            (enquiry_reference, quote_sent_at, followup_stage,
             last_followup_at, followups_disabled)
-         VALUES (?, datetime('now'), 0, NULL, 0)`
+         VALUES (?, datetime('now'), 0, NULL, 0)
+         ON CONFLICT(enquiry_reference) DO UPDATE SET
+           quote_sent_at = excluded.quote_sent_at,
+           followup_stage = excluded.followup_stage,
+           last_followup_at = excluded.last_followup_at`
       )
         .bind(quoteReference)
         .run();
