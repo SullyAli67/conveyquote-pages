@@ -47,6 +47,7 @@ type LoadedQuote = {
   sdltNote?: string;
   totalIncludingSdlt?: number;
   feeBreakdown?: string;
+  additionalNotes?: string;
 };
 
 type SummaryRow = {
@@ -213,6 +214,7 @@ type ApprovedQuoteForm = {
   quoteReference: string;
   feeBreakdown: string;
   nextSteps: string;
+  additionalNotes: string;
   quoteData: ApprovedQuoteData;
 };
 
@@ -438,6 +440,7 @@ const initialApprovedQuoteState: ApprovedQuoteForm = {
   quoteReference: "",
   feeBreakdown: "",
   nextSteps: defaultApprovedNextSteps,
+  additionalNotes: "",
   quoteData: {
     legalFees: [],
     disbursements: [],
@@ -957,6 +960,16 @@ function App() {
   const [isLoadingEnquiry, setIsLoadingEnquiry] = useState(false);
 
   const [manualReference, setManualReference] = useState("");
+
+  // Manual adjustment to the Quote Total — surfaces as its own labelled
+  // line item in the customer email so the discount/surcharge is visible.
+  const [adjustmentEditorOpen, setAdjustmentEditorOpen] = useState(false);
+  const [adjustmentAmount, setAdjustmentAmount] = useState("");
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+
+  // Confirm-before-send preview for the customer email.
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  const [isSendingApprovedQuote, setIsSendingApprovedQuote] = useState(false);
   const [dashboardEnquiries, setDashboardEnquiries] = useState<
     DashboardEnquiry[]
   >([]);
@@ -2833,7 +2846,72 @@ function App() {
     // "ID checks (2)", "Bankruptcy search (1)". These are required.
     if (normalised.startsWith("id checks")) return false;
     if (normalised.startsWith("bankruptcy search")) return false;
+    // Telegraphic transfer fees always apply on the relevant transaction —
+    // amount is editable but the line item itself isn't optional.
+    if (normalised.startsWith("telegraphic transfer fee")) return false;
     return true;
+  };
+
+  const handleApplyAdjustment = () => {
+    const trimmedReason = adjustmentReason.trim();
+    const parsed = Number(String(adjustmentAmount).replace(/[, ]/g, ""));
+    if (!Number.isFinite(parsed) || parsed === 0) {
+      alert("Enter a non-zero adjustment amount (use - for a discount).");
+      return;
+    }
+    if (!trimmedReason) {
+      alert("Reason is required for a manual adjustment.");
+      return;
+    }
+    const label = parsed < 0 ? "Discount" : "Manual adjustment";
+    setApprovedQuote((prev) => {
+      // Drop any existing adjustment so the customer never sees stacked ones.
+      const cleaned = prev.quoteData.legalFees.filter(
+        (item) =>
+          !["discount", "manual adjustment"].includes(
+            String(item.label || "").trim().toLowerCase()
+          )
+      );
+      const newQuoteData = {
+        ...prev.quoteData,
+        legalFees: [
+          ...cleaned,
+          { label, amount: parsed, note: trimmedReason },
+        ],
+      };
+      const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
+      return {
+        ...prev,
+        quoteData: rebuilt.quoteData,
+        quoteAmount: rebuilt.quoteAmount,
+        feeBreakdown: rebuilt.feeBreakdown,
+      };
+    });
+    setAdjustmentEditorOpen(false);
+    setAdjustmentAmount("");
+    setAdjustmentReason("");
+  };
+
+  const handleClearAdjustment = () => {
+    setApprovedQuote((prev) => {
+      const cleaned = prev.quoteData.legalFees.filter(
+        (item) =>
+          !["discount", "manual adjustment"].includes(
+            String(item.label || "").trim().toLowerCase()
+          )
+      );
+      const newQuoteData = { ...prev.quoteData, legalFees: cleaned };
+      const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
+      return {
+        ...prev,
+        quoteData: rebuilt.quoteData,
+        quoteAmount: rebuilt.quoteAmount,
+        feeBreakdown: rebuilt.feeBreakdown,
+      };
+    });
+    setAdjustmentEditorOpen(false);
+    setAdjustmentAmount("");
+    setAdjustmentReason("");
   };
 
   const handleRemoveQuoteItem = (
@@ -2975,12 +3053,20 @@ function App() {
       quoteReference: enquiry.reference || "",
       feeBreakdown: rebuilt.feeBreakdown,
       nextSteps: defaultApprovedNextSteps,
+      additionalNotes: "",
       quoteData: rebuilt.quoteData,
     };
   };
 
   const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Form submit is the trigger to open the preview, not to send.
+    setEmailPreviewOpen(true);
+  };
+
+  const handleConfirmSendApprovedQuote = async () => {
+    if (isSendingApprovedQuote) return;
+    setIsSendingApprovedQuote(true);
 
     const payload = {
       name: approvedQuote.clientName,
@@ -2992,6 +3078,7 @@ function App() {
       quoteReference: approvedQuote.quoteReference,
       feeBreakdown: approvedQuote.feeBreakdown,
       nextSteps: approvedQuote.nextSteps,
+      additionalNotes: approvedQuote.additionalNotes,
       quoteData: approvedQuote.quoteData,
     };
 
@@ -3008,6 +3095,7 @@ function App() {
 
       if (result.success) {
         alert("Approved client quote sent successfully.");
+        setEmailPreviewOpen(false);
         setApprovedQuote(initialApprovedQuoteState);
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
@@ -3027,6 +3115,8 @@ function App() {
     } catch (error) {
       alert("Sorry, something went wrong while sending the approved quote.");
       console.error("Approved quote request error:", error);
+    } finally {
+      setIsSendingApprovedQuote(false);
     }
   };
 
@@ -3103,11 +3193,9 @@ function App() {
                 : "",
             quoteAmount: rebuilt.quoteAmount,
             quoteReference: enquiry.reference || "",
-            feeBreakdown:
-              quote.feeBreakdown ||
-              rebuilt.feeBreakdown ||
-              buildFeeBreakdown(quote),
+            feeBreakdown: rebuilt.feeBreakdown,
             nextSteps: defaultApprovedNextSteps,
+            additionalNotes: quote.additionalNotes || "",
             quoteData: rebuilt.quoteData,
           });
 
@@ -3754,6 +3842,99 @@ function App() {
 
     return [];
   }, [loadedEnquiry]);
+
+  // Pending admin review: enquiries that have been submitted but not yet
+  // had an approved quote sent. `quote_sent` (auto-set on send), `accepted`,
+  // `rejected`, `instructed`, `archived`, and `on_hold` are out of the queue.
+  // Anything else (primarily `new` and `reviewed`) is awaiting admin action.
+  const pendingQuotesSummary = useMemo(() => {
+    const TERMINAL = new Set([
+      "quote_sent",
+      "accepted",
+      "rejected",
+      "instructed",
+      "archived",
+      "on_hold",
+    ]);
+    const pending = dashboardEnquiries.filter((enq) => {
+      const s = String(enq.status || "new").toLowerCase();
+      return !TERMINAL.has(s);
+    });
+
+    const parseCreatedAt = (raw?: string): number => {
+      if (!raw) return 0;
+      // D1 stores datetime('now') as "YYYY-MM-DD HH:MM:SS" (UTC). Force UTC.
+      const iso = raw.includes("T") ? raw : raw.replace(" ", "T") + "Z";
+      const t = new Date(iso).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    let oldestAge = 0;
+    let oldestRef = "";
+    let oldestCreatedAt = 0;
+    pending.forEach((enq) => {
+      const t = parseCreatedAt(enq.created_at);
+      if (!t) return;
+      const age = Date.now() - t;
+      if (age > oldestAge) {
+        oldestAge = age;
+        oldestRef = enq.reference || "";
+        oldestCreatedAt = t;
+      }
+    });
+
+    const oldestHours = oldestAge / 3600000;
+    const oldestDays = oldestAge / 86400000;
+
+    let ageLabel = "";
+    if (pending.length > 0 && oldestAge > 0) {
+      if (oldestDays >= 1) {
+        const d = Math.floor(oldestDays);
+        ageLabel = `oldest waiting ${d} day${d === 1 ? "" : "s"}`;
+      } else if (oldestHours >= 1) {
+        const h = Math.floor(oldestHours);
+        ageLabel = `oldest waiting ${h} hour${h === 1 ? "" : "s"}`;
+      } else {
+        const m = Math.max(1, Math.floor(oldestAge / 60000));
+        ageLabel = `oldest waiting ${m} minute${m === 1 ? "" : "s"}`;
+      }
+    }
+
+    // Urgency thresholds, in UK time:
+    //   amber: oldest > 2h during office hours (9–18 local)
+    //   red:   oldest > 6h OR overnight backlog (submitted before 9am today)
+    // Intl handles BST / GMT for us.
+    const nowLocal = new Date();
+    const ukHour = parseInt(
+      new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        hour12: false,
+        timeZone: "Europe/London",
+      }).format(nowLocal),
+      10
+    );
+    const isOfficeHours = ukHour >= 9 && ukHour < 18;
+
+    let urgency: "none" | "amber" | "red" = "none";
+    if (pending.length > 0 && oldestAge > 0) {
+      const overnight = (() => {
+        if (!oldestCreatedAt) return false;
+        const today9am = new Date();
+        today9am.setHours(9, 0, 0, 0);
+        return oldestCreatedAt < today9am.getTime() &&
+          nowLocal.getTime() > today9am.getTime();
+      })();
+      if (oldestHours > 6 || overnight) urgency = "red";
+      else if (oldestHours > 2 && isOfficeHours) urgency = "amber";
+    }
+
+    return {
+      count: pending.length,
+      ageLabel,
+      oldestRef,
+      urgency,
+    };
+  }, [dashboardEnquiries]);
 
   const dashboardSummaryRows: SummaryRow[] = [
     {
@@ -6328,6 +6509,114 @@ function App() {
               </button>
             </div>
 
+            {/* ── Pending quotes badge ── */}
+            {(() => {
+              const { count, ageLabel, oldestRef, urgency } = pendingQuotesSummary;
+              const borderColor =
+                urgency === "red"
+                  ? "#dc2626"
+                  : urgency === "amber"
+                  ? "#f59e0b"
+                  : "var(--navy)";
+              const background =
+                urgency === "red"
+                  ? "#fef2f2"
+                  : urgency === "amber"
+                  ? "#fffbeb"
+                  : "#f8fafc";
+              if (count === 0) {
+                return (
+                  <div
+                    style={{
+                      border: "1px solid #d9e2ec",
+                      background: "#f8fafc",
+                      borderRadius: "18px",
+                      padding: "16px 20px",
+                      marginBottom: "20px",
+                      color: "var(--muted)",
+                      fontSize: "14px",
+                    }}
+                  >
+                    All caught up — no quotes pending review.
+                  </div>
+                );
+              }
+              return (
+                <div
+                  style={{
+                    border: `2px solid ${borderColor}`,
+                    background,
+                    borderRadius: "18px",
+                    padding: "18px 22px",
+                    marginBottom: "20px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "14px",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: 700,
+                        color: "var(--navy)",
+                      }}
+                    >
+                      {count} quote{count === 1 ? "" : "s"} pending review
+                    </div>
+                    {ageLabel && (
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          color: urgency === "red" ? "#991b1b" : "var(--muted)",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {ageLabel}
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: "6px",
+                    }}
+                  >
+                    {oldestRef && (
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={() =>
+                          void handleOpenDashboardEnquiry(oldestRef)
+                        }
+                      >
+                        Review oldest quote
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleAdminTabChange("enquiries")}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        color: "var(--teal)",
+                        fontSize: "13px",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                    >
+                      View all pending
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div
               style={{
                 display: "flex",
@@ -6626,14 +6915,14 @@ function App() {
                                 fontSize: "12px",
                                 fontWeight: 600,
                                 background:
-                                  enquiry.status === "accepted" ? "#d1fae5" :
-                                  enquiry.status === "rejected" ? "#fee2e2" :
-                                  enquiry.status === "quoted"   ? "#dbeafe" :
+                                  enquiry.status === "accepted"   ? "#d1fae5" :
+                                  enquiry.status === "rejected"   ? "#fee2e2" :
+                                  enquiry.status === "quote_sent" ? "#dbeafe" :
                                   "#f3f4f6",
                                 color:
-                                  enquiry.status === "accepted" ? "#065f46" :
-                                  enquiry.status === "rejected" ? "#991b1b" :
-                                  enquiry.status === "quoted"   ? "#1e40af" :
+                                  enquiry.status === "accepted"   ? "#065f46" :
+                                  enquiry.status === "rejected"   ? "#991b1b" :
+                                  enquiry.status === "quote_sent" ? "#1e40af" :
                                   "#374151",
                               }}
                             >
@@ -8200,16 +8489,24 @@ function App() {
                         <strong>{prettifyValue(loadedEnquiry.status || "new")}</strong>
                       </p>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
-                        {["new", "reviewed", "quoted", "accepted", "rejected", "instructed", "on_hold"].map((s) => (
+                        {[
+                          { value: "new", label: "New" },
+                          { value: "reviewed", label: "Reviewed" },
+                          { value: "quote_sent", label: "Quote Sent" },
+                          { value: "accepted", label: "Accepted" },
+                          { value: "rejected", label: "Rejected" },
+                          { value: "instructed", label: "Instructed" },
+                          { value: "on_hold", label: "On Hold" },
+                        ].map((s) => (
                           <button
-                            key={s}
+                            key={s.value}
                             type="button"
-                            className={loadedEnquiry.status === s ? "primary-button" : "muted-button"}
+                            className={loadedEnquiry.status === s.value ? "primary-button" : "muted-button"}
                             style={{ fontSize: "13px", padding: "6px 12px" }}
-                            disabled={isUpdatingStatus || loadedEnquiry.status === s}
-                            onClick={() => void handleUpdateEnquiryStatus(s)}
+                            disabled={isUpdatingStatus || loadedEnquiry.status === s.value}
+                            onClick={() => void handleUpdateEnquiryStatus(s.value)}
                           >
-                            {prettifyValue(s)}
+                            {s.label}
                           </button>
                         ))}
                       </div>
@@ -8498,18 +8795,6 @@ function App() {
                       />
                     </div>
 
-                    <div className="field">
-                      <label htmlFor="quoteAmount">Approved quote amount</label>
-                      <input
-                        id="quoteAmount"
-                        type="text"
-                        name="quoteAmount"
-                        value={approvedQuote.quoteAmount}
-                        readOnly
-                        required
-                      />
-                    </div>
-
                     <div className="field field--full">
                       <label htmlFor="quoteReference">Quote reference</label>
                       <input
@@ -8637,13 +8922,157 @@ function App() {
                     </div>
 
                     <div className="field field--full">
-                      <label htmlFor="feeBreakdown">Fee notes / breakdown</label>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <label style={{ marginBottom: 0 }}>
+                          Manual adjustment
+                        </label>
+                        {!adjustmentEditorOpen && (
+                          <button
+                            type="button"
+                            onClick={() => setAdjustmentEditorOpen(true)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: 0,
+                              color: "var(--teal)",
+                              fontSize: "13px",
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Apply manual adjustment
+                          </button>
+                        )}
+                      </div>
+                      {adjustmentEditorOpen && (
+                        <div
+                          style={{
+                            border: "1px solid #d9e2ec",
+                            borderRadius: "12px",
+                            padding: "14px 16px",
+                            marginTop: "8px",
+                            background: "#f8fafc",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "10px",
+                              flexWrap: "wrap",
+                              alignItems: "flex-end",
+                            }}
+                          >
+                            <div style={{ flex: "0 0 160px" }}>
+                              <label htmlFor="adjustmentAmount">
+                                Amount (£, use - for discount)
+                              </label>
+                              <input
+                                id="adjustmentAmount"
+                                type="number"
+                                step="0.01"
+                                value={adjustmentAmount}
+                                onChange={(e) =>
+                                  setAdjustmentAmount(e.target.value)
+                                }
+                              />
+                            </div>
+                            <div style={{ flex: "1 1 220px" }}>
+                              <label htmlFor="adjustmentReason">
+                                Reason (shown to client)
+                              </label>
+                              <input
+                                id="adjustmentReason"
+                                type="text"
+                                value={adjustmentReason}
+                                onChange={(e) =>
+                                  setAdjustmentReason(e.target.value)
+                                }
+                                placeholder="e.g. Goodwill discount"
+                              />
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              marginTop: "10px",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="primary-button"
+                              onClick={handleApplyAdjustment}
+                            >
+                              Apply
+                            </button>
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={handleClearAdjustment}
+                            >
+                              Clear adjustment
+                            </button>
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={() => setAdjustmentEditorOpen(false)}
+                            >
+                              Close
+                            </button>
+                          </div>
+                          <p
+                            className="form-note"
+                            style={{ marginTop: "8px" }}
+                          >
+                            The adjustment is added as its own labelled line item
+                            in the customer email.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="field field--full">
+                      <label htmlFor="feeBreakdown">
+                        Fee breakdown preview (auto-generated)
+                      </label>
                       <textarea
                         id="feeBreakdown"
                         name="feeBreakdown"
                         value={approvedQuote.feeBreakdown}
-                        onChange={handleApprovedQuoteChange}
                         rows={10}
+                        readOnly
+                        style={{
+                          background: "#f8fafc",
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, monospace",
+                          fontSize: "13px",
+                        }}
+                      />
+                      <p className="form-note" style={{ marginTop: "6px" }}>
+                        Generated from the line items above. To change wording
+                        the client sees, edit the line items.
+                      </p>
+                    </div>
+
+                    <div className="field field--full">
+                      <label htmlFor="additionalNotes">
+                        Additional notes to client (optional)
+                      </label>
+                      <textarea
+                        id="additionalNotes"
+                        name="additionalNotes"
+                        value={approvedQuote.additionalNotes}
+                        onChange={handleApprovedQuoteChange}
+                        rows={4}
+                        placeholder="Appended to the email below the breakdown. Leave blank if not needed."
                       />
                     </div>
 
@@ -8690,6 +9119,185 @@ function App() {
                       Send Approved Quote
                     </button>
                   </div>
+
+                  {emailPreviewOpen && (() => {
+                    const totalForSubject =
+                      String(approvedQuote.quoteAmount || "").split(".")[0] ||
+                      "0";
+                    const firstName = (approvedQuote.clientName || "")
+                      .trim()
+                      .split(" ")[0];
+                    const previewSubject = firstName
+                      ? `${firstName}, your conveyancing quote is ready (£${totalForSubject})`
+                      : `Your conveyancing quote is ready (£${totalForSubject})`;
+                    return (
+                      <div
+                        style={{
+                          border: "2px solid var(--navy)",
+                          background: "#f8fafc",
+                          borderRadius: "18px",
+                          padding: "20px 22px",
+                          marginTop: "16px",
+                        }}
+                      >
+                        <h3
+                          style={{
+                            margin: "0 0 10px 0",
+                            color: "var(--navy)",
+                          }}
+                        >
+                          Preview before sending
+                        </h3>
+                        <p
+                          className="form-note"
+                          style={{ marginTop: 0 }}
+                        >
+                          <strong>To:</strong>{" "}
+                          {approvedQuote.clientEmail || "—"}
+                        </p>
+                        <p className="form-note" style={{ marginTop: "4px" }}>
+                          <strong>Subject:</strong> {previewSubject}
+                        </p>
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            background: "#ffffff",
+                            border: "1px solid #d9e2ec",
+                            borderRadius: "12px",
+                            padding: "14px 16px",
+                            maxHeight: "360px",
+                            overflowY: "auto",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              lineHeight: 1.6,
+                              color: "var(--navy)",
+                            }}
+                          >
+                            Dear{" "}
+                            {approvedQuote.clientName?.trim().split(" ")[0] ||
+                              "there"}
+                            ,
+                            <br />
+                            <br />
+                            Please find your conveyancing quote below.
+                          </div>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              marginTop: "14px",
+                              fontSize: "13px",
+                            }}
+                          >
+                            <tbody>
+                              <tr>
+                                <td colSpan={2} style={{ fontWeight: 700, padding: "8px 0", color: "var(--navy)" }}>
+                                  Legal Fees
+                                </td>
+                              </tr>
+                              {approvedQuote.quoteData.legalFees.map(
+                                (item, i) => (
+                                  <tr key={`p-lf-${i}`}>
+                                    <td style={{ padding: "4px 0", borderBottom: "1px solid #eef2f7" }}>
+                                      {item.label}
+                                      {item.note ? (
+                                        <span style={{ color: "var(--muted)", fontSize: "12px" }}>
+                                          {" "}— {item.note}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td style={{ padding: "4px 0", borderBottom: "1px solid #eef2f7", textAlign: "right" }}>
+                                      £{Number(item.amount).toFixed(2)}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                              <tr>
+                                <td style={{ padding: "4px 0" }}>VAT (20%)</td>
+                                <td style={{ padding: "4px 0", textAlign: "right" }}>
+                                  £{Number(approvedQuote.quoteData.vat || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} style={{ fontWeight: 700, padding: "12px 0 8px", color: "var(--navy)" }}>
+                                  Disbursements
+                                </td>
+                              </tr>
+                              {approvedQuote.quoteData.disbursements.map(
+                                (item, i) => (
+                                  <tr key={`p-db-${i}`}>
+                                    <td style={{ padding: "4px 0", borderBottom: "1px solid #eef2f7" }}>
+                                      {item.label}
+                                    </td>
+                                    <td style={{ padding: "4px 0", borderBottom: "1px solid #eef2f7", textAlign: "right" }}>
+                                      {item.note
+                                        ? item.note
+                                        : `£${Number(item.amount).toFixed(2)}`}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                              <tr>
+                                <td style={{ padding: "10px 0 4px", fontWeight: 700, color: "var(--navy)" }}>
+                                  Total Estimated Cost
+                                </td>
+                                <td style={{ padding: "10px 0 4px", fontWeight: 700, textAlign: "right", color: "var(--navy)" }}>
+                                  £{approvedQuote.quoteAmount}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          {approvedQuote.additionalNotes.trim() && (
+                            <div style={{ marginTop: "14px", fontSize: "13px", lineHeight: 1.6 }}>
+                              <strong style={{ color: "var(--navy)" }}>
+                                Additional Notes
+                              </strong>
+                              <div style={{ whiteSpace: "pre-wrap", marginTop: "4px" }}>
+                                {approvedQuote.additionalNotes}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ marginTop: "14px", fontSize: "13px", lineHeight: 1.6 }}>
+                            <strong style={{ color: "var(--navy)" }}>
+                              Next Steps
+                            </strong>
+                            <div style={{ whiteSpace: "pre-wrap", marginTop: "4px" }}>
+                              {approvedQuote.nextSteps}
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "10px",
+                            marginTop: "14px",
+                            justifyContent: "flex-end",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="muted-button"
+                            onClick={() => setEmailPreviewOpen(false)}
+                            disabled={isSendingApprovedQuote}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => void handleConfirmSendApprovedQuote()}
+                            disabled={isSendingApprovedQuote}
+                          >
+                            {isSendingApprovedQuote ? "Sending…" : "Send"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </form>
               </>
             )}
