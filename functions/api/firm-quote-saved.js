@@ -1,4 +1,4 @@
-// functions/api/firm-quote/[id].js
+// functions/api/firm-quote-saved.js
 //
 // Phase 2 of Type 2 firm-quoting product.
 //
@@ -7,8 +7,10 @@
 // returns 404 (not 403) to avoid leaking the existence of other firms'
 // quote ids.
 //
-// Cloudflare Pages dynamic route: /api/firm-quote/<id>
-// `context.params.id` comes from the [id] segment.
+// Route: GET /api/firm-quote-saved?id=<id>
+// Flat-file pattern matching the rest of functions/api/. The Type 1
+// rail uses /api/firm-quote-detail for its own purposes — this endpoint
+// is for Type 2 firm-issued quotes only.
 //
 // Firm-role session, is_saas_firm = 1 required.
 
@@ -17,11 +19,11 @@ import {
   validateSession,
   jsonResponse,
   unauthorised,
-} from "../../lib/auth.js";
+} from "../lib/auth.js";
 
 export async function onRequestGet(context) {
   try {
-    const { request, env, params } = context;
+    const { request, env } = context;
 
     const token = getTokenFromRequest(request);
     const session = await validateSession(env.DB, token, "firm");
@@ -48,11 +50,19 @@ export async function onRequestGet(context) {
       );
     }
 
-    const rawId = Number(params?.id);
-    if (!Number.isFinite(rawId) || rawId <= 0) {
-      return jsonResponse({ success: false, error: "Quote not found." }, 404);
+    const url = new URL(request.url);
+    const rawIdParam = url.searchParams.get("id");
+    const rawId = Number(rawIdParam);
+    if (
+      rawIdParam === null ||
+      rawIdParam === "" ||
+      !Number.isFinite(rawId) ||
+      !Number.isInteger(rawId) ||
+      rawId <= 0
+    ) {
+      return jsonResponse({ success: false, error: "Invalid quote id" }, 400);
     }
-    const quoteId = Math.floor(rawId);
+    const quoteId = rawId;
 
     const row = await env.DB.prepare(
       `SELECT id, firm_id, client_name, client_email, transaction_type,
@@ -97,7 +107,7 @@ export async function onRequestGet(context) {
       },
     });
   } catch (error) {
-    console.error("firm-quote/[id] error:", error);
+    console.error("firm-quote-saved error:", error);
     return jsonResponse(
       {
         success: false,

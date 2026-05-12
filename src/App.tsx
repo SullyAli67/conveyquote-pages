@@ -2715,7 +2715,7 @@ function App() {
     setFirmHistoryDetailError("");
     setIsLoadingFirmHistoryDetail(true);
     try {
-      const res = await fetch(`/api/firm-quote/${quoteId}`, {
+      const res = await fetch(`/api/firm-quote-saved?id=${quoteId}`, {
         headers: { Authorization: `Bearer ${firmToken}` },
       });
       const data = await res.json();
