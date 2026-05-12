@@ -7,6 +7,7 @@ import {
   getTransferBaseFee,
   getBespokeNote,
 } from "./priceConfig";
+import { getOfficeCopyEntriesAmount } from "../functions/lib/disbursement-constants.js";
 
 type TransactionType =
   | "sale"
@@ -303,14 +304,17 @@ function finaliseQuote(
   };
 }
 
-function buildSaleQuote(input: {
-  price?: string;
-  tenure?: string;
-  saleMortgage?: string;
-  managementCompany?: string;
-  tenanted?: string;
-  numberOfSellers?: string;
-}): BuiltQuoteData {
+function buildSaleQuote(
+  input: {
+    price?: string;
+    tenure?: string;
+    saleMortgage?: string;
+    managementCompany?: string;
+    tenanted?: string;
+    numberOfSellers?: string;
+  },
+  options: { omitOfficeCopies?: boolean } = {}
+): BuiltQuoteData {
   const config = PRICE_CONFIG.sale;
   const legalFees: QuoteItem[] = [];
   const disbursements: QuoteItem[] = [];
@@ -369,11 +373,16 @@ function buildSaleQuote(input: {
     );
   }
 
-  addItem(
-    disbursements,
-    "Office copy entries",
-    config.disbursements.officeCopyEntries
-  );
+  // Office copy entries: tenure-based estimate. Skipped when this helper
+  // is the sale leg of a combined sale_purchase (purchase leg's tenure
+  // drives the single line in combined matters).
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure || "")
+    );
+  }
   addItem(
     disbursements,
     `ID checks (${sellerCount})`,
@@ -390,22 +399,25 @@ function buildSaleQuote(input: {
   );
 }
 
-function buildPurchaseQuote(input: {
-  price?: string;
-  tenure?: string;
-  mortgage?: string;
-  ownershipType?: string;
-  firstTimeBuyer?: string;
-  additionalProperty?: string;
-  ukResidentForSdlt?: string;
-  giftedDeposit?: string;
-  newBuild?: string;
-  sharedOwnership?: string;
-  helpToBuy?: string;
-  isCompany?: string;
-  buyToLet?: string;
-  lifetimeIsa?: string;
-}): BuiltQuoteData {
+function buildPurchaseQuote(
+  input: {
+    price?: string;
+    tenure?: string;
+    mortgage?: string;
+    ownershipType?: string;
+    firstTimeBuyer?: string;
+    additionalProperty?: string;
+    ukResidentForSdlt?: string;
+    giftedDeposit?: string;
+    newBuild?: string;
+    sharedOwnership?: string;
+    helpToBuy?: string;
+    isCompany?: string;
+    buyToLet?: string;
+    lifetimeIsa?: string;
+  },
+  options: { omitOfficeCopies?: boolean } = {}
+): BuiltQuoteData {
   const config = PRICE_CONFIG.purchase;
   const legalFees: QuoteItem[] = [];
   const disbursements: QuoteItem[] = [];
@@ -518,6 +530,19 @@ function buildPurchaseQuote(input: {
     config.disbursements.ap1SubmissionFee
   );
 
+  // Office copy entries: tenure-based estimate. The buyer's solicitor
+  // needs title copies for the new charge / registration. Single line
+  // per matter. Skipped when this helper is called as a leg of a
+  // combined sale_purchase — the dispatcher decides which leg's tenure
+  // governs the single combined line.
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure || "")
+    );
+  }
+
   const sdlt = getSdltResult({
     price: undefined,
     firstTimeBuyer: input.firstTimeBuyer,
@@ -538,23 +563,26 @@ function buildPurchaseQuote(input: {
   );
 }
 
-function buildPurchaseQuoteWithPrice(input: {
-  price?: string;
-  tenure?: string;
-  mortgage?: string;
-  ownershipType?: string;
-  firstTimeBuyer?: string;
-  additionalProperty?: string;
-  ukResidentForSdlt?: string;
-  giftedDeposit?: string;
-  newBuild?: string;
-  sharedOwnership?: string;
-  helpToBuy?: string;
-  isCompany?: string;
-  buyToLet?: string;
-  lifetimeIsa?: string;
-}): BuiltQuoteData {
-  const base = buildPurchaseQuote(input);
+function buildPurchaseQuoteWithPrice(
+  input: {
+    price?: string;
+    tenure?: string;
+    mortgage?: string;
+    ownershipType?: string;
+    firstTimeBuyer?: string;
+    additionalProperty?: string;
+    ukResidentForSdlt?: string;
+    giftedDeposit?: string;
+    newBuild?: string;
+    sharedOwnership?: string;
+    helpToBuy?: string;
+    isCompany?: string;
+    buyToLet?: string;
+    lifetimeIsa?: string;
+  },
+  options: { omitOfficeCopies?: boolean } = {}
+): BuiltQuoteData {
+  const base = buildPurchaseQuote(input, options);
   const sdlt = getSdltResult({
     price: input.price,
     firstTimeBuyer: input.firstTimeBuyer,
@@ -577,13 +605,16 @@ function buildPurchaseQuoteWithPrice(input: {
   );
 }
 
-function buildRemortgageQuote(input: {
-  price?: string;
-  tenure?: string;
-  additionalBorrowing?: string;
-  remortgageTransfer?: string;
-  ownershipType?: string;
-}): BuiltQuoteData {
+function buildRemortgageQuote(
+  input: {
+    price?: string;
+    tenure?: string;
+    additionalBorrowing?: string;
+    remortgageTransfer?: string;
+    ownershipType?: string;
+  },
+  options: { omitOfficeCopies?: boolean } = {}
+): BuiltQuoteData {
   const config = PRICE_CONFIG.remortgage;
   const legalFees: QuoteItem[] = [];
   const disbursements: QuoteItem[] = [];
@@ -623,11 +654,16 @@ function buildRemortgageQuote(input: {
     config.legalFees.telegraphicTransferFee
   );
 
-  addItem(
-    disbursements,
-    "Office copy entries",
-    config.disbursements.officeCopyEntries
-  );
+  // Office copy entries: tenure-based estimate. In a combined
+  // remortgage_transfer matter, the transfer leg omits its own office
+  // copies so the line appears exactly once (remortgage leg owns it).
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure || "")
+    );
+  }
   addItem(
     disbursements,
     `ID checks (${partyCount})`,
@@ -659,12 +695,15 @@ function buildRemortgageQuote(input: {
   );
 }
 
-function buildTransferQuote(input: {
-  price?: string;
-  tenure?: string;
-  transferMortgage?: string;
-  ownersChanging?: string;
-}): BuiltQuoteData {
+function buildTransferQuote(
+  input: {
+    price?: string;
+    tenure?: string;
+    transferMortgage?: string;
+    ownersChanging?: string;
+  },
+  options: { omitOfficeCopies?: boolean } = {}
+): BuiltQuoteData {
   const config = PRICE_CONFIG.transfer;
   const legalFees: QuoteItem[] = [];
   const disbursements: QuoteItem[] = [];
@@ -703,11 +742,16 @@ function buildTransferQuote(input: {
     );
   }
 
-  addItem(
-    disbursements,
-    "Office copy entries",
-    config.disbursements.officeCopyEntries
-  );
+  // Office copy entries: tenure-based estimate. In a combined
+  // remortgage_transfer matter, this leg's office copies are skipped so
+  // the line appears exactly once (remortgage leg owns it).
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure || "")
+    );
+  }
   addItem(
     disbursements,
     `ID checks (${partyCount})`,
@@ -833,14 +877,20 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   }
 
   if (type === "sale_purchase") {
-    const sale = buildSaleQuote({
-      price: form.salePrice,
-      tenure: form.saleTenure,
-      saleMortgage: form.saleMortgageCombined,
-      managementCompany: form.managementCompanyCombined,
-      tenanted: form.tenantedCombined,
-      numberOfSellers: form.numberOfSellersCombined,
-    });
+    // Office copies on a combined matter relate to the single property —
+    // the purchase leg's tenure governs (acting on the new title), so
+    // the sale leg omits its own office-copies line.
+    const sale = buildSaleQuote(
+      {
+        price: form.salePrice,
+        tenure: form.saleTenure,
+        saleMortgage: form.saleMortgageCombined,
+        managementCompany: form.managementCompanyCombined,
+        tenanted: form.tenantedCombined,
+        numberOfSellers: form.numberOfSellersCombined,
+      },
+      { omitOfficeCopies: true }
+    );
 
     const purchase = buildPurchaseQuoteWithPrice({
       price: form.purchasePrice,
@@ -881,6 +931,9 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   }
 
   if (type === "remortgage_transfer") {
+    // Both legs reference the same property and tenure. The remortgage
+    // leg owns the office-copies line; the transfer leg omits it so the
+    // single combined matter shows the line exactly once.
     const remortgage = buildRemortgageQuote({
       price: form.remortgageTransferPrice,
       tenure: form.remortgageTransferTenure,
@@ -889,12 +942,15 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       ownershipType: form.remortgageTransferOwnershipType,
     });
 
-    const transfer = buildTransferQuote({
-      price: form.remortgageTransferPrice,
-      tenure: form.remortgageTransferTenure,
-      transferMortgage: form.remortgageTransferHasMortgage,
-      ownersChanging: form.remortgageTransferOwnersChanging,
-    });
+    const transfer = buildTransferQuote(
+      {
+        price: form.remortgageTransferPrice,
+        tenure: form.remortgageTransferTenure,
+        transferMortgage: form.remortgageTransferHasMortgage,
+        ownersChanging: form.remortgageTransferOwnersChanging,
+      },
+      { omitOfficeCopies: true }
+    );
 
     const remortgageTransferBespoke = getBespokeNote(
       toNumber(form.remortgageTransferPrice)

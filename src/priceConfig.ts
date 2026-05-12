@@ -61,7 +61,9 @@ export const PRICE_CONFIG = {
       telegraphicTransferFee: 45,
     },
     disbursements: {
-      officeCopyEntries: 12,
+      // Office copy entries: see getOfficeCopyEntriesAmount in
+      // functions/lib/disbursement-constants.js — tenure-based, single
+      // source of truth shared with the server-side JS engine.
       idChecks: 14.4,
     },
   },
@@ -98,7 +100,8 @@ export const PRICE_CONFIG = {
       telegraphicTransferFee: 45,
     },
     disbursements: {
-      officeCopyEntries: 12,
+      // Office copy entries: see getOfficeCopyEntriesAmount in
+      // functions/lib/disbursement-constants.js.
       idChecks: 14.4,
       os1PrioritySearch: 8.8,
       bankruptcySearchPerName: 7.6,
@@ -114,7 +117,8 @@ export const PRICE_CONFIG = {
       telegraphicTransferFee: 45,
     },
     disbursements: {
-      officeCopyEntries: 12,
+      // Office copy entries: see getOfficeCopyEntriesAmount in
+      // functions/lib/disbursement-constants.js.
       idChecks: 14.4,
       bankruptcySearchPerName: 7.6,
       ap1SubmissionFee: 6,
