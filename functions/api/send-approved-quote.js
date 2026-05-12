@@ -253,7 +253,7 @@ export async function onRequestPost(context) {
 
     const formattedNextSteps = formatMultilineHtml(
       nextSteps ||
-        "If you would like to proceed, please click Accept Quote below. Once we receive your instruction, we will move your matter to the next stage, which may include referral to one of our selected panel solicitor firms. If you do not wish to proceed, you may click Decline Quote. If you have any questions before deciding, please contact us at info@conveyquote.uk."
+        "If you would like to proceed, please click Accept Quote below. Once we receive your instruction, we will open your file and allocate your matter to an SRA-regulated panel firm within one working day. If you have any questions before deciding, please reply to this email or call us on 07592 654 666."
     );
 
     const logoUrl = "https://conveyquote.uk/logo.png";
@@ -470,8 +470,8 @@ export async function onRequestPost(context) {
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#eef6ff;border:1px solid #c9dcef;">
                               <tr>
                                 <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
-                                  <strong>How your matter may proceed</strong><br />
-                                  If you would like to move forward, we will take your matter to the next stage of onboarding. This may include referral to one of our selected panel solicitor firms, depending on the type of transaction, lender requirements and panel availability.
+                                  <strong>What happens when you accept</strong><br />
+                                  Once you accept, we open your file and allocate your matter to an SRA-regulated firm from our panel within one working day. You will receive a welcome pack and client care letter from the firm directly, along with any ID and document requests needed to get your transaction underway.
                                 </td>
                               </tr>
                             </table>
@@ -506,8 +506,7 @@ export async function onRequestPost(context) {
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fef3f2;border:1px solid #fca5a5;border-radius:8px;">
                               <tr>
                                 <td style="padding:12px 16px;font-size:13px;line-height:1.6;color:#991b1b;text-align:center;">
-                                  ⏳ <strong>This quote is valid until ${expiryFormatted}.</strong>
-                                  After this date the quote may be subject to review.
+                                  🔒 <strong>Lock in this price by accepting before ${expiryFormatted}.</strong>
                                 </td>
                               </tr>
                             </table>
@@ -529,12 +528,6 @@ export async function onRequestPost(context) {
                             >
                               📞 Book a Free Call
                             </a>
-                            <a
-                              href="${rejectUrl}"
-                              style="display:inline-block;background:#ffffff;color:#0f2747;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:bold;border:1px solid #0f2747;margin:0 8px 12px 8px;"
-                            >
-                              Decline Quote
-                            </a>
                           </td>
                         </tr>
 
@@ -546,6 +539,8 @@ export async function onRequestPost(context) {
                               <a href="${bookACallUrl}" style="color:#0f2747;text-decoration:none;font-weight:600;">Book a free 10-minute call</a>
                               &nbsp;·&nbsp;
                               <a href="mailto:info@conveyquote.uk" style="color:#0f2747;text-decoration:none;font-weight:600;">Email us</a>
+                              &nbsp;·&nbsp;
+                              <a href="${rejectUrl}" style="color:#6b7280;text-decoration:none;font-weight:600;">Not the right fit? Let us know</a>
                             </div>
                           </td>
                         </tr>
@@ -627,6 +622,12 @@ export async function onRequestPost(context) {
       )
       .run();
 
+    const firstName = safe(name).trim().split(" ")[0];
+    const subjectAmount = displayQuoteAmount.split(".")[0];
+    const emailSubject = firstName
+      ? `${firstName}, your conveyancing quote is ready (£${subjectAmount})`
+      : `Your conveyancing quote is ready (£${subjectAmount})`;
+
     // ── Step 2: Send the email using the same data that was just saved ────────
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -639,7 +640,7 @@ export async function onRequestPost(context) {
         to: [email],
         cc: ["info@conveyquote.uk"],
         reply_to: "info@conveyquote.uk",
-        subject: `Your Conveyancing Quote - ${safe(quoteReference)}`,
+        subject: emailSubject,
         html: clientHtml,
       }),
     });
