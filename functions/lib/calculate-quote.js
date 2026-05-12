@@ -128,7 +128,7 @@ function calculateFirstTimeBuyerSdlt(price) {
   return Math.max(0, tax);
 }
 
-function calculateSdlt({
+export function calculateSdlt({
   price,
   firstTimeBuyer,
   additionalProperty,
