@@ -50,6 +50,7 @@ export async function onRequestGet(context) {
         e.negotiator_name,
         e.target_completion_date,
         e.fall_through_reason,
+        e.decline_reason,
         e.created_at,
         e.referred_at,
         r.referrer_name

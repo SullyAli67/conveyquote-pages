@@ -10,6 +10,17 @@ import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
 
+// MUST STAY IN SYNC with the REASONS mapping in
+// functions/api/reject-quote.js. Same keys, same labels.
+const DECLINE_REASONS: Record<string, string> = {
+  price: "Price was higher than expected",
+  different_firm: "I went with a different firm",
+  not_ready: "I'm not ready yet / my purchase fell through",
+  timeline: "The timeline didn't work",
+  other: "Something else",
+  skip: "(no reason given)",
+};
+
 type QuoteDataItem = {
   label: string;
   amount: number;
@@ -213,6 +224,9 @@ type LoadedEnquiry = {
   reference?: string;
   status?: string;
   consent_to_panel?: string;
+
+  decline_reason?: string;
+  decline_reason_text?: string;
 
   tenure?: string;
   price?: string | number;
@@ -7980,6 +7994,32 @@ function App() {
                   <SummaryCard title="Quote Summary">
                     <SummaryGrid rows={quoteSummaryRows} />
                   </SummaryCard>
+
+                  {loadedEnquiry.status === "rejected" &&
+                    loadedEnquiry.decline_reason && (
+                      <SummaryCard title="Decline reason">
+                        <p className="form-note" style={{ marginTop: 0 }}>
+                          <strong>
+                            {DECLINE_REASONS[loadedEnquiry.decline_reason] ||
+                              loadedEnquiry.decline_reason}
+                          </strong>
+                        </p>
+                        {loadedEnquiry.decline_reason_text && (
+                          <p
+                            className="form-note"
+                            style={{
+                              marginTop: "8px",
+                              whiteSpace: "pre-wrap",
+                              color: "var(--navy)",
+                            }}
+                          >
+                            Customer added: &ldquo;
+                            {loadedEnquiry.decline_reason_text}
+                            &rdquo;
+                          </p>
+                        )}
+                      </SummaryCard>
+                    )}
 
                   <div className="admin-two-col">
                     <SummaryCard title="Update Status">
