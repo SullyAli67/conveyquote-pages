@@ -3,6 +3,8 @@
 // Invoked by a Cloudflare Cron Trigger (POST) or manually by an admin (GET,
 // usually with ?dryRun=true). Both methods require a bearer token matching
 // env.FOLLOWUP_SECRET; unauthenticated requests get an intentionally vague 401.
+
+import { buildUnsubUrl } from "../lib/unsub.js";
 //
 // Decision logic for an eligible enquiry (quote_sent_at NOT NULL, status not
 // terminal, follow-ups not paused, less than 15 days old):
@@ -155,6 +157,7 @@ export function renderFollowupEmail(stage, data) {
 
   const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(reference)}`;
   const rejectUrl = `https://conveyquote.uk/api/reject-quote?ref=${encodeURIComponent(reference)}`;
+  const unsubUrl = safe(data.unsubUrl);
 
   const subject = config.subject(firstName);
 
@@ -267,6 +270,15 @@ export function renderFollowupEmail(stage, data) {
                     </td>
                   </tr>
 
+                  ${unsubUrl ? `
+                  <tr>
+                    <td style="text-align:center;padding:16px 28px 0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                      No longer interested in reminders for this quote?
+                      <a href="${unsubUrl}" style="color:#6b7280;text-decoration:underline;">Unsubscribe from these reminders</a>
+                    </td>
+                  </tr>
+                  ` : ""}
+
                   <tr>
                     <td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;text-align:center;">
                       ConveyQuote is a trading name of Essentially Law Limited (Company No. 14625839).<br />
@@ -337,22 +349,30 @@ async function fetchEligible(env) {
   return result.results || [];
 }
 
-async function sendResendEmail(env, to, subject, html) {
-  const response = await fetch("https://api.resend.com/emails", {
+async function sendResendEmail(env, to, subject, html, unsubUrl) {
+  const payload = {
+    from: FROM_ADDRESS,
+    to: [to],
+    reply_to: REPLY_TO,
+    subject,
+    html,
+  };
+  // RFC 8058 one-click unsubscribe — surfaces a native button in Gmail /
+  // Yahoo / Outlook. Resend forwards custom headers via the `headers` field.
+  if (unsubUrl) {
+    payload.headers = {
+      "List-Unsubscribe": `<${unsubUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    };
+  }
+  return fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
     },
-    body: JSON.stringify({
-      from: FROM_ADDRESS,
-      to: [to],
-      reply_to: REPLY_TO,
-      subject,
-      html,
-    }),
+    body: JSON.stringify(payload),
   });
-  return response;
 }
 
 async function runFollowups(context, { dryRun }) {
@@ -395,11 +415,14 @@ async function runFollowups(context, { dryRun }) {
     const sentMs = Date.parse(row.quote_sent_at);
     const expiryDate = new Date(sentMs + 14 * 24 * 60 * 60 * 1000);
 
+    const unsubUrl = await buildUnsubUrl(row.reference, env);
+
     const { subject, html } = renderFollowupEmail(nextStage, {
       clientName: row.client_name,
       reference: row.reference,
       amount: row.approved_quote_amount,
       expiryDate,
+      unsubUrl,
     });
 
     const stageKey = STAGE_LABELS[nextStage];
@@ -437,7 +460,8 @@ async function runFollowups(context, { dryRun }) {
         env,
         row.client_email,
         subject,
-        html
+        html,
+        unsubUrl
       );
 
       if (!resendResponse.ok) {

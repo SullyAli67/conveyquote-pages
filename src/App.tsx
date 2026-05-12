@@ -8119,7 +8119,9 @@ function App() {
                                 disabled={isTogglingFollowups}
                                 onClick={() => void handleToggleFollowups()}
                               >
-                                {isPaused ? "Resume follow-ups" : "Pause follow-ups"}
+                                {isPaused
+                                  ? "Resume follow-ups (admin)"
+                                  : "Pause follow-ups (admin)"}
                               </button>
                               {followupToggleMessage && (
                                 <p
