@@ -651,13 +651,23 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, data }, 500);
     }
 
-    // Mark quote_sent_at now that email confirmed delivered
-    const sentIso = new Date().toISOString();
-    await env.DB.prepare(
-      `UPDATE enquiries SET quote_sent_at = ? WHERE reference = ?`
-    )
-      .bind(sentIso, quoteReference)
-      .run();
+    // Mark quote_sent_at + reset followup_stage now that email confirmed delivered.
+    // This is the start of the 14-day follow-up clock (see run-followups.js).
+    // Wrapped so a DB failure here doesn't undo a successful customer send.
+    try {
+      const sentIso = new Date().toISOString();
+      await env.DB.prepare(
+        `UPDATE enquiries
+           SET quote_sent_at = ?,
+               followup_stage = 0,
+               last_followup_at = NULL
+         WHERE reference = ?`
+      )
+        .bind(sentIso, quoteReference)
+        .run();
+    } catch (followupErr) {
+      console.error("quote_sent_at update failed", followupErr);
+    }
 
     return jsonResponse({ success: true, data });
   } catch (error) {

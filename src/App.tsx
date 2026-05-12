@@ -228,6 +228,11 @@ type LoadedEnquiry = {
   decline_reason?: string;
   decline_reason_text?: string;
 
+  quote_sent_at?: string | null;
+  followup_stage?: number | null;
+  last_followup_at?: string | null;
+  followups_disabled?: number | null;
+
   tenure?: string;
   price?: string | number;
   postcode?: string;
@@ -992,6 +997,9 @@ function App() {
   const [statusUpdateMessage, setStatusUpdateMessage] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  const [isTogglingFollowups, setIsTogglingFollowups] = useState(false);
+  const [followupToggleMessage, setFollowupToggleMessage] = useState("");
+
   const [vatCalculatorNet, setVatCalculatorNet] = useState("");
   const [sdltPrice, setSdltPrice] = useState("");
   const [sdltFirstTimeBuyer, setSdltFirstTimeBuyer] = useState("no");
@@ -1569,6 +1577,44 @@ function App() {
       setStatusUpdateMessage("Something went wrong updating the status.");
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleToggleFollowups = async () => {
+    if (!loadedEnquiry?.reference) return;
+    const currentlyDisabled = Number(loadedEnquiry.followups_disabled || 0) === 1;
+    const nextDisabled = currentlyDisabled ? 0 : 1;
+
+    setIsTogglingFollowups(true);
+    setFollowupToggleMessage("");
+
+    try {
+      const response = await adminFetch("/api/admin-toggle-followups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: loadedEnquiry.reference,
+          disabled: nextDisabled,
+        }),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        setFollowupToggleMessage(result.error || "Failed to update follow-ups.");
+        return;
+      }
+
+      setLoadedEnquiry((prev) =>
+        prev ? { ...prev, followups_disabled: nextDisabled } : prev
+      );
+      setFollowupToggleMessage(
+        nextDisabled === 1 ? "Follow-ups paused." : "Follow-ups resumed."
+      );
+    } catch (error) {
+      console.error("Toggle follow-ups error:", error);
+      setFollowupToggleMessage("Something went wrong updating follow-ups.");
+    } finally {
+      setIsTogglingFollowups(false);
     }
   };
 
@@ -8018,6 +8064,74 @@ function App() {
                             &rdquo;
                           </p>
                         )}
+                      </SummaryCard>
+                    )}
+
+                  {loadedEnquiry.quote_sent_at &&
+                    !["accepted", "rejected", "archived", "instructed"].includes(
+                      loadedEnquiry.status || ""
+                    ) && (
+                      <SummaryCard title="Follow-ups">
+                        {(() => {
+                          const stage = Number(loadedEnquiry.followup_stage || 0);
+                          const stageLabel =
+                            stage === 0
+                              ? "No follow-ups sent yet"
+                              : stage === 1
+                              ? "Day 3 sent"
+                              : stage === 2
+                              ? "Day 8 sent"
+                              : "Day 13 sent (final)";
+                          const lastSent = loadedEnquiry.last_followup_at
+                            ? new Date(loadedEnquiry.last_followup_at).toLocaleString(
+                                "en-GB",
+                                {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )
+                            : "—";
+                          const isPaused =
+                            Number(loadedEnquiry.followups_disabled || 0) === 1;
+                          return (
+                            <>
+                              <p className="form-note" style={{ marginTop: 0 }}>
+                                <strong>Stage:</strong> {stageLabel}
+                              </p>
+                              <p className="form-note" style={{ marginTop: "4px" }}>
+                                <strong>Last sent:</strong> {lastSent}
+                              </p>
+                              <p className="form-note" style={{ marginTop: "4px" }}>
+                                <strong>Follow-ups enabled:</strong>{" "}
+                                {isPaused ? "No" : "Yes"}
+                              </p>
+                              <button
+                                type="button"
+                                className={isPaused ? "primary-button" : "muted-button"}
+                                style={{
+                                  marginTop: "10px",
+                                  fontSize: "13px",
+                                  padding: "6px 12px",
+                                }}
+                                disabled={isTogglingFollowups}
+                                onClick={() => void handleToggleFollowups()}
+                              >
+                                {isPaused ? "Resume follow-ups" : "Pause follow-ups"}
+                              </button>
+                              {followupToggleMessage && (
+                                <p
+                                  className="form-note"
+                                  style={{ marginTop: "8px" }}
+                                >
+                                  {followupToggleMessage}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </SummaryCard>
                     )}
 
