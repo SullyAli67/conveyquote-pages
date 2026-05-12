@@ -533,10 +533,111 @@ export async function onRequestPost(context) {
       emailSent = true;
     }
 
-    // NOTE: The automatic client-facing quote email has been intentionally removed.
-    // Clients should only receive a quote after an admin has reviewed and approved it
-    // via the admin panel using send-approved-quote.js. This prevents clients from
-    // receiving both an unreviewed auto-generated quote AND a later manual override.
+    // Best-effort customer confirmation email. Fires AFTER the internal
+    // notification has succeeded. Failures here are logged but never bubble
+    // up — the internal notification is the critical path.
+    if (env.RESEND_API_KEY && email) {
+      const customerName = (name && String(name).trim()) || "there";
+      const customerHtml = `
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#0f172a;background:#f4f6f8;padding:24px;">
+          <div style="max-width:700px;margin:0 auto;background:#ffffff;border:1px solid #d9e2ec;border-radius:10px;overflow:hidden;">
+            <div style="text-align:center;padding:20px 24px 0 24px;">
+              <img src="https://conveyquote.uk/logo.png" alt="ConveyQuote" style="width:110px;height:auto;" />
+            </div>
+            <div style="background:#0f2747;color:#ffffff;padding:18px 24px;margin-top:16px;">
+              <h2 style="margin:0;font-size:20px;">Enquiry received</h2>
+            </div>
+
+            <div style="padding:24px;">
+              <p style="margin-top:0;">Dear ${escapeHtml(customerName)},</p>
+
+              <p>
+                Thank you for your conveyancing quote enquiry. We have received
+                your details and a member of our team will review them shortly.
+              </p>
+
+              <table style="border-collapse:collapse;width:100%;margin:16px 0 24px 0;">
+                <tr>
+                  <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;width:35%;">Reference</td>
+                  <td style="padding:10px 12px;border:1px solid #d9d9d9;">${escapeHtml(
+                    reference
+                  )}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 12px;border:1px solid #d9d9d9;background:#f7f7f7;font-weight:bold;">Transaction type</td>
+                  <td style="padding:10px 12px;border:1px solid #d9d9d9;">${escapeHtml(
+                    prettyType
+                  )}</td>
+                </tr>
+              </table>
+
+              <h3 style="margin:0 0 10px 0;color:#0f2747;font-size:16px;">What happens next</h3>
+
+              <p>
+                Your itemised quote will be prepared by our team and emailed to
+                you within one working day. Our office hours are Monday to
+                Friday, 9am to 5pm, so if you submitted this outside those
+                hours your quote will arrive on the next working day.
+              </p>
+
+              <p>
+                If you have any questions in the meantime, you can reply to
+                this email or call us on
+                <a href="tel:+447592654666" style="color:#0f2747;font-weight:600;text-decoration:none;">07592 654 666</a>.
+                We are happy to discuss your proposed transaction and answer
+                anything before your quote arrives.
+              </p>
+
+              <p style="margin-bottom:0;">
+                Kind regards,<br>
+                The ConveyQuote team
+              </p>
+            </div>
+
+            <div style="padding:16px 24px;border-top:1px solid #d9e2ec;background:#f7f9fb;color:#6b7280;font-size:12px;line-height:1.6;">
+              ConveyQuote is a trading name of Essentially Law Limited
+              (Company No. 14625839). We are not a firm of solicitors. Legal
+              services are provided by independent SRA-regulated firms.
+            </div>
+          </div>
+        </div>
+      `;
+
+      try {
+        const customerResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: [email],
+            reply_to: "info@conveyquote.uk",
+            subject: `We've received your conveyancing enquiry — ${reference}`,
+            html: customerHtml,
+          }),
+        });
+
+        if (!customerResponse.ok) {
+          const errText = await customerResponse.text();
+          console.error(
+            `Customer confirmation email failed for ${reference}: ${customerResponse.status} ${errText}`
+          );
+        }
+      } catch (customerEmailError) {
+        console.error(
+          `Customer confirmation email threw for ${reference}:`,
+          customerEmailError
+        );
+      }
+    }
+
+    // NOTE: The automatic client-facing QUOTE email has been intentionally
+    // removed. Clients should only receive a priced quote after an admin has
+    // reviewed and approved it via the admin panel using
+    // send-approved-quote.js. The confirmation email above only acknowledges
+    // receipt — it does not contain pricing.
 
     return jsonResponse({
       success: true,

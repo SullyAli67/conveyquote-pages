@@ -736,6 +736,9 @@ function AdminPasswordForm({ adminFetch }: { adminFetch: (url: string, opts?: Re
 
 function App() {
   const [form, setForm] = useState<QuoteForm>(initialFormState);
+  const [submissionResult, setSubmissionResult] = useState<
+    { reference: string; email: string } | null
+  >(null);
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
     initialApprovedQuoteState
   );
@@ -2499,7 +2502,10 @@ function App() {
       const result = await response.json();
 
       if (result.success) {
-        alert("Thank you. Your enquiry has been submitted for review.");
+        setSubmissionResult({
+          reference: result.reference,
+          email: form.email,
+        });
         setForm(initialFormState);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -3805,6 +3811,79 @@ function App() {
       <main className="container" style={{ paddingTop: "28px" }}>
         {(isHomePage || isSdltPage || isFeesPage || isAboutPage) && (
           <>
+            {submissionResult ? (
+              <section className="card card--form success-card">
+                <div className="status-badge">
+                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 00-1.414 0L8 12.586 4.707 9.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8a1 1 0 000-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Enquiry received
+                </div>
+
+                <div className="section-heading">
+                  <div>
+                    <h2>Thank you — we have your enquiry</h2>
+                    <p>
+                      We have sent a confirmation to{" "}
+                      <strong>{submissionResult.email}</strong>. Your itemised
+                      quote will follow within one working day.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="success-reference">
+                  <span className="success-reference__label">Your reference</span>
+                  <span className="success-reference__value">
+                    {submissionResult.reference}
+                  </span>
+                </div>
+
+                <div className="success-next-steps">
+                  <h3>What happens next</h3>
+                  <ol>
+                    <li>
+                      Our team reviews your enquiry and prepares a clear,
+                      itemised quote.
+                    </li>
+                    <li>
+                      You receive your quote by email within one working day
+                      (Mon–Fri, 9am–5pm).
+                    </li>
+                    <li>
+                      You can accept, ask questions, or decline — no obligation
+                      at any stage.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="success-contact">
+                  <h3>Need to reach us before then?</h3>
+                  <ul>
+                    <li>
+                      Phone:{" "}
+                      <a href="tel:+447592654666">07592 654 666</a>
+                    </li>
+                    <li>
+                      Email:{" "}
+                      <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>
+                    </li>
+                    <li>Office hours: Monday to Friday, 9am to 5pm</li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  className="muted-button success-card__reset"
+                  onClick={() => setSubmissionResult(null)}
+                >
+                  Submit another enquiry
+                </button>
+              </section>
+            ) : (
             <section className="card card--form">
               <div className="section-heading">
                 <div>
@@ -4964,6 +5043,11 @@ function App() {
                         solicitor firm in order to progress your enquiry.
                       </p>
 
+                      <p className="form-reassurance">
+                        We'll review your enquiry and email your itemised quote
+                        within one working day (Monday to Friday, 9am to 5pm).
+                      </p>
+
                       <button type="submit" className="primary-button">
                         Request My Quote
                       </button>
@@ -4972,6 +5056,7 @@ function App() {
                 )}
               </form>
             </section>
+            )}
 
             <section className="info-grid">
               <article className="card">
