@@ -966,6 +966,7 @@ function App() {
     []
   );
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState("");
 
   const [adminTab, setAdminTabRaw] = useState<AdminTab>(
     () => (localStorage.getItem("cq_admin_tab") as AdminTab) || "dashboard"
@@ -1083,6 +1084,7 @@ function App() {
 
   const loadDashboardData = async () => {
     setIsLoadingDashboard(true);
+    setDashboardError("");
 
     try {
       const [
@@ -1101,6 +1103,22 @@ function App() {
       const firmsResult = await firmsResponse.json();
       const panelLendersResult = await panelLendersResponse.json();
       const membershipsResult = await membershipsResponse.json();
+
+      const anyFailed =
+        !enquiriesResult.success ||
+        !firmsResult.success ||
+        !panelLendersResult.success ||
+        !membershipsResult.success;
+
+      if (anyFailed) {
+        console.error("Admin dashboard refresh returned failure:", {
+          enquiries: enquiriesResult.error,
+          firms: firmsResult.error,
+          lenders: panelLendersResult.error,
+          memberships: membershipsResult.error,
+        });
+        setDashboardError("Couldn't refresh — please try again.");
+      }
 
       setDashboardEnquiries(
         enquiriesResult.success && Array.isArray(enquiriesResult.enquiries)
@@ -1132,6 +1150,7 @@ function App() {
       setDashboardFirms([]);
       setPanelLenders([]);
       setPanelMemberships([]);
+      setDashboardError("Couldn't refresh — please try again.");
     } finally {
       setIsLoadingDashboard(false);
     }
@@ -1662,7 +1681,12 @@ function App() {
         // Persist so a page refresh does not log the admin out
         localStorage.setItem("cq_admin_token", result.token);
         setManualReference(refFromUrl);
-        if (!refFromUrl) {
+        if (refFromUrl) {
+          // Deep-link from email — jump straight to the Quote Review screen
+          // with the enquiry loaded.
+          setAdminTab("quote");
+          await loadEnquiryByReference(refFromUrl);
+        } else {
           setAdminTab("dashboard");
           await loadDashboardData();
         }
@@ -2785,6 +2809,33 @@ function App() {
     });
   };
 
+  const isFeeRemovable = (label: string): boolean => {
+    const normalised = (label || "").trim().toLowerCase();
+    // Core legal fees — always part of the matter, not optional.
+    const coreLegalFees = [
+      "purchase legal fee",
+      "sale legal fee",
+      "remortgage legal fee",
+      "transfer legal fee",
+    ];
+    // Core disbursements — required for every matter of that type.
+    const coreDisbursements = [
+      "search pack",
+      "land registry fee",
+      "os1 search",
+      "sdlt submission",
+      "ap1 submission",
+      "office copy entries",
+    ];
+    if (coreLegalFees.includes(normalised)) return false;
+    if (coreDisbursements.includes(normalised)) return false;
+    // ID checks and Bankruptcy search include a count suffix, e.g.
+    // "ID checks (2)", "Bankruptcy search (1)". These are required.
+    if (normalised.startsWith("id checks")) return false;
+    if (normalised.startsWith("bankruptcy search")) return false;
+    return true;
+  };
+
   const handleRemoveQuoteItem = (
     section: "legalFees" | "disbursements",
     index: number
@@ -3117,11 +3168,12 @@ function App() {
 
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
-        setLoadedEnquiryMessage(result.error || "Could not load enquiry.");
+        console.error("Load enquiry returned failure:", result.error);
+        setLoadedEnquiryMessage("Couldn't load enquiry — please try again.");
       }
     } catch (error) {
       console.error("Load enquiry error:", error);
-      setLoadedEnquiryMessage("Error loading enquiry.");
+      setLoadedEnquiryMessage("Couldn't load enquiry — please try again.");
     } finally {
       setIsLoadingEnquiry(false);
     }
@@ -6258,12 +6310,20 @@ function App() {
             <div className="section-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h2>Admin Dashboard</h2>
-                <p>
-                  Review enquiries, manage panel firms, edit lender panel
-                  memberships and send approved quotes.
-                </p>
               </div>
-              <button type="button" className="muted-button" onClick={() => void handleAdminLogout()}>
+              <button
+                type="button"
+                onClick={() => void handleAdminLogout()}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--teal)",
+                  fontSize: "14px",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                }}
+              >
                 Log out
               </button>
             </div>
@@ -6281,7 +6341,7 @@ function App() {
                 className={adminTab === "dashboard" ? "primary-button" : "muted-button"}
                 onClick={() => void handleAdminTabChange("dashboard")}
               >
-                Dashboard
+                Overview
               </button>
 
               <button
@@ -6382,16 +6442,6 @@ function App() {
                     </button>
                   </div>
 
-                  <div className="field" style={{ alignSelf: "end" }}>
-                    <button
-                      type="button"
-                      className="muted-button"
-                      onClick={() => void loadDashboardData()}
-                    >
-                      Refresh Admin Data
-                    </button>
-                  </div>
-
                   {loadedEnquiry && (
                     <div className="field" style={{ alignSelf: "end" }}>
                       <button
@@ -6415,6 +6465,12 @@ function App() {
 
                 {!loadedEnquiry && isLoadingDashboard && (
                   <p className="form-note">Loading dashboard...</p>
+                )}
+
+                {dashboardError && (
+                  <p className="form-note" style={{ color: "#dc2626" }}>
+                    {dashboardError}
+                  </p>
                 )}
               </SummaryCard>
             </div>
@@ -8495,15 +8551,17 @@ function App() {
                                     )
                                   }
                                 />
-                                <button
-                                  type="button"
-                                  className="muted-button"
-                                  onClick={() =>
-                                    handleRemoveQuoteItem("legalFees", index)
-                                  }
-                                >
-                                  Remove
-                                </button>
+                                {isFeeRemovable(item.label) && (
+                                  <button
+                                    type="button"
+                                    className="muted-button"
+                                    onClick={() =>
+                                      handleRemoveQuoteItem("legalFees", index)
+                                    }
+                                  >
+                                    Remove
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -8550,15 +8608,17 @@ function App() {
                                     }
                                   />
                                 )}
-                                <button
-                                  type="button"
-                                  className="muted-button"
-                                  onClick={() =>
-                                    handleRemoveQuoteItem("disbursements", index)
-                                  }
-                                >
-                                  Remove
-                                </button>
+                                {isFeeRemovable(item.label) && (
+                                  <button
+                                    type="button"
+                                    className="muted-button"
+                                    onClick={() =>
+                                      handleRemoveQuoteItem("disbursements", index)
+                                    }
+                                  >
+                                    Remove
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -8600,15 +8660,17 @@ function App() {
                   </div>
 
                   <div className="form-footer action-row">
-                    <p className="form-note">
-                      Internal tool only. This sends the approved client-facing
-                      quote email using the updated approved figures shown above.
-                    </p>
-
                     <button
                       type="button"
                       className="muted-button"
                       onClick={() => {
+                        if (
+                          !window.confirm(
+                            "Clear all edits to this quote? This can't be undone."
+                          )
+                        ) {
+                          return;
+                        }
                         setApprovedQuote(initialApprovedQuoteState);
                         setLoadedEnquiryMessage("");
                         setLoadedEnquiry(null);
