@@ -1,3 +1,5 @@
+import { getOfficeCopyEntriesAmount } from "./disbursement-constants.js";
+
 function toNumber(value) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
@@ -268,7 +270,7 @@ function finaliseQuote(args) {
   };
 }
 
-function buildPurchaseQuote(input) {
+function buildPurchaseQuote(input, options = {}) {
   const legalFees = [];
   const disbursements = [];
   const price = toNumber(input.price);
@@ -307,6 +309,17 @@ function buildPurchaseQuote(input) {
     addItem(disbursements, "AP1 submission", 6);
   }
 
+  // Office copy entries: tenure-based estimate, single line per matter.
+  // Skipped when this helper is called as a leg of a combined quote;
+  // the combining caller decides which leg's tenure governs the line.
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure)
+    );
+  }
+
   const sdlt = calculateSdlt({
     price,
     firstTimeBuyer: input.firstTimeBuyer,
@@ -326,7 +339,7 @@ function buildPurchaseQuote(input) {
   });
 }
 
-function buildSaleQuote(input) {
+function buildSaleQuote(input, options = {}) {
   const legalFees = [];
   const disbursements = [];
   const sellerCount = getSellerCount(input.numberOfSellers);
@@ -356,7 +369,16 @@ function buildSaleQuote(input) {
     addItem(legalFees, "Tenanted property supplement", 150);
   }
 
-  addItem(disbursements, "Office copy entries", 12);
+  // Office copy entries: tenure-based estimate, single line per matter.
+  // Skipped when this helper is called as the sale leg of sale_purchase;
+  // the purchase leg's tenure drives the line in combined matters.
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure)
+    );
+  }
   addItem(
     disbursements,
     sellerCount > 1 ? `ID checks (x${sellerCount})` : "ID checks",
@@ -391,7 +413,11 @@ function buildRemortgageQuote(input) {
     addItem(legalFees, "Simultaneous transfer of equity supplement", 350);
   }
 
-  addItem(disbursements, "Office copy entries", 12);
+  addItem(
+    disbursements,
+    "Office copy entries",
+    getOfficeCopyEntriesAmount(input.tenure)
+  );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required on remortgage
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
@@ -428,7 +454,11 @@ function buildTransferQuote(input) {
     addItem(legalFees, "Complex ownership change supplement", 150);
   }
 
-  addItem(disbursements, "Office copy entries", 12);
+  addItem(
+    disbursements,
+    "Office copy entries",
+    getOfficeCopyEntriesAmount(input.tenure)
+  );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required on transfer of equity
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
@@ -473,7 +503,11 @@ function buildRemortgageTransferQuote(input) {
     addItem(legalFees, "Complex ownership change supplement", 150);
   }
 
-  addItem(disbursements, "Office copy entries", 12);
+  addItem(
+    disbursements,
+    "Office copy entries",
+    getOfficeCopyEntriesAmount(input.remortgageTransferTenure)
+  );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), 14.4 * partyCount);
   // Bankruptcy search always required
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), 7.6 * partyCount);
@@ -531,15 +565,21 @@ export function buildQuoteData(input) {
   }
 
   if (type === "sale_purchase") {
-    const saleQuote = buildSaleQuote({
-      tenure: input.saleTenure,
-      price: input.salePrice,
-      postcode: input.salePostcode,
-      saleMortgage: input.saleMortgageCombined,
-      managementCompany: input.managementCompanyCombined,
-      tenanted: input.tenantedCombined,
-      numberOfSellers: input.numberOfSellersCombined,
-    });
+    // Office copies on a combined matter relate to the single property —
+    // the purchase leg's tenure governs (acting on the new title), so the
+    // sale leg omits its own office-copies line to avoid double-billing.
+    const saleQuote = buildSaleQuote(
+      {
+        tenure: input.saleTenure,
+        price: input.salePrice,
+        postcode: input.salePostcode,
+        saleMortgage: input.saleMortgageCombined,
+        managementCompany: input.managementCompanyCombined,
+        tenanted: input.tenantedCombined,
+        numberOfSellers: input.numberOfSellersCombined,
+      },
+      { omitOfficeCopies: true }
+    );
 
     const purchaseQuote = buildPurchaseQuote({
       tenure: input.purchaseTenure,
