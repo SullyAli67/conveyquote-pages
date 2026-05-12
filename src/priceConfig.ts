@@ -1,9 +1,59 @@
 export const VAT_RATE = 0.2;
 
+// MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
+// Changing pricing requires editing both files.
+export function getPurchaseBaseFee(price: number): number {
+  const value = Number(price) || 0;
+  if (value <= 0) return 995;
+  if (value < 200000) return 795;
+  if (value < 400000) return 995;
+  if (value < 750000) return 1195;
+  return 1395;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
+// Changing pricing requires editing both files.
+export function getSaleBaseFee(price: number): number {
+  const value = Number(price) || 0;
+  if (value <= 0) return 895;
+  if (value < 200000) return 775;
+  if (value < 400000) return 895;
+  if (value < 750000) return 995;
+  return 1195;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
+// Changing pricing requires editing both files.
+export function getRemortgageBaseFee(propertyValue: number): number {
+  const value = Number(propertyValue) || 0;
+  if (value <= 0) return 695;
+  if (value < 200000) return 595;
+  if (value < 400000) return 695;
+  if (value < 750000) return 795;
+  return 895;
+}
+
+// MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
+// Changing pricing requires editing both files.
+export function getTransferBaseFee(propertyValue: number): number {
+  const value = Number(propertyValue) || 0;
+  if (value <= 0) return 550;
+  if (value < 200000) return 495;
+  if (value < 400000) return 550;
+  if (value < 750000) return 625;
+  return 725;
+}
+
+export const BESPOKE_PRICING_NOTE =
+  "Properties over £1.5m may be subject to bespoke pricing — please contact us to confirm.";
+
+export function getBespokeNote(value: number): string | null {
+  return (Number(value) || 0) >= 1500000 ? BESPOKE_PRICING_NOTE : null;
+}
+
 export const PRICE_CONFIG = {
   sale: {
     legalFees: {
-      baseLegalFee: 995,
       leaseholdSupplement: 300,
       mortgageRedemptionSupplement: 50,
       managementCompanySupplement: 150,
@@ -18,7 +68,6 @@ export const PRICE_CONFIG = {
 
   purchase: {
     legalFees: {
-      baseLegalFee: 1025,
       leaseholdSupplement: 300,
       actingForLenderSupplement: 125,
       telegraphicTransferFee: 45,
@@ -43,7 +92,6 @@ export const PRICE_CONFIG = {
 
   remortgage: {
     legalFees: {
-      baseLegalFee: 695,
       leaseholdSupplement: 250,
       additionalBorrowingSupplement: 100,
       transferOfEquitySupplement: 250,
@@ -60,7 +108,6 @@ export const PRICE_CONFIG = {
 
   transfer: {
     legalFees: {
-      baseLegalFee: 550,
       leaseholdSupplement: 250,
       mortgageSupplement: 150,
       additionalOwnerChangeSupplement: 100,
