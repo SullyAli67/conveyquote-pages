@@ -116,6 +116,13 @@ export async function onRequestPost(context) {
       </div>
     `;
 
+    const formatMoneyWithSign = (value) => {
+      const number = Number(value || 0);
+      if (!Number.isFinite(number)) return "£0.00";
+      if (number < 0) return `−£${formatMoney(Math.abs(number))}`;
+      return `£${formatMoney(number)}`;
+    };
+
     const buildRowsHtml = (items = []) =>
       items
         .map((item, index) => {
@@ -142,7 +149,7 @@ export async function onRequestPost(context) {
                 text-align:right;
                 white-space:nowrap;
               ">
-                £${escapeHtml(formatMoney(item.amount || 0))}
+                ${escapeHtml(formatMoneyWithSign(item.amount || 0))}
               </td>
             </tr>
           `;
@@ -174,7 +181,28 @@ export async function onRequestPost(context) {
     const legalFeesSubtotal = sumItems(legalFees);
     const legalFeesTotal = legalFeesSubtotal + vatAmount;
     const disbursementTotal = sumItems(disbursements);
-    const calculatedGrandTotal = legalFeesTotal + disbursementTotal;
+
+    // Manual adjustment applied flat against the grand total AFTER VAT.
+    // It does NOT enter the VAT base. Treated as no-op when amount is 0.
+    const rawAdjustment = quoteData?.manualAdjustment;
+    const adjustment =
+      rawAdjustment &&
+      Number.isFinite(Number(rawAdjustment.amount)) &&
+      Number(rawAdjustment.amount) !== 0
+        ? {
+            amount: Number(rawAdjustment.amount),
+            reason: String(rawAdjustment.reason || ""),
+          }
+        : null;
+    const adjustmentAmount = adjustment ? adjustment.amount : 0;
+    const adjustmentLabel = adjustment
+      ? adjustment.amount < 0
+        ? "Discount"
+        : "Adjustment"
+      : "";
+
+    const calculatedGrandTotal =
+      legalFeesTotal + disbursementTotal + adjustmentAmount;
 
     const finalQuoteAmountValue =
       quoteAmount && !Number.isNaN(Number(cleanMoney(quoteAmount)))
@@ -216,8 +244,18 @@ export async function onRequestPost(context) {
     const totalRows = [
       {
         label: "Legal fees and disbursements",
-        amount: calculatedGrandTotal,
+        amount: legalFeesTotal + disbursementTotal,
       },
+      ...(adjustment
+        ? [
+            {
+              label: adjustment.reason
+                ? `${adjustmentLabel} – ${adjustment.reason}`
+                : adjustmentLabel,
+              amount: adjustment.amount,
+            },
+          ]
+        : []),
       ...(sdltAmount !== null
         ? [
             {
@@ -632,6 +670,7 @@ export async function onRequestPost(context) {
       feeBreakdown: feeBreakdown || "",
       nextSteps: nextSteps || "",
       additionalNotes: trimmedAdditionalNotes,
+      manualAdjustment: adjustment || undefined,
     };
 
     const nowIso = new Date().toISOString();

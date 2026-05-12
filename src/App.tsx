@@ -48,6 +48,7 @@ type LoadedQuote = {
   totalIncludingSdlt?: number;
   feeBreakdown?: string;
   additionalNotes?: string;
+  manualAdjustment?: { amount: number; reason: string } | null;
 };
 
 type SummaryRow = {
@@ -202,6 +203,9 @@ type ApprovedQuoteData = {
   sdltAmount?: number;
   sdltNote?: string;
   totalIncludingSdlt?: number;
+  // Manual adjustment applied flat against the grand total AFTER VAT.
+  // Single object — only one adjustment supported at a time.
+  manualAdjustment?: { amount: number; reason: string };
 };
 
 type ApprovedQuoteForm = {
@@ -2708,6 +2712,9 @@ function App() {
       0
     );
 
+    // VAT is calculated on the unadjusted legal fees only. Manual
+    // adjustments are flat against the grand total — they do NOT enter
+    // the VAT base.
     const vat = Number((legalFeesExVat * 0.2).toFixed(2));
 
     const disbursementTotal = quoteData.disbursements.reduce(
@@ -2715,8 +2722,20 @@ function App() {
       0
     );
 
-    const grandTotal = Number(
+    const adjustmentAmount =
+      quoteData.manualAdjustment &&
+      Number.isFinite(quoteData.manualAdjustment.amount) &&
+      quoteData.manualAdjustment.amount !== 0
+        ? Number(quoteData.manualAdjustment.amount)
+        : 0;
+    const adjustmentReason = quoteData.manualAdjustment?.reason || "";
+    const adjustmentLabel = adjustmentAmount < 0 ? "Discount" : "Adjustment";
+
+    const preAdjustmentGrandTotal = Number(
       (legalFeesExVat + vat + disbursementTotal).toFixed(2)
+    );
+    const grandTotal = Number(
+      (preAdjustmentGrandTotal + adjustmentAmount).toFixed(2)
     );
 
     const totalIncludingSdlt =
@@ -2751,6 +2770,14 @@ function App() {
     feeBreakdownLines.push(
       `Total disbursements: £${disbursementTotal.toFixed(2)}`
     );
+
+    if (adjustmentAmount !== 0) {
+      feeBreakdownLines.push("");
+      const reasonSuffix = adjustmentReason ? ` – ${adjustmentReason}` : "";
+      feeBreakdownLines.push(
+        `${adjustmentLabel}${reasonSuffix}: £${adjustmentAmount.toFixed(2)}`
+      );
+    }
 
     feeBreakdownLines.push("");
     feeBreakdownLines.push(
@@ -2863,21 +2890,35 @@ function App() {
       alert("Reason is required for a manual adjustment.");
       return;
     }
-    const label = parsed < 0 ? "Discount" : "Manual adjustment";
-    setApprovedQuote((prev) => {
-      // Drop any existing adjustment so the customer never sees stacked ones.
-      const cleaned = prev.quoteData.legalFees.filter(
-        (item) =>
-          !["discount", "manual adjustment"].includes(
-            String(item.label || "").trim().toLowerCase()
-          )
+
+    // Block adjustments that would push the grand total negative.
+    // Compute the pre-adjustment grand total from the current line items
+    // (ignoring any adjustment already applied) so the check is honest.
+    const legalFeesExVat = approvedQuote.quoteData.legalFees.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+    const vat = legalFeesExVat * 0.2;
+    const disbursementTotal = approvedQuote.quoteData.disbursements.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+    const preAdjustmentGrandTotal = Number(
+      (legalFeesExVat + vat + disbursementTotal).toFixed(2)
+    );
+    if (preAdjustmentGrandTotal + parsed < 0) {
+      alert(
+        `Adjustment cannot exceed quote total (£${preAdjustmentGrandTotal.toFixed(
+          2
+        )}).`
       );
-      const newQuoteData = {
+      return;
+    }
+
+    setApprovedQuote((prev) => {
+      const newQuoteData: ApprovedQuoteData = {
         ...prev.quoteData,
-        legalFees: [
-          ...cleaned,
-          { label, amount: parsed, note: trimmedReason },
-        ],
+        manualAdjustment: { amount: parsed, reason: trimmedReason },
       };
       const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
       return {
@@ -2894,13 +2935,10 @@ function App() {
 
   const handleClearAdjustment = () => {
     setApprovedQuote((prev) => {
-      const cleaned = prev.quoteData.legalFees.filter(
-        (item) =>
-          !["discount", "manual adjustment"].includes(
-            String(item.label || "").trim().toLowerCase()
-          )
-      );
-      const newQuoteData = { ...prev.quoteData, legalFees: cleaned };
+      const newQuoteData: ApprovedQuoteData = {
+        ...prev.quoteData,
+        manualAdjustment: undefined,
+      };
       const rebuilt = rebuildApprovedQuoteFromQuoteData(newQuoteData);
       return {
         ...prev,
@@ -3164,6 +3202,14 @@ function App() {
             totalIncludingSdlt:
               typeof quote.totalIncludingSdlt === "number"
                 ? quote.totalIncludingSdlt
+                : undefined,
+            manualAdjustment:
+              quote.manualAdjustment &&
+              Number.isFinite(quote.manualAdjustment.amount)
+                ? {
+                    amount: Number(quote.manualAdjustment.amount),
+                    reason: String(quote.manualAdjustment.reason || ""),
+                  }
                 : undefined,
           };
 
@@ -3976,6 +4022,13 @@ function App() {
     },
   ];
 
+  const activeAdjustment =
+    approvedQuote.quoteData.manualAdjustment &&
+    Number.isFinite(approvedQuote.quoteData.manualAdjustment.amount) &&
+    approvedQuote.quoteData.manualAdjustment.amount !== 0
+      ? approvedQuote.quoteData.manualAdjustment
+      : null;
+
   const quoteSummaryRows: SummaryRow[] = [
     {
       label: "Legal fees ex VAT",
@@ -3993,6 +4046,16 @@ function App() {
       label: "Disbursements",
       value: formatMoney(disbursementTotal),
     },
+    ...(activeAdjustment
+      ? [
+          {
+            label: `${activeAdjustment.amount < 0 ? "Discount" : "Adjustment"}${
+              activeAdjustment.reason ? ` – ${activeAdjustment.reason}` : ""
+            }`,
+            value: formatMoney(activeAdjustment.amount),
+          },
+        ]
+      : []),
     {
       label: "Quote total",
       value: formatMoney(approvedQuote.quoteAmount),
@@ -8948,10 +9011,20 @@ function App() {
                               cursor: "pointer",
                             }}
                           >
-                            Apply manual adjustment
+                            {activeAdjustment ? "Edit / clear adjustment" : "Apply manual adjustment"}
                           </button>
                         )}
                       </div>
+                      {!adjustmentEditorOpen && activeAdjustment && (
+                        <p className="form-note" style={{ marginTop: "6px" }}>
+                          Currently applied:{" "}
+                          <strong>
+                            {activeAdjustment.amount < 0 ? "Discount" : "Adjustment"}
+                          </strong>{" "}
+                          £{Number(activeAdjustment.amount).toFixed(2)}
+                          {activeAdjustment.reason ? ` — ${activeAdjustment.reason}` : ""}
+                        </p>
+                      )}
                       {adjustmentEditorOpen && (
                         <div
                           style={{
@@ -9239,6 +9312,21 @@ function App() {
                                     </td>
                                   </tr>
                                 )
+                              )}
+                              {activeAdjustment && (
+                                <tr>
+                                  <td style={{ padding: "8px 0 4px", color: activeAdjustment.amount < 0 ? "#991b1b" : "var(--navy)" }}>
+                                    {activeAdjustment.amount < 0 ? "Discount" : "Adjustment"}
+                                    {activeAdjustment.reason ? (
+                                      <span style={{ color: "var(--muted)", fontSize: "12px" }}>
+                                        {" "}– {activeAdjustment.reason}
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                  <td style={{ padding: "8px 0 4px", textAlign: "right", color: activeAdjustment.amount < 0 ? "#991b1b" : "var(--navy)" }}>
+                                    £{Number(activeAdjustment.amount).toFixed(2)}
+                                  </td>
+                                </tr>
                               )}
                               <tr>
                                 <td style={{ padding: "10px 0 4px", fontWeight: 700, color: "var(--navy)" }}>
