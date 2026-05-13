@@ -548,6 +548,22 @@ type LoadedEnquiry = {
 
 type AdminTab = "dashboard" | "enquiries" | "firms" | "lenders" | "quote" | "settings" | "referrers" | "invoices" | "pipeline" | "audit";
 
+const ADMIN_TABS = [
+  "dashboard",
+  "enquiries",
+  "firms",
+  "lenders",
+  "quote",
+  "settings",
+  "referrers",
+  "invoices",
+  "pipeline",
+  "audit",
+] as const satisfies readonly AdminTab[];
+
+const isValidAdminTab = (value: string | null | undefined): value is AdminTab =>
+  !!value && (ADMIN_TABS as readonly string[]).includes(value);
+
 type LenderEditorState = {
   id: number | null;
   lender_name: string;
@@ -1309,6 +1325,18 @@ function App() {
   type FirmQuoteRow = { id: number; firm_reference: string; internal_reference: string; client_name: string; client_email: string; transaction_type: string; price: number; status: string; sent_at: string; accepted_at: string; created_at: string };
 
   type FirmPortalTab = "referrals" | "quotes" | "issue_quote" | "history" | "fees" | "profile";
+  const FIRM_PORTAL_TABS = [
+    "referrals",
+    "quotes",
+    "issue_quote",
+    "history",
+    "fees",
+    "profile",
+  ] as const satisfies readonly FirmPortalTab[];
+  const isValidFirmPortalTab = (
+    value: string | null | undefined
+  ): value is FirmPortalTab =>
+    !!value && (FIRM_PORTAL_TABS as readonly string[]).includes(value);
   const [firmPortalTab, setFirmPortalTabRaw] = useState<FirmPortalTab>(
     () => (localStorage.getItem("cq_firm_tab") as FirmPortalTab) || "referrals"
   );
@@ -2031,10 +2059,25 @@ function App() {
     if (tab !== "quote") {
       setLoadedEnquiry(null);
       setLoadedEnquiryMessage("");
-      // Remove ?ref= from the URL without adding to history
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete("ref");
-      window.history.replaceState({}, "", cleanUrl.toString());
+    }
+
+    // Push tab to the URL so the browser back button moves between tabs.
+    // Skip the push when the URL already reflects the same tab (idempotent
+    // re-clicks shouldn't pile up history entries).
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("tab", tab);
+    if (tab !== "quote") {
+      nextUrl.searchParams.delete("ref");
+    }
+    const currentTab = new URL(window.location.href).searchParams.get("tab");
+    const currentRef = new URL(window.location.href).searchParams.get("ref");
+    const sameTab = currentTab === tab;
+    const sameRef =
+      tab === "quote"
+        ? currentRef === nextUrl.searchParams.get("ref")
+        : !currentRef;
+    if (!sameTab || !sameRef) {
+      window.history.pushState({ adminTab: tab }, "", nextUrl.toString());
     }
 
     // Dashboard data is loaded once on portal entry and on explicit
@@ -4846,28 +4889,38 @@ function App() {
       setAdminTab("quote");
       void loadEnquiryByReference(refFromUrl);
     } else {
-      setAdminTab("dashboard");
-      void loadDashboardData();
+      // Restore tab from URL ?tab= if valid, else fall through to
+      // the persisted/default value already set by useState.
+      const urlTab = new URLSearchParams(window.location.search).get("tab");
+      if (isValidAdminTab(urlTab)) {
+        setAdminTab(urlTab);
+      }
     }
+    void loadDashboardData();
   }, [isAdminPage, isAdminUnlocked, refFromUrl]);
 
-  // Listen for browser back/forward — when user presses Back from a quote,
-  // the URL loses the ?ref= param and we restore the dashboard view.
+  // Listen for browser back/forward — restore tab + loaded enquiry from
+  // the URL so back/forward across tab changes works as expected.
   useEffect(() => {
     if (!isAdminPage) return;
     const onPopState = () => {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref") || "";
+      const urlTab = params.get("tab");
       if (ref) {
         setManualReference(ref);
         setAdminTab("quote");
         void loadEnquiryByReference(ref);
+      } else if (isValidAdminTab(urlTab)) {
+        setAdminTab(urlTab);
+        setLoadedEnquiry(null);
+        setLoadedEnquiryMessage("");
+        setManualReference("");
       } else {
         setAdminTab("dashboard");
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
-        void loadDashboardData();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -4880,6 +4933,31 @@ function App() {
       void loadFirmPortalData(firmToken);
     }
   }, [isFirmPortalPage, firmToken]);
+
+  // Restore the firm portal active tab from the URL on entry, so a bookmark
+  // such as /firm-portal/?tab=issue_quote lands on the right tab.
+  useEffect(() => {
+    if (!isFirmPortalPage) return;
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    if (isValidFirmPortalTab(urlTab)) {
+      setFirmPortalTab(urlTab);
+    }
+  }, [isFirmPortalPage]);
+
+  // Listen for browser back/forward inside the firm portal — restore the tab
+  // state from the URL without re-pushing history.
+  useEffect(() => {
+    if (!isFirmPortalPage) return;
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (isValidFirmPortalTab(urlTab)) {
+        setFirmPortalTab(urlTab);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [isFirmPortalPage]);
 
   // Phase 4: once a SaaS firm's portal data has loaded, fetch branding
   // once so the Profile tab renders without a flash regardless of the
@@ -6994,6 +7072,22 @@ function App() {
                       className={firmPortalTab === tab ? "primary-button" : "muted-button"}
                       onClick={() => {
                         setFirmPortalTab(tab);
+
+                        // Push tab to URL so browser back/forward navigates
+                        // between firm portal tabs. Skip if already current.
+                        const nextUrl = new URL(window.location.href);
+                        nextUrl.searchParams.set("tab", tab);
+                        const currentUrlTab = new URL(
+                          window.location.href
+                        ).searchParams.get("tab");
+                        if (currentUrlTab !== tab) {
+                          window.history.pushState(
+                            { firmPortalTab: tab },
+                            "",
+                            nextUrl.toString()
+                          );
+                        }
+
                         if (tab === "quotes" && !firmQuotesLoaded) {
                           setFirmQuotesLoaded(true);
                           void loadFirmQuotes();
