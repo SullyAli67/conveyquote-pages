@@ -1507,6 +1507,15 @@ function App() {
   const [isSavingFees, setIsSavingFees] = useState(false);
   const [feeConfigMessage, setFeeConfigMessage] = useState("");
 
+  const legalFeeItems = useMemo(
+    () => feeConfigItems.filter((f) => !f.is_disbursement),
+    [feeConfigItems]
+  );
+  const disbursementItems = useMemo(
+    () => feeConfigItems.filter((f) => f.is_disbursement),
+    [feeConfigItems]
+  );
+
   // ── Firm branding state (Phase 4) ─────────────────────────────────────────
   // Lives on the Profile tab for is_saas_firm=1 firms. The logo binary is in
   // R2; we only hold the object key on the client and render previews via
@@ -5474,45 +5483,49 @@ function App() {
     };
   }, [dashboardEnquiries]);
 
-  const dashboardSummaryRows: SummaryRow[] = [
-    {
-      label: "Recent enquiries",
-      value: String(dashboardEnquiries.length),
-    },
-    {
-      label: "Active panel firms",
-      value: String(
-        dashboardFirms.filter((firm) => Number(firm.active) === 1).length
-      ),
-    },
-    {
-      label: "Panel lenders",
-      value: String(activePanelLenders.length),
-    },
-    {
-      label: "Active lender memberships",
-      value: String(
-        panelMemberships.filter((membership) => Number(membership.active) === 1)
-          .length
-      ),
-    },
-    {
-      label: "Purchase enquiries",
-      value: String(
-        dashboardEnquiries.filter(
-          (enquiry) => enquiry.transaction_type === "purchase"
-        ).length
-      ),
-    },
-    {
-      label: "Sale enquiries",
-      value: String(
-        dashboardEnquiries.filter(
-          (enquiry) => enquiry.transaction_type === "sale"
-        ).length
-      ),
-    },
-  ];
+  const dashboardSummaryRows: SummaryRow[] = useMemo(
+    () => [
+      {
+        label: "Recent enquiries",
+        value: String(dashboardEnquiries.length),
+      },
+      {
+        label: "Active panel firms",
+        value: String(
+          dashboardFirms.filter((firm) => Number(firm.active) === 1).length
+        ),
+      },
+      {
+        label: "Panel lenders",
+        value: String(activePanelLenders.length),
+      },
+      {
+        label: "Active lender memberships",
+        value: String(
+          panelMemberships.filter(
+            (membership) => Number(membership.active) === 1
+          ).length
+        ),
+      },
+      {
+        label: "Purchase enquiries",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) => enquiry.transaction_type === "purchase"
+          ).length
+        ),
+      },
+      {
+        label: "Sale enquiries",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) => enquiry.transaction_type === "sale"
+          ).length
+        ),
+      },
+    ],
+    [dashboardEnquiries, dashboardFirms, activePanelLenders, panelMemberships]
+  );
 
   const activeAdjustment =
     approvedQuote.quoteData.manualAdjustment &&
@@ -7640,10 +7653,12 @@ function App() {
                               </p>
                             )}
 
-                            {feeConfigItems.some((f) => !f.is_disbursement) && (
+                            {legalFeeItems.length > 0 && (
                               <div style={{ marginBottom: "12px" }}>
                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Legal Fees</div>
-                                {feeConfigItems.map((item, idx) => !item.is_disbursement ? (
+                                {legalFeeItems.map((item) => {
+                                  const idx = feeConfigItems.indexOf(item);
+                                  return (
                                   <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
                                     <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
                                       onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Fee description" />
@@ -7652,14 +7667,17 @@ function App() {
                                     <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
                                       onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
                                   </div>
-                                ) : null)}
+                                  );
+                                })}
                               </div>
                             )}
 
-                            {feeConfigItems.some((f) => f.is_disbursement) && (
+                            {disbursementItems.length > 0 && (
                               <div style={{ marginBottom: "12px" }}>
                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Disbursements</div>
-                                {feeConfigItems.map((item, idx) => item.is_disbursement ? (
+                                {disbursementItems.map((item) => {
+                                  const idx = feeConfigItems.indexOf(item);
+                                  return (
                                   <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
                                     <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
                                       onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Disbursement description" />
@@ -7668,7 +7686,8 @@ function App() {
                                     <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
                                       onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
                                   </div>
-                                ) : null)}
+                                  );
+                                })}
                               </div>
                             )}
 
@@ -8561,7 +8580,7 @@ function App() {
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
-                      {feeConfigItems.filter((f) => !f.is_disbursement).map((item, globalIdx) => {
+                      {legalFeeItems.map((item, globalIdx) => {
                         const idx = feeConfigItems.indexOf(item);
                         return (
                           <div key={globalIdx} className="detail-row">
@@ -8594,7 +8613,7 @@ function App() {
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Disbursements</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
-                      {feeConfigItems.filter((f) => f.is_disbursement).map((item, localIdx) => {
+                      {disbursementItems.map((item, localIdx) => {
                         const idx = feeConfigItems.indexOf(item);
                         return (
                           <div key={localIdx} className="detail-row">
