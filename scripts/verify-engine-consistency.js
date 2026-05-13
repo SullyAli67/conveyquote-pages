@@ -57,142 +57,142 @@ const c = {
   cyan: "\x1b[36m",
 };
 
+// Re-usable defaults so each fixture only states what differs.
+const purchaseDefaults = {
+  type: "purchase",
+  tenure: "freehold",
+  mortgage: "mortgage",
+  ownershipType: "individual",
+  firstTimeBuyer: "no",
+  additionalProperty: "no",
+  ukResidentForSdlt: "yes",
+};
+
+const remortgageDefaults = {
+  type: "remortgage",
+  tenure: "freehold",
+  ownershipType: "individual",
+};
+
+const transferDefaults = {
+  type: "transfer",
+  tenure: "freehold",
+  transferMortgage: "yes",
+  ownersChanging: "one",
+};
+
+const remortgageTransferDefaults = {
+  type: "remortgage_transfer",
+  remortgageTransferTenure: "freehold",
+  remortgageTransferOwnershipType: "individual",
+  remortgageTransferOwnersChanging: "one",
+  remortgageTransferHasMortgage: "yes",
+};
+
+const salePurchaseDefaults = {
+  type: "sale_purchase",
+  saleTenure: "freehold",
+  purchaseTenure: "freehold",
+  purchaseOwnershipType: "individual",
+  purchaseMortgage: "mortgage",
+  purchaseFirstTimeBuyer: "no",
+  purchaseAdditionalProperty: "no",
+  purchaseUkResidentForSdlt: "yes",
+  numberOfSellersCombined: "1",
+};
+
 const SCENARIOS = [
-  {
-    name: "Freehold purchase £255k",
-    input: {
-      type: "purchase",
-      price: "255000",
-      tenure: "freehold",
-      mortgage: "mortgage",
-      ownershipType: "individual",
-      firstTimeBuyer: "no",
-      additionalProperty: "no",
-      ukResidentForSdlt: "yes",
-    },
-  },
-  {
-    name: "Leasehold purchase £255k",
-    input: {
-      type: "purchase",
-      price: "255000",
-      tenure: "leasehold",
-      mortgage: "mortgage",
-      ownershipType: "individual",
-      firstTimeBuyer: "no",
-      additionalProperty: "no",
-      ukResidentForSdlt: "yes",
-    },
-  },
-  {
-    name: "Freehold sale £255k",
-    input: {
-      type: "sale",
-      price: "255000",
-      tenure: "freehold",
-      numberOfSellers: "1",
-    },
-  },
-  {
-    name: "Leasehold sale £255k",
-    input: {
-      type: "sale",
-      price: "255000",
-      tenure: "leasehold",
-      numberOfSellers: "1",
-    },
-  },
-  {
-    name: "Freehold remortgage £200k",
-    input: {
-      type: "remortgage",
-      price: "200000",
-      tenure: "freehold",
-      ownershipType: "individual",
-    },
-  },
-  {
-    name: "Leasehold remortgage £200k",
-    input: {
-      type: "remortgage",
-      price: "200000",
-      tenure: "leasehold",
-      ownershipType: "individual",
-    },
-  },
-  {
-    name: "Freehold transfer £200k",
-    input: {
-      type: "transfer",
-      price: "200000",
-      tenure: "freehold",
-      transferMortgage: "yes",
-      ownersChanging: "one",
-    },
-  },
-  {
-    name: "Leasehold transfer £200k",
-    input: {
-      type: "transfer",
-      price: "200000",
-      tenure: "leasehold",
-      transferMortgage: "yes",
-      ownersChanging: "one",
-    },
-  },
+  // ── Original scenarios (kept for general drift coverage) ─────────
+  { name: "Freehold purchase £255k", input: { ...purchaseDefaults, price: "255000" } },
+  { name: "Leasehold purchase £255k", input: { ...purchaseDefaults, price: "255000", tenure: "leasehold" } },
+  { name: "Freehold sale £255k", input: { type: "sale", price: "255000", tenure: "freehold", numberOfSellers: "1" } },
+  { name: "Leasehold sale £255k", input: { type: "sale", price: "255000", tenure: "leasehold", numberOfSellers: "1" } },
+  { name: "Freehold remortgage £200k", input: { ...remortgageDefaults, price: "200000", mortgageAmount: "150000" } },
+  { name: "Leasehold remortgage £200k", input: { ...remortgageDefaults, price: "200000", tenure: "leasehold", mortgageAmount: "150000" } },
+  { name: "Freehold transfer £200k", input: { ...transferDefaults, price: "200000" } },
+  { name: "Leasehold transfer £200k", input: { ...transferDefaults, price: "200000", tenure: "leasehold" } },
   {
     name: "Freehold remortgage+transfer £200k",
     input: {
-      type: "remortgage_transfer",
+      ...remortgageTransferDefaults,
       remortgageTransferPrice: "200000",
-      remortgageTransferTenure: "freehold",
-      remortgageTransferOwnershipType: "individual",
-      remortgageTransferOwnersChanging: "one",
-      remortgageTransferHasMortgage: "yes",
+      remortgageTransferMortgageAmount: "150000",
     },
   },
   {
     name: "Leasehold remortgage+transfer £200k",
     input: {
-      type: "remortgage_transfer",
+      ...remortgageTransferDefaults,
       remortgageTransferPrice: "200000",
       remortgageTransferTenure: "leasehold",
-      remortgageTransferOwnershipType: "individual",
-      remortgageTransferOwnersChanging: "one",
-      remortgageTransferHasMortgage: "yes",
+      remortgageTransferMortgageAmount: "150000",
     },
   },
   {
     name: "Freehold sale+purchase £255k+£255k",
-    input: {
-      type: "sale_purchase",
-      saleTenure: "freehold",
-      salePrice: "255000",
-      purchaseTenure: "freehold",
-      purchasePrice: "255000",
-      purchaseOwnershipType: "individual",
-      purchaseMortgage: "mortgage",
-      purchaseFirstTimeBuyer: "no",
-      purchaseAdditionalProperty: "no",
-      purchaseUkResidentForSdlt: "yes",
-      numberOfSellersCombined: "1",
-    },
+    input: { ...salePurchaseDefaults, salePrice: "255000", purchasePrice: "255000" },
   },
   {
     name: "Leasehold sale+purchase £255k+£255k",
     input: {
-      type: "sale_purchase",
-      saleTenure: "leasehold",
+      ...salePurchaseDefaults,
       salePrice: "255000",
-      purchaseTenure: "leasehold",
       purchasePrice: "255000",
-      purchaseOwnershipType: "individual",
-      purchaseMortgage: "mortgage",
-      purchaseFirstTimeBuyer: "no",
-      purchaseAdditionalProperty: "no",
-      purchaseUkResidentForSdlt: "yes",
-      numberOfSellersCombined: "1",
+      saleTenure: "leasehold",
+      purchaseTenure: "leasehold",
     },
+  },
+
+  // ── HMLR Scale 1 bracket coverage (purchase) ─────────────────────
+  // Each price sits inside a different Scale 1 band so both engines
+  // must produce the same Land Registry fee: 20, 100, 150, 295, 500.
+  { name: "Purchase £75k (Scale 1 → £20)", input: { ...purchaseDefaults, price: "75000" } },
+  { name: "Purchase £150k (Scale 1 → £100)", input: { ...purchaseDefaults, price: "150000" } },
+  { name: "Purchase £350k (Scale 1 → £150)", input: { ...purchaseDefaults, price: "350000" } },
+  { name: "Purchase £750k (Scale 1 → £295)", input: { ...purchaseDefaults, price: "750000" } },
+  { name: "Purchase £1.2m (Scale 1 → £500)", input: { ...purchaseDefaults, price: "1200000" } },
+
+  // ── HMLR Scale 1 via sale_purchase (purchase leg drives LR) ──────
+  {
+    name: "Sale+Purchase £350k/£350k (Scale 1 on purchase → £150)",
+    input: { ...salePurchaseDefaults, salePrice: "350000", purchasePrice: "350000" },
+  },
+  {
+    name: "Sale+Purchase £750k/£750k (Scale 1 on purchase → £295)",
+    input: { ...salePurchaseDefaults, salePrice: "750000", purchasePrice: "750000" },
+  },
+
+  // ── HMLR Scale 2 bracket coverage (remortgage on mortgage amount) ─
+  { name: "Remortgage £80k mortgage (Scale 2 → £20)", input: { ...remortgageDefaults, price: "200000", mortgageAmount: "80000" } },
+  { name: "Remortgage £250k mortgage (Scale 2 → £45)", input: { ...remortgageDefaults, price: "400000", mortgageAmount: "250000" } },
+  { name: "Remortgage £600k mortgage (Scale 2 → £65)", input: { ...remortgageDefaults, price: "800000", mortgageAmount: "600000" } },
+
+  // ── HMLR Scale 2 via transfer (property value drives LR) ─────────
+  { name: "Transfer £200k property (Scale 2 → £30)", input: { ...transferDefaults, price: "200000" } },
+  { name: "Transfer £450k property (Scale 2 → £45)", input: { ...transferDefaults, price: "450000" } },
+
+  // ── HMLR remortgage_transfer: max(Scale 2 mortgage, Scale 2 value) ─
+  {
+    name: "Remortgage+Transfer £400k value / £80k mortgage (value wins → £45)",
+    input: {
+      ...remortgageTransferDefaults,
+      remortgageTransferPrice: "400000",
+      remortgageTransferMortgageAmount: "80000",
+    },
+  },
+  {
+    name: "Remortgage+Transfer £150k value / £600k mortgage (mortgage wins → £65)",
+    input: {
+      ...remortgageTransferDefaults,
+      remortgageTransferPrice: "150000",
+      remortgageTransferMortgageAmount: "600000",
+    },
+  },
+
+  // ── Sale-only must NOT bill an LR fee (helper returns 0) ─────────
+  {
+    name: "Sale £350k (no LR fee)",
+    input: { type: "sale", price: "350000", tenure: "freehold", numberOfSellers: "1" },
   },
 ];
 

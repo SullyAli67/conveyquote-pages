@@ -7,7 +7,10 @@ import {
   getTransferBaseFee,
   getBespokeNote,
 } from "./priceConfig";
-import { getOfficeCopyEntriesAmount } from "../functions/lib/disbursement-constants.js";
+import {
+  getOfficeCopyEntriesAmount,
+  getLandRegistryFee,
+} from "../functions/lib/disbursement-constants.js";
 
 type TransactionType =
   | "sale"
@@ -41,6 +44,7 @@ type QuoteFormLike = {
 
   additionalBorrowing?: string;
   remortgageTransfer?: string;
+  mortgageAmount?: string;
 
   transferMortgage?: string;
   ownersChanging?: string;
@@ -78,6 +82,7 @@ type QuoteFormLike = {
   remortgageTransferHasMortgage?: string;
   remortgageTransferOwnersChanging?: string;
   remortgageTransferOwnershipType?: string;
+  remortgageTransferMortgageAmount?: string;
 };
 
 export type QuoteItem = {
@@ -496,10 +501,15 @@ function buildPurchaseQuote(
   }
 
   addItem(disbursements, "Search pack", config.disbursements.searchPack);
+  // HMLR Scale 1 sliding scale, no VAT. Shared source of truth in
+  // functions/lib/disbursement-constants.js.
   addItem(
     disbursements,
     "Land Registry fee",
-    config.disbursements.landRegistryRegistrationFee
+    getLandRegistryFee({
+      transactionType: "purchase",
+      purchasePrice: toNumber(input.price),
+    })
   );
   addItem(
     disbursements,
@@ -612,8 +622,9 @@ function buildRemortgageQuote(
     additionalBorrowing?: string;
     remortgageTransfer?: string;
     ownershipType?: string;
+    mortgageAmount?: string;
   },
-  options: { omitOfficeCopies?: boolean } = {}
+  options: { omitOfficeCopies?: boolean; omitLandRegistryFee?: boolean } = {}
 ): BuiltQuoteData {
   const config = PRICE_CONFIG.remortgage;
   const legalFees: QuoteItem[] = [];
@@ -664,6 +675,20 @@ function buildRemortgageQuote(
       getOfficeCopyEntriesAmount(input.tenure || "")
     );
   }
+  // HMLR Scale 2 on the new mortgage advance. In a combined
+  // remortgage_transfer matter, the LR fee comes from the combined
+  // dispatcher path (one fee, max of two scenarios), so this leg
+  // omits its own line in that case.
+  if (!options.omitLandRegistryFee) {
+    addItem(
+      disbursements,
+      "Land Registry fee",
+      getLandRegistryFee({
+        transactionType: "remortgage",
+        mortgageAmount: toNumber(input.mortgageAmount),
+      })
+    );
+  }
   addItem(
     disbursements,
     `ID checks (${partyCount})`,
@@ -702,7 +727,7 @@ function buildTransferQuote(
     transferMortgage?: string;
     ownersChanging?: string;
   },
-  options: { omitOfficeCopies?: boolean } = {}
+  options: { omitOfficeCopies?: boolean; omitLandRegistryFee?: boolean } = {}
 ): BuiltQuoteData {
   const config = PRICE_CONFIG.transfer;
   const legalFees: QuoteItem[] = [];
@@ -750,6 +775,19 @@ function buildTransferQuote(
       disbursements,
       "Office copy entries",
       getOfficeCopyEntriesAmount(input.tenure || "")
+    );
+  }
+  // HMLR Scale 2 on property value. In a combined remortgage_transfer
+  // matter, the combined dispatcher path takes the max-of-two — this
+  // leg therefore omits its own LR line in that case.
+  if (!options.omitLandRegistryFee) {
+    addItem(
+      disbursements,
+      "Land Registry fee",
+      getLandRegistryFee({
+        transactionType: "transfer",
+        propertyValue,
+      })
     );
   }
   addItem(
@@ -864,6 +902,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       additionalBorrowing: form.additionalBorrowing,
       remortgageTransfer: form.remortgageTransfer,
       ownershipType: form.ownershipType,
+      mortgageAmount: form.mortgageAmount,
     });
   }
 
@@ -934,13 +973,22 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
     // Both legs reference the same property and tenure. The remortgage
     // leg owns the office-copies line; the transfer leg omits it so the
     // single combined matter shows the line exactly once.
-    const remortgage = buildRemortgageQuote({
-      price: form.remortgageTransferPrice,
-      tenure: form.remortgageTransferTenure,
-      additionalBorrowing: form.remortgageTransferAdditionalBorrowing,
-      remortgageTransfer: "yes",
-      ownershipType: form.remortgageTransferOwnershipType,
-    });
+    //
+    // Land Registry: HMLR charges one fee on combined applications. We
+    // skip both legs' LR lines and add ONE row at this dispatcher level
+    // using the max of Scale 2 on the mortgage amount and Scale 2 on
+    // the property value — see getLandRegistryFee helper.
+    const remortgage = buildRemortgageQuote(
+      {
+        price: form.remortgageTransferPrice,
+        tenure: form.remortgageTransferTenure,
+        additionalBorrowing: form.remortgageTransferAdditionalBorrowing,
+        remortgageTransfer: "yes",
+        ownershipType: form.remortgageTransferOwnershipType,
+        mortgageAmount: form.remortgageTransferMortgageAmount,
+      },
+      { omitLandRegistryFee: true }
+    );
 
     const transfer = buildTransferQuote(
       {
@@ -949,8 +997,23 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
         transferMortgage: form.remortgageTransferHasMortgage,
         ownersChanging: form.remortgageTransferOwnersChanging,
       },
-      { omitOfficeCopies: true }
+      { omitOfficeCopies: true, omitLandRegistryFee: true }
     );
+
+    const combinedLandRegistryFee = getLandRegistryFee({
+      transactionType: "remortgage_transfer",
+      mortgageAmount: toNumber(form.remortgageTransferMortgageAmount),
+      propertyValue: toNumber(form.remortgageTransferPrice),
+    });
+    if (combinedLandRegistryFee > 0) {
+      remortgage.disbursements.push({
+        label: "Land Registry fee",
+        amount: combinedLandRegistryFee,
+      });
+      remortgage.disbursementTotal = Number(
+        (remortgage.disbursementTotal + combinedLandRegistryFee).toFixed(2)
+      );
+    }
 
     const remortgageTransferBespoke = getBespokeNote(
       toNumber(form.remortgageTransferPrice)

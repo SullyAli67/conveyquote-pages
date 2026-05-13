@@ -156,6 +156,7 @@ type QuoteForm = {
   newLender: string;
   additionalBorrowing: string;
   remortgageTransfer: string;
+  mortgageAmount: string;
 
   transferMortgage: string;
   ownersChanging: string;
@@ -194,6 +195,7 @@ type QuoteForm = {
   remortgageTransferHasMortgage: string;
   remortgageTransferOwnersChanging: string;
   remortgageTransferOwnershipType: string;
+  remortgageTransferMortgageAmount: string;
 };
 
 type ApprovedQuoteData = {
@@ -391,6 +393,7 @@ const initialFormState: QuoteForm = {
   newLender: "",
   additionalBorrowing: "",
   remortgageTransfer: "",
+  mortgageAmount: "",
 
   transferMortgage: "",
   ownersChanging: "",
@@ -429,6 +432,7 @@ const initialFormState: QuoteForm = {
   remortgageTransferHasMortgage: "",
   remortgageTransferOwnersChanging: "",
   remortgageTransferOwnershipType: "",
+  remortgageTransferMortgageAmount: "",
 };
 
 const defaultApprovedNextSteps =
@@ -1096,6 +1100,7 @@ function App() {
     transactionType: FirmIssueTransactionType;
     price: string;
     salePrice: string;
+    mortgageAmount: string;
     tenure: "freehold" | "leasehold";
     postcode: string;
     buyerCount: string;
@@ -1126,6 +1131,7 @@ function App() {
     transactionType: "purchase",
     price: "",
     salePrice: "",
+    mortgageAmount: "",
     tenure: "freehold",
     postcode: "",
     buyerCount: "1",
@@ -2719,6 +2725,12 @@ function App() {
     salePrice: form.transactionType === "sale_purchase"
       ? Number(form.salePrice) || 0
       : undefined,
+    // Required for remortgage / remortgage_transfer — feeds Scale 2 LR.
+    mortgageAmount:
+      form.transactionType === "remortgage" ||
+      form.transactionType === "remortgage_transfer"
+        ? Number(form.mortgageAmount) || 0
+        : undefined,
     tenure: form.tenure,
     postcode: form.postcode,
     buyerCount: Math.max(1, Math.min(4, Math.floor(Number(form.buyerCount) || 1))),
@@ -2736,6 +2748,13 @@ function App() {
     if (form.transactionType === "sale_purchase" &&
         (!form.salePrice || Number(form.salePrice) <= 0)) {
       return "Sale price is required for a Sale + Purchase matter.";
+    }
+    if (
+      (form.transactionType === "remortgage" ||
+        form.transactionType === "remortgage_transfer") &&
+      (!form.mortgageAmount || Number(form.mortgageAmount) <= 0)
+    ) {
+      return "Mortgage amount is required for remortgage matters.";
     }
     if (!form.postcode.trim()) return "Postcode is required.";
     const buyerCount = Number(form.buyerCount);
@@ -5789,6 +5808,21 @@ function App() {
                       </div>
 
                       <div className="field">
+                        <label htmlFor="mortgageAmount">Mortgage amount (£)</label>
+                        <input
+                          id="mortgageAmount"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          name="mortgageAmount"
+                          value={form.mortgageAmount}
+                          onChange={handleChange}
+                          placeholder="200000"
+                          required
+                        />
+                      </div>
+
+                      <div className="field">
                         <label htmlFor="remortgageTransfer">
                           Transfer of equity at same time?
                         </label>
@@ -5966,6 +6000,21 @@ function App() {
                           <option value="yes">Yes</option>
                           <option value="no">No</option>
                         </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferMortgageAmount">Mortgage amount (£)</label>
+                        <input
+                          id="remortgageTransferMortgageAmount"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          name="remortgageTransferMortgageAmount"
+                          value={form.remortgageTransferMortgageAmount}
+                          onChange={handleChange}
+                          placeholder="200000"
+                          required
+                        />
                       </div>
 
                       <div className="field">
@@ -7177,6 +7226,24 @@ function App() {
                               onChange={(e) =>
                                 setIssueQuoteForm((f) => ({ ...f, salePrice: e.target.value }))
                               }
+                            />
+                          </div>
+                        )}
+                        {(issueQuoteForm.transactionType === "remortgage" ||
+                          issueQuoteForm.transactionType === "remortgage_transfer") && (
+                          <div className="field">
+                            <label htmlFor="iq-mortgageAmount">Mortgage amount (£)</label>
+                            <input
+                              id="iq-mortgageAmount"
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              value={issueQuoteForm.mortgageAmount}
+                              onChange={(e) =>
+                                setIssueQuoteForm((f) => ({ ...f, mortgageAmount: e.target.value }))
+                              }
+                              placeholder="200000"
+                              required
                             />
                           </div>
                         )}

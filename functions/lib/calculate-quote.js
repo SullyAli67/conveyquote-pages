@@ -1,4 +1,7 @@
-import { getOfficeCopyEntriesAmount } from "./disbursement-constants.js";
+import {
+  getOfficeCopyEntriesAmount,
+  getLandRegistryFee,
+} from "./disbursement-constants.js";
 
 // Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
 // engine can source the same values — these costs must not diverge
@@ -9,11 +12,11 @@ import { getOfficeCopyEntriesAmount } from "./disbursement-constants.js";
 // function exported from ./disbursement-constants.js. Both engines call
 // getOfficeCopyEntriesAmount(tenure) directly.
 //
-// Land Registry: currently a flat fee. When/if we model the real HMLR
-// sliding scale, replace this constant with a function that takes price
-// and update both consumers together.
+// Land Registry is also NOT here — it's a transaction-type-aware
+// statutory sliding scale exported from ./disbursement-constants.js.
+// Call getLandRegistryFee({ transactionType, purchasePrice,
+// mortgageAmount, propertyValue }) directly. HMLR fees are NOT VAT-able.
 export const SEARCH_PACK_FEE = 350;
-export const LAND_REGISTRY_FEE = 150;
 export const ID_CHECKS_PER_BUYER = 14.4;
 export const OS1_SEARCH_FEE = 8.8;
 export const BANKRUPTCY_SEARCH_PER_BUYER = 7.6;
@@ -319,7 +322,16 @@ function buildPurchaseQuote(input, options = {}) {
   }
 
   addItem(disbursements, "Search pack", SEARCH_PACK_FEE);
-  addItem(disbursements, "Land Registry fee", LAND_REGISTRY_FEE);
+  // HMLR Scale 1 sliding scale, no VAT. Single source of truth for
+  // both rails in functions/lib/disbursement-constants.js.
+  addItem(
+    disbursements,
+    "Land Registry fee",
+    getLandRegistryFee({
+      transactionType: "purchase",
+      purchasePrice: price,
+    })
+  );
   addItem(disbursements, perPersonLabel("ID checks", buyerCount), ID_CHECKS_PER_BUYER * buyerCount);
   addItem(disbursements, "OS1 search", OS1_SEARCH_FEE);
   addItem(disbursements, perPersonLabel("Bankruptcy search", buyerCount), BANKRUPTCY_SEARCH_PER_BUYER * buyerCount);
@@ -417,6 +429,7 @@ function buildRemortgageQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
+  const mortgageAmount = toNumber(input.mortgageAmount);
   const partyCount = getBuyerCount(input.ownershipType);
 
   addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
@@ -437,6 +450,15 @@ function buildRemortgageQuote(input) {
     disbursements,
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.tenure)
+  );
+  // HMLR Scale 2 on the new mortgage advance, no VAT.
+  addItem(
+    disbursements,
+    "Land Registry fee",
+    getLandRegistryFee({
+      transactionType: "remortgage",
+      mortgageAmount,
+    })
   );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on remortgage
@@ -479,6 +501,15 @@ function buildTransferQuote(input) {
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.tenure)
   );
+  // HMLR Scale 2 — conservative over-estimate, see helper note.
+  addItem(
+    disbursements,
+    "Land Registry fee",
+    getLandRegistryFee({
+      transactionType: "transfer",
+      propertyValue,
+    })
+  );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on transfer of equity
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
@@ -496,6 +527,13 @@ function buildRemortgageTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
+  // remortgageTransfer-prefixed fields are the canonical form names for
+  // combined matters. Read both directly here for the LR fee — the
+  // legacy `input.price` mapping doesn't always flow on this path.
+  const combinedPropertyValue = toNumber(
+    input.remortgageTransferPrice || input.price
+  );
+  const mortgageAmount = toNumber(input.remortgageTransferMortgageAmount);
   // Use the larger of the two party counts so disbursements aren't
   // under-charged when more owners are being added than the remortgage
   // ownership type suggests.
@@ -527,6 +565,17 @@ function buildRemortgageTransferQuote(input) {
     disbursements,
     "Office copy entries",
     getOfficeCopyEntriesAmount(input.remortgageTransferTenure)
+  );
+  // HMLR: combined applications attract ONE fee — the higher of
+  // Scale 2 on the new mortgage and Scale 2 on the property value.
+  addItem(
+    disbursements,
+    "Land Registry fee",
+    getLandRegistryFee({
+      transactionType: "remortgage_transfer",
+      mortgageAmount,
+      propertyValue: combinedPropertyValue,
+    })
   );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required
