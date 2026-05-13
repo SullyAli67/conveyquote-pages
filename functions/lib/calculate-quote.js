@@ -446,6 +446,10 @@ function buildRemortgageQuote(input) {
     addItem(legalFees, "Simultaneous transfer of equity supplement", 350);
   }
 
+  // TS engine adds TT to wire the remortgage advance from the new lender —
+  // mirrored here so JS doesn't under-quote.
+  addItem(legalFees, "Telegraphic transfer fee - remortgage advance", 45);
+
   addItem(
     disbursements,
     "Office copy entries",
