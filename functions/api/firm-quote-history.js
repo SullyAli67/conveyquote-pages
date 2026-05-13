@@ -55,7 +55,9 @@ export async function onRequestGet(context) {
 
     let sql = `
       SELECT id, client_name, client_email, transaction_type,
-             grand_total, issued_at
+             grand_total, issued_at,
+             client_email_sent_at, client_email_message_id,
+             client_email_last_error
         FROM firm_issued_quotes
        WHERE firm_id = ?
     `;
@@ -80,6 +82,15 @@ export async function onRequestGet(context) {
       transactionType: String(r.transaction_type || ""),
       grandTotal: Number(r.grand_total || 0),
       issuedAt: String(r.issued_at || ""),
+      clientEmailSentAt: r.client_email_sent_at
+        ? String(r.client_email_sent_at)
+        : null,
+      clientEmailMessageId: r.client_email_message_id
+        ? String(r.client_email_message_id)
+        : null,
+      clientEmailLastError: r.client_email_last_error
+        ? String(r.client_email_last_error)
+        : null,
     }));
 
     return jsonResponse({

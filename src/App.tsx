@@ -810,6 +810,35 @@ function getTransactionLabel(type: string | undefined) {
   return "Not provided";
 }
 
+// "2 minutes ago" / "3 hours ago" / "yesterday" / "2 days ago" — used by
+// the firm portal's email-sent indicators. SQLite datetime values come
+// without timezone, so normalise to UTC the same way the PDF code does.
+function formatRelativeTime(iso: string): string {
+  if (!iso) return "";
+  const normalised = String(iso).includes("T")
+    ? String(iso)
+    : String(iso).replace(" ", "T") + "Z";
+  const t = Date.parse(normalised);
+  if (Number.isNaN(t)) return "";
+  const diffMs = Date.now() - t;
+  if (diffMs < 0) return "just now";
+  const secs = Math.floor(diffMs / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return mins === 1 ? "1 minute ago" : `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
 function getBuyerCountFromOwnershipType(ownershipType?: string) {
   return ownershipType === "joint" ? 2 : 1;
 }
@@ -1320,14 +1349,14 @@ function App() {
   const [isLoadingPipeline, setIsLoadingPipeline] = useState(false);
   const [pipelineFilter, setPipelineFilter] = useState("all");
 
-  // Firm quotes state
+  // Firm fee config state — shared by the Fee Settings tab and the
+  // Issue Quote rail. The legacy "My Quotes" rail (firm_quotes table)
+  // was retired along with its handlers, types, and endpoints.
   type FirmFeeItem = { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean };
-  type FirmQuoteRow = { id: number; firm_reference: string; internal_reference: string; client_name: string; client_email: string; transaction_type: string; price: number; status: string; sent_at: string; accepted_at: string; created_at: string };
 
-  type FirmPortalTab = "referrals" | "quotes" | "issue_quote" | "history" | "fees" | "profile";
+  type FirmPortalTab = "referrals" | "issue_quote" | "history" | "fees" | "profile";
   const FIRM_PORTAL_TABS = [
     "referrals",
-    "quotes",
     "issue_quote",
     "history",
     "fees",
@@ -1337,9 +1366,13 @@ function App() {
     value: string | null | undefined
   ): value is FirmPortalTab =>
     !!value && (FIRM_PORTAL_TABS as readonly string[]).includes(value);
-  const [firmPortalTab, setFirmPortalTabRaw] = useState<FirmPortalTab>(
-    () => (localStorage.getItem("cq_firm_tab") as FirmPortalTab) || "referrals"
-  );
+  const [firmPortalTab, setFirmPortalTabRaw] = useState<FirmPortalTab>(() => {
+    // Validate before adopting — a stale "quotes" value left over from the
+    // retired My Quotes rail would otherwise hide the portal until the
+    // user manually clicked another tab.
+    const stored = localStorage.getItem("cq_firm_tab");
+    return isValidFirmPortalTab(stored) ? stored : "referrals";
+  });
   const setFirmPortalTab = (tab: FirmPortalTab) => {
     localStorage.setItem("cq_firm_tab", tab);
     setFirmPortalTabRaw(tab);
@@ -1347,13 +1380,9 @@ function App() {
   // Session-level "already loaded" flags so tab clicks don't refetch
   // (firmBrandingLoaded already exists below). A manual Refresh button
   // resets these to force a reload.
-  const [firmQuotesLoaded, setFirmQuotesLoaded] = useState(false);
   const [firmHistoryLoaded, setFirmHistoryLoaded] = useState(false);
   const [firmFeesLoaded, setFirmFeesLoaded] = useState(false);
   const [isFirmRefreshing, setIsFirmRefreshing] = useState(false);
-  const [firmQuotes, setFirmQuotes] = useState<FirmQuoteRow[]>([]);
-  const [isLoadingFirmQuotes, setIsLoadingFirmQuotes] = useState(false);
-  const [firmQuotesMessage, setFirmQuotesMessage] = useState("");
 
   // ── Issue Quote (Type 2 SaaS firm-quoting) state ──────────────────────────
   type FirmIssueTransactionType =
@@ -1463,6 +1492,11 @@ function App() {
     transactionType: string;
     grandTotal: number;
     issuedAt: string;
+    // Phase 5 email tracking (nullable — older rows pre-migration won't
+    // have these set, and a quote that hasn't been sent yet won't either).
+    clientEmailSentAt?: string | null;
+    clientEmailMessageId?: string | null;
+    clientEmailLastError?: string | null;
   };
 
   type FirmIssuedQuoteDetail = {
@@ -1544,28 +1578,6 @@ function App() {
   // endpoint doesn't set a session cookie, so a plain <img src> can't
   // pass the Bearer token — same constraint as the PDF download flow.
   const [firmLogoPreviewUrl, setFirmLogoPreviewUrl] = useState<string>("");
-
-  // Quote builder state
-  const [isCreatingQuote, setIsCreatingQuote] = useState(false);
-  const [isSavingAndSending, setIsSavingAndSending] = useState(false);
-  const [quoteBuilderMode, setQuoteBuilderMode] = useState<"list" | "new" | "edit">("list");
-  const [isDeletingFirmQuote, setIsDeletingFirmQuote] = useState<string | null>(null);
-  const [isLoadingFirmQuoteForEdit, setIsLoadingFirmQuoteForEdit] = useState<string | null>(null);
-  const [firmQuoteManageMessage, setFirmQuoteManageMessage] = useState("");
-  const [firmQuoteForm, setFirmQuoteForm] = useState({
-    firm_reference: "",
-    client_name: "",
-    client_email: "",
-    client_phone: "",
-    transaction_type: "purchase",
-    tenure: "freehold",
-    price: "",
-    postcode: "",
-    email_signature: "",
-    internal_reference: "",
-  });
-  const [firmQuoteLineItems, setFirmQuoteLineItems] = useState<FirmFeeItem[]>([]);
-  const [firmQuoteSendMessage, setFirmQuoteSendMessage] = useState("");
 
   // ── Referrer portal state ──────────────────────────────────────────────
   type ReferrerEnquiry = Record<string, unknown>;
@@ -2739,7 +2751,6 @@ function App() {
     setIsFirmRefreshing(true);
     try {
       // Clear per-tab loaded flags so other tabs also refetch on next visit.
-      setFirmQuotesLoaded(false);
       setFirmHistoryLoaded(false);
       setFirmFeesLoaded(false);
       setFirmBrandingLoaded(false);
@@ -2747,10 +2758,7 @@ function App() {
       await loadFirmPortalData(firmToken);
 
       // Reload the data for the currently-active tab.
-      if (firmPortalTab === "quotes") {
-        setFirmQuotesLoaded(true);
-        await loadFirmQuotes();
-      } else if (firmPortalTab === "fees") {
+      if (firmPortalTab === "fees") {
         setFirmFeesLoaded(true);
         await loadFeeConfig(feeConfigType);
       } else if (firmPortalTab === "history") {
@@ -3551,6 +3559,99 @@ function App() {
     }
   };
 
+  // ── Phase 5: Send firm-issued quote to client via email ──────────────────
+  // Tracks the quote id currently being sent so the relevant row can show a
+  // "Sending…" state without lighting up every button at once.
+  const [firmSendingId, setFirmSendingId] = useState<number | null>(null);
+
+  const applySendSuccessToHistory = (
+    quoteId: number,
+    sentAt: string,
+    messageId: string | null
+  ) => {
+    setFirmHistoryQuotes((prev) =>
+      prev.map((q) =>
+        q.id === quoteId
+          ? {
+              ...q,
+              clientEmailSentAt: sentAt,
+              clientEmailMessageId: messageId,
+              clientEmailLastError: null,
+            }
+          : q
+      )
+    );
+  };
+
+  const sendFirmIssuedQuote = async (
+    quoteId: number,
+    clientName: string,
+    confirmResend = false
+  ): Promise<void> => {
+    if (!firmToken || !quoteId) return;
+    setFirmSendingId(quoteId);
+    try {
+      const res = await fetch("/api/firm-issued-quote-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${firmToken}`,
+        },
+        body: JSON.stringify({ id: quoteId, confirmResend }),
+      });
+      let data: {
+        success?: boolean;
+        error?: string;
+        detail?: string;
+        sentAt?: string;
+        messageId?: string;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {}
+
+      if (res.status === 409 && data.error === "recent_send") {
+        const relative = formatRelativeTime(data.sentAt || "") || "recently";
+        const ok = window.confirm(
+          `This quote was sent ${relative}. Send again?`
+        );
+        if (ok) {
+          await sendFirmIssuedQuote(quoteId, clientName, true);
+        }
+        return;
+      }
+
+      if (!res.ok || !data.success) {
+        pushToast({
+          variant: "error",
+          message:
+            (data.detail && String(data.detail)) ||
+            (data.error && String(data.error)) ||
+            "Could not send — try again",
+        });
+        return;
+      }
+
+      const sentAt = data.sentAt || new Date().toISOString();
+      const messageId = data.messageId || null;
+      applySendSuccessToHistory(quoteId, sentAt, messageId);
+      pushToast({
+        variant: "success",
+        message: clientName
+          ? `Quote sent to ${clientName}`
+          : "Quote sent to client",
+      });
+    } catch (e) {
+      console.error("Send firm-issued quote error:", e);
+      pushToast({
+        variant: "error",
+        message: "Could not send — try again",
+      });
+    } finally {
+      setFirmSendingId(null);
+    }
+  };
+
   const openFirmHistoryDetail = async (quoteId: number) => {
     setFirmHistoryDetail(null);
     setFirmHistoryDetailError("");
@@ -3575,305 +3676,6 @@ function App() {
     }
   };
 
-  // ── Firm quotes ───────────────────────────────────────────────────────────
-
-  const loadFirmQuotes = async () => {
-    setIsLoadingFirmQuotes(true);
-    try {
-      const res = await fetch("/api/firm-quotes", {
-        headers: { Authorization: `Bearer ${firmToken}` },
-      });
-      const result = await res.json();
-      if (result.success) setFirmQuotes(result.quotes || []);
-    } catch {}
-    finally { setIsLoadingFirmQuotes(false); }
-  };
-
-  const buildFirmQuoteData = () => {
-    const legalFees = feeConfigItems
-      .filter((f) => !f.is_disbursement)
-      .map((f) => ({
-        label: f.label,
-        amount: f.includes_vat ? Number((f.amount).toFixed(2)) : Number(f.amount.toFixed(2)),
-        includesVat: f.includes_vat,
-      }));
-
-    const disbursements = feeConfigItems
-      .filter((f) => f.is_disbursement)
-      .map((f) => ({ label: f.label, amount: Number(f.amount.toFixed(2)) }));
-
-    const legalFeesExVat = legalFees.reduce((sum, f) => sum + f.amount, 0);
-    const vat = Number((legalFeesExVat * 0.2).toFixed(2));
-    const disbursementTotal = disbursements.reduce((sum, d) => sum + d.amount, 0);
-    const grandTotal = Number((legalFeesExVat + vat + disbursementTotal).toFixed(2));
-
-    const sdltAmount = includeQuoteSdlt && quoteSdltAmount ? Number(quoteSdltAmount) : undefined;
-    const totalIncludingSdlt = sdltAmount !== undefined ? Number((grandTotal + sdltAmount).toFixed(2)) : undefined;
-
-    return { legalFees, disbursements, vat, legalFeesExVat, disbursementTotal, grandTotal, sdltAmount, totalIncludingSdlt };
-  };
-
-  // Auto-calculate SDLT from quote form fields
-  const calcQuoteSdlt = () => {
-    const p = Number(String(firmQuoteForm.price).replace(/,/g, ""));
-    if (!p || firmQuoteForm.transaction_type !== "purchase") return;
-    const isFirst = (firmQuoteForm as Record<string, string>).firstTimeBuyer === "yes";
-    const isAdditional = (firmQuoteForm as Record<string, string>).additionalProperty === "yes";
-    const isNonUk = (firmQuoteForm as Record<string, string>).ukResidentForSdlt === "no";
-
-    function calcStd(v: number) {
-      let t = 0;
-      if (v > 250000) t += (Math.min(v, 925000) - 250000) * 0.05;
-      if (v > 925000) t += (Math.min(v, 1500000) - 925000) * 0.1;
-      if (v > 1500000) t += (v - 1500000) * 0.12;
-      return Math.max(0, t);
-    }
-    function calcFtb(v: number) {
-      if (v > 625000) return calcStd(v);
-      return Math.max(0, v > 425000 ? (v - 425000) * 0.05 : 0);
-    }
-
-    const base = isFirst && !isAdditional ? calcFtb(p) : calcStd(p);
-    let surcharge = 0;
-    if (isAdditional) surcharge += p * 0.05;
-    if (isNonUk) surcharge += p * 0.02;
-    const total = base + surcharge;
-    setQuoteSdltAmount(total.toFixed(2));
-    setIncludeQuoteSdlt(true);
-  };
-
-  const handleCreateQuote = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsCreatingQuote(true);
-    setFirmQuoteSendMessage("");
-
-    try {
-      const quoteData = buildFirmQuoteData();
-      const res = await fetch("/api/firm-quotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${firmToken}` },
-        body: JSON.stringify({
-          ...firmQuoteForm,
-          quote_json: JSON.stringify(quoteData),
-        }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setFirmQuoteForm((prev) => ({ ...prev, internal_reference: result.internal_reference }));
-        setFirmQuoteSendMessage(`Quote created. Reference: ${result.internal_reference}`);
-        await loadFirmQuotes();
-      } else {
-        setFirmQuoteSendMessage(result.error || "Failed to create quote.");
-      }
-    } catch {
-      setFirmQuoteSendMessage("Something went wrong.");
-    } finally {
-      setIsCreatingQuote(false);
-    }
-  };
-
-  const handleSendFirmQuote = async (internalRef: string) => {
-    setFirmQuoteSendMessage("");
-    try {
-      const res = await fetch("/api/firm-quote-send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${firmToken}` },
-        body: JSON.stringify({ internal_reference: internalRef }),
-      });
-      const result = await res.json();
-      setFirmQuoteSendMessage(result.success
-        ? `Quote sent to client successfully.`
-        : result.error || "Failed to send.");
-      if (result.success) await loadFirmQuotes();
-    } catch {
-      setFirmQuoteSendMessage("Something went wrong sending the quote.");
-    }
-  };
-
-  // Save a new firm quote then immediately send it to the client in one step
-  const handleCreateAndSendFirmQuote = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSavingAndSending(true);
-    setFirmQuoteSendMessage("");
-
-    try {
-      // Step 1 — save the quote
-      const quoteData = buildFirmQuoteData();
-      const saveRes = await fetch("/api/firm-quotes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${firmToken}` },
-        body: JSON.stringify({ ...firmQuoteForm, quote_json: JSON.stringify(quoteData) }),
-      });
-      const saveResult = await saveRes.json();
-      if (!saveResult.success) {
-        setFirmQuoteSendMessage(saveResult.error || "Failed to save quote.");
-        return;
-      }
-
-      const internalRef = saveResult.internal_reference as string;
-      setFirmQuoteForm((prev) => ({ ...prev, internal_reference: internalRef }));
-      await loadFirmQuotes();
-
-      // Step 2 — send it to the client
-      const sendRes = await fetch("/api/firm-quote-send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${firmToken}` },
-        body: JSON.stringify({ internal_reference: internalRef }),
-      });
-      const sendResult = await sendRes.json();
-      setFirmQuoteSendMessage(
-        sendResult.success
-          ? `Quote saved (${internalRef}) and sent to client successfully.`
-          : sendResult.error || "Quote saved but failed to send to client."
-      );
-      if (sendResult.success) await loadFirmQuotes();
-    } catch {
-      setFirmQuoteSendMessage("Something went wrong. Please try again.");
-    } finally {
-      setIsSavingAndSending(false);
-    }
-  };
-
-  // Delete a firm quote (only draft/sent — not accepted)
-  const handleDeleteFirmQuote = async (internalRef: string) => {
-    const confirmed = window.confirm(
-      `Delete quote ${internalRef}?\n\nThis cannot be undone. Accepted quotes cannot be deleted.`
-    );
-    if (!confirmed) return;
-    setIsDeletingFirmQuote(internalRef);
-    setFirmQuoteManageMessage("");
-    try {
-      const res = await fetch(`/api/firm-quote-manage?ref=${encodeURIComponent(internalRef)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${firmToken}` },
-      });
-      const result = await res.json() as { success: boolean; error?: string };
-      if (result.success) {
-        setFirmQuoteManageMessage(`Quote ${internalRef} deleted.`);
-        await loadFirmQuotes();
-      } else {
-        setFirmQuoteManageMessage(result.error || "Failed to delete quote.");
-      }
-    } catch {
-      setFirmQuoteManageMessage("Something went wrong.");
-    } finally {
-      setIsDeletingFirmQuote(null);
-    }
-  };
-
-  // Load a quote into the form for editing. Pulls the full saved row
-  // (including quote_json -> quote_data) from /api/firm-quote-detail so
-  // edits round-trip correctly. Falls back to the firm's default fee
-  // config only for pre-feature quotes that have no saved line items.
-  const handleLoadFirmQuoteForEdit = async (q: FirmQuoteRow) => {
-    setIsLoadingFirmQuoteForEdit(q.internal_reference);
-    try {
-      const res = await fetch(
-        `/api/firm-quote-detail?ref=${encodeURIComponent(q.internal_reference)}`,
-        { headers: { Authorization: `Bearer ${firmToken}` } }
-      );
-      const result = (await res.json()) as {
-        success: boolean;
-        error?: string;
-        quote?: Record<string, unknown> & {
-          quote_data?: {
-            legalFees?: { label: string; amount: number; includesVat?: boolean }[];
-            disbursements?: { label: string; amount: number }[];
-          } | null;
-        };
-      };
-      if (!res.ok || !result.success || !result.quote) {
-        pushToast({
-          variant: "error",
-          message: result.error || "Couldn't load the saved quote — please try again.",
-        });
-        return;
-      }
-
-      const full = result.quote;
-      const transactionType = String(full.transaction_type || q.transaction_type || "purchase");
-
-      setFirmQuoteForm({
-        firm_reference: String(full.firm_reference || ""),
-        client_name: String(full.client_name || ""),
-        client_email: String(full.client_email || ""),
-        client_phone: String(full.client_phone || ""),
-        transaction_type: transactionType,
-        tenure: String(full.tenure || "freehold"),
-        price: full.price != null ? String(full.price) : "",
-        postcode: String(full.postcode || ""),
-        email_signature: String(full.email_signature || ""),
-        internal_reference: String(full.internal_reference || q.internal_reference),
-      });
-
-      const savedQuoteData = full.quote_data;
-      const hasSavedItems =
-        !!savedQuoteData &&
-        ((Array.isArray(savedQuoteData.legalFees) && savedQuoteData.legalFees.length > 0) ||
-          (Array.isArray(savedQuoteData.disbursements) && savedQuoteData.disbursements.length > 0));
-
-      if (hasSavedItems) {
-        const legal: FirmFeeItem[] = (savedQuoteData?.legalFees ?? []).map((f) => ({
-          label: String(f.label || ""),
-          amount: Number(f.amount || 0),
-          includes_vat: Boolean(f.includesVat),
-          is_disbursement: false,
-        }));
-        const disb: FirmFeeItem[] = (savedQuoteData?.disbursements ?? []).map((d) => ({
-          label: String(d.label || ""),
-          amount: Number(d.amount || 0),
-          includes_vat: false,
-          is_disbursement: true,
-        }));
-        setFeeConfigItems([...legal, ...disb]);
-      } else {
-        // Pre-feature quote with no saved line items — fall back to the
-        // firm's current fee config so the form has something to render.
-        await loadFeeConfig(transactionType);
-      }
-
-      setQuoteBuilderMode("edit");
-      setFirmQuoteSendMessage("");
-      setFirmQuoteManageMessage("");
-    } catch (e) {
-      console.error("Load firm quote for edit error:", e);
-      pushToast({
-        variant: "error",
-        message: "Couldn't load the saved quote — please try again.",
-      });
-    } finally {
-      setIsLoadingFirmQuoteForEdit(null);
-    }
-  };
-
-  // Save edits to an existing quote
-  const handleUpdateFirmQuote = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsCreatingQuote(true);
-    setFirmQuoteManageMessage("");
-    try {
-      const quoteData = buildFirmQuoteData();
-      const res = await fetch("/api/firm-quote-manage", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${firmToken}` },
-        body: JSON.stringify({
-          ...firmQuoteForm,
-          quote_json: JSON.stringify(quoteData),
-        }),
-      });
-      const result = await res.json() as { success: boolean; error?: string };
-      if (result.success) {
-        setFirmQuoteManageMessage("Quote updated successfully. It has been reset to draft — resend to client if needed.");
-        await loadFirmQuotes();
-      } else {
-        setFirmQuoteManageMessage(result.error || "Failed to update quote.");
-      }
-    } catch {
-      setFirmQuoteManageMessage("Something went wrong.");
-    } finally {
-      setIsCreatingQuote(false);
-    }
-  };
 
   // Set ETA on a referred matter — date is chosen explicitly by the firm in the UI
   const handleSetEta = async (reference: string, etaDate: string) => {
@@ -7082,13 +6884,12 @@ function App() {
             {(() => {
               const firmRecord = firmPortalData?.firm as Record<string, unknown> | undefined;
               const isSaasFirm = Number(firmRecord?.is_saas_firm) === 1;
-              const baseTabs: FirmPortalTab[] = ["referrals", "quotes"];
+              const baseTabs: FirmPortalTab[] = ["referrals"];
               const saasTabs: FirmPortalTab[] = isSaasFirm ? ["issue_quote", "history"] : [];
               const tailTabs: FirmPortalTab[] = ["fees", "profile"];
               const allTabs: FirmPortalTab[] = [...baseTabs, ...saasTabs, ...tailTabs];
               const tabLabel = (tab: FirmPortalTab): string =>
                 tab === "referrals" ? "Referred Matters"
-                : tab === "quotes" ? "My Quotes"
                 : tab === "issue_quote" ? "Issue Quote"
                 : tab === "history" ? "Quote History"
                 : tab === "fees" ? "Fee Settings"
@@ -7118,10 +6919,6 @@ function App() {
                           );
                         }
 
-                        if (tab === "quotes" && !firmQuotesLoaded) {
-                          setFirmQuotesLoaded(true);
-                          void loadFirmQuotes();
-                        }
                         if (tab === "fees" && !firmFeesLoaded) {
                           setFirmFeesLoaded(true);
                           void loadFeeConfig(feeConfigType);
@@ -7139,7 +6936,6 @@ function App() {
                         if (tab === "profile" && !firmBrandingLoaded) {
                           void loadFirmBranding();
                         }
-                        setFirmQuoteSendMessage("");
                         setFeeConfigMessage("");
                         setFirmRespondMessage("");
                       }}
@@ -7283,641 +7079,6 @@ function App() {
                   </>
                 )}
 
-                {/* ── My Quotes tab ── */}
-                {firmPortalTab === "quotes" && (
-                  <>
-                    {firmQuoteSendMessage && (
-                      <p className="form-note" style={{ background: "#d1fae5", padding: "10px 14px", borderRadius: "6px", color: "#065f46" }}>
-                        {firmQuoteSendMessage}
-                      </p>
-                    )}
-
-                    {quoteBuilderMode === "list" && (
-                      <>
-                        <SummaryCard title="My Client Quotes">
-                          <div style={{ marginBottom: "14px" }}>
-                            <button type="button" className="primary-button"
-                              onClick={() => {
-                                void loadFeeConfig(firmQuoteForm.transaction_type);
-                                setQuoteBuilderMode("new");
-                                setFirmQuoteSendMessage("");
-                                setFirmQuoteForm({ firm_reference: "", client_name: "", client_email: "", client_phone: "", transaction_type: "purchase", tenure: "freehold", price: "", postcode: "", email_signature: "", internal_reference: "" });
-                              }}>
-                              + New Quote
-                            </button>
-                          </div>
-                          {isLoadingFirmQuotes && <p className="form-note">Loading…</p>}
-                          {firmQuotes.length === 0 && !isLoadingFirmQuotes ? (
-                            <p className="form-note">No quotes yet. Click New Quote to get started.</p>
-                          ) : (
-                            <div className="detail-table">
-                              {firmQuotes.map((q) => (
-                                <div key={q.internal_reference} className="detail-row">
-                                  <div className="detail-row__label">
-                                    <strong>{q.firm_reference || q.internal_reference}</strong>
-                                    <div style={{ fontSize: "12px", color: "#6b7280" }}>{q.internal_reference}</div>
-                                    <div>{q.client_name || q.client_email}</div>
-                                    <div>{String(q.transaction_type || "").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}</div>
-                                    {q.price && <div>£{Number(q.price).toLocaleString("en-GB")}</div>}
-                                  </div>
-                                  <div className="detail-row__value">
-                                    <div style={{
-                                      display: "inline-block", padding: "2px 8px", borderRadius: "10px",
-                                      fontSize: "12px", fontWeight: 600,
-                                      background: q.status === "accepted" ? "#d1fae5" : q.status === "rejected" ? "#fee2e2" : q.status === "sent" ? "#dbeafe" : "#f3f4f6",
-                                      color: q.status === "accepted" ? "#065f46" : q.status === "rejected" ? "#991b1b" : q.status === "sent" ? "#1e40af" : "#6b7280",
-                                    }}>
-                                      {q.status === "accepted" ? "✓ Accepted" : q.status === "rejected" ? "✗ Declined" : q.status === "sent" ? "Sent" : "Draft"}
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
-                                      {q.status !== "accepted" && (
-                                        <button type="button" className="muted-button" style={{ fontSize: "12px" }}
-                                          onClick={() => void handleSendFirmQuote(q.internal_reference)}>
-                                          {q.status === "sent" ? "Resend to Client" : "Send to Client"}
-                                        </button>
-                                      )}
-                                      {q.status !== "accepted" && (
-                                        <button type="button" className="muted-button" style={{ fontSize: "12px" }}
-                                          disabled={isLoadingFirmQuoteForEdit === q.internal_reference}
-                                          onClick={() => void handleLoadFirmQuoteForEdit(q)}>
-                                          {isLoadingFirmQuoteForEdit === q.internal_reference ? "Loading…" : "Edit Quote"}
-                                        </button>
-                                      )}
-                                      <button type="button" className="muted-button" style={{ fontSize: "12px" }}
-                                        onClick={() => {
-                                          // Build a proper printable quote in a new window
-                                          const firmName = firmSession?.firm_name || "Your Solicitor";
-                                          const ref2 = q.firm_reference || q.internal_reference;
-                                          const txLabel = (q.transaction_type || "").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-                                          const win = window.open("", "_blank");
-                                          if (win) {
-                                            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Quote ${ref2}</title>
-                                            <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#1a1a1a;}
-                                            h1{color:#0f2747;font-size:22px;margin-bottom:4px;}
-                                            .sub{color:#6b7280;font-size:14px;margin-bottom:24px;}
-                                            table{border-collapse:collapse;width:100%;margin-bottom:16px;}
-                                            td,th{padding:9px 12px;border:1px solid #d1d5db;font-size:14px;}
-                                            th{background:#f3f4f6;font-weight:600;text-align:left;}
-                                            .total{background:#0f2747;color:#fff;font-weight:700;}
-                                            .section{margin-top:20px;font-weight:600;color:#0f2747;border-bottom:2px solid #0f2747;padding-bottom:4px;margin-bottom:8px;}
-                                            .footer{margin-top:32px;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;}
-                                            @media print{button{display:none;}}</style></head><body>
-                                            <h1>${firmName}</h1>
-                                            <div class="sub">Conveyancing Quote &mdash; ${ref2}</div>
-                                            <table><tr><th>Reference</th><td>${ref2}</td></tr>
-                                            <tr><th>Client</th><td>${q.client_name || q.client_email}</td></tr>
-                                            <tr><th>Transaction</th><td>${txLabel}</td></tr>
-                                            ${q.price ? `<tr><th>Property value</th><td>£${Number(q.price).toLocaleString("en-GB")}</td></tr>` : ""}
-                                            <tr><th>Date</th><td>${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</td></tr>
-                                            </table>`);
-                                            // Fee breakdown from firmQuotes doesn't carry quote_json — load detail separately
-                                            win.document.write(`<div class="footer">This is an indicative estimate. Final costs will be confirmed upon review. &mdash; Powered by ConveyQuote</div>
-                                            <button onclick="window.print()" style="margin-top:20px;padding:10px 24px;background:#0f2747;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print this quote</button>
-                                            </body></html>`);
-                                            win.document.close();
-                                          }
-                                        }}>
-                                        View / Print PDF
-                                      </button>
-                                      {q.status !== "accepted" && (
-                                        <button type="button" className="muted-button"
-                                          style={{ fontSize: "12px", color: "#991b1b", borderColor: "#fca5a5" }}
-                                          disabled={isDeletingFirmQuote === q.internal_reference}
-                                          onClick={() => void handleDeleteFirmQuote(q.internal_reference)}>
-                                          {isDeletingFirmQuote === q.internal_reference ? "Deleting…" : "Delete"}
-                                        </button>
-                                      )}
-                                    </div>
-                                    {firmQuoteManageMessage && (
-                                      <p style={{ fontSize: "12px", marginTop: "6px",
-                                        color: firmQuoteManageMessage.includes("deleted") || firmQuoteManageMessage.includes("updated") ? "#065f46" : "#991b1b" }}>
-                                        {firmQuoteManageMessage}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </SummaryCard>
-                      </>
-                    )}
-
-                    {quoteBuilderMode === "new" && (
-                      <SummaryCard title="New Client Quote">
-                        <form onSubmit={(e) => void handleCreateQuote(e)}>
-                          {/* ── Client & reference ── */}
-                          <div style={{ marginBottom: "18px", paddingBottom: "16px", borderBottom: "1px solid var(--border)" }}>
-                            <h4 style={{ margin: "0 0 12px", color: "var(--navy)" }}>Client & Reference</h4>
-                            <div className="form-grid">
-                              <div className="field">
-                                <label htmlFor="fqFirmRef">Your reference</label>
-                                <input id="fqFirmRef" type="text" value={firmQuoteForm.firm_reference}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, firm_reference: e.target.value }))}
-                                  placeholder="e.g. JS/2026/001" />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqSignature">Email sign-off name</label>
-                                <input id="fqSignature" type="text" value={firmQuoteForm.email_signature}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, email_signature: e.target.value }))}
-                                  placeholder={firmSession?.firm_name || "Your firm name"} />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqClientName">Client name</label>
-                                <input id="fqClientName" type="text" value={firmQuoteForm.client_name}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, client_name: e.target.value }))}
-                                  placeholder="Full name" required />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqClientEmail">Client email</label>
-                                <input id="fqClientEmail" type="email" value={firmQuoteForm.client_email}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, client_email: e.target.value }))}
-                                  placeholder="client@example.com" required />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqClientPhone">Client phone</label>
-                                <input id="fqClientPhone" type="text" value={firmQuoteForm.client_phone}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, client_phone: e.target.value }))}
-                                  placeholder="Optional" />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqType">Transaction type</label>
-                                <select id="fqType" value={firmQuoteForm.transaction_type}
-                                  onChange={(e) => {
-                                    setFirmQuoteForm((p) => ({ ...p, transaction_type: e.target.value }));
-                                    void loadFeeConfig(e.target.value);
-                                  }}>
-                                  <option value="purchase">Purchase</option>
-                                  <option value="sale">Sale</option>
-                                  <option value="remortgage">Remortgage</option>
-                                  <option value="transfer">Transfer of Equity</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* ── Transaction-specific fields ── */}
-                          <div style={{ marginBottom: "18px", paddingBottom: "16px", borderBottom: "1px solid var(--border)" }}>
-                            <h4 style={{ margin: "0 0 12px", color: "var(--navy)" }}>Matter Details</h4>
-                            <div className="form-grid">
-                              <div className="field">
-                                <label htmlFor="fqTenure">Tenure</label>
-                                <select id="fqTenure" value={firmQuoteForm.tenure}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, tenure: e.target.value }))}>
-                                  <option value="freehold">Freehold</option>
-                                  <option value="leasehold">Leasehold</option>
-                                </select>
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqPrice">Property value (£)</label>
-                                <input id="fqPrice" type="text" value={firmQuoteForm.price}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, price: e.target.value }))}
-                                  placeholder="e.g. 300000" />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="fqPostcode">Property postcode</label>
-                                <input id="fqPostcode" type="text" value={firmQuoteForm.postcode}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, postcode: e.target.value }))}
-                                  placeholder="e.g. B15 1AA" />
-                              </div>
-
-                              {/* Purchase-specific */}
-                              {firmQuoteForm.transaction_type === "purchase" && <>
-                                <div className="field">
-                                  <label>Mortgage or cash?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).mortgage || ""}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, mortgage: e.target.value }))}>
-                                    <option value="">Please select</option>
-                                    <option value="mortgage">Mortgage</option>
-                                    <option value="cash">Cash</option>
-                                  </select>
-                                </div>
-                                {(firmQuoteForm as Record<string, string>).mortgage === "mortgage" && (
-                                  <div className="field">
-                                    <label>Lender</label>
-                                    <select value={(firmQuoteForm as Record<string, string>).lender || ""}
-                                      onChange={(e) => setFirmQuoteForm((p) => ({ ...p, lender: e.target.value }))}>
-                                      <option value="">Please select</option>
-                                      {lenders.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-                                    </select>
-                                  </div>
-                                )}
-                                <div className="field">
-                                  <label>Buyer type</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).ownershipType || ""}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, ownershipType: e.target.value }))}>
-                                    <option value="">Please select</option>
-                                    <option value="individual">Individual</option>
-                                    <option value="joint">Joint</option>
-                                    <option value="company">Company</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>First time buyer?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).firstTimeBuyer || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, firstTimeBuyer: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Additional property?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).additionalProperty || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, additionalProperty: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>New build?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).newBuild || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, newBuild: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Shared ownership?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).sharedOwnership || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, sharedOwnership: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Help to Buy / scheme?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).helpToBuy || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, helpToBuy: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Gifted deposit?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).giftedDeposit || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, giftedDeposit: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>UK resident for SDLT?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).ukResidentForSdlt || "yes"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, ukResidentForSdlt: e.target.value }))}>
-                                    <option value="yes">Yes</option>
-                                    <option value="no">No</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Lifetime ISA?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).lifetimeIsa || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, lifetimeIsa: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                              </>}
-
-                              {/* Sale-specific */}
-                              {firmQuoteForm.transaction_type === "sale" && <>
-                                <div className="field">
-                                  <label>Mortgage to redeem?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).saleMortgage || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, saleMortgage: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Number of sellers</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).numberOfSellers || "1"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, numberOfSellers: e.target.value }))}>
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3 or more</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Management company?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).managementCompany || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, managementCompany: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Tenanted?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).tenanted || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, tenanted: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                              </>}
-
-                              {/* Remortgage-specific */}
-                              {firmQuoteForm.transaction_type === "remortgage" && <>
-                                <div className="field">
-                                  <label>New lender</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).newLender || ""}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, newLender: e.target.value }))}>
-                                    <option value="">Please select</option>
-                                    {lenders.map((l) => <option key={l.id} value={l.name}>{l.name}</option>)}
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Additional borrowing?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).additionalBorrowing || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, additionalBorrowing: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                              </>}
-
-                              {/* Transfer-specific */}
-                              {firmQuoteForm.transaction_type === "transfer" && <>
-                                <div className="field">
-                                  <label>Is there a mortgage?</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).transferMortgage || "no"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, transferMortgage: e.target.value }))}>
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                  </select>
-                                </div>
-                                <div className="field">
-                                  <label>Owners changing</label>
-                                  <select value={(firmQuoteForm as Record<string, string>).ownersChanging || "one"}
-                                    onChange={(e) => setFirmQuoteForm((p) => ({ ...p, ownersChanging: e.target.value }))}>
-                                    <option value="one">One</option>
-                                    <option value="two">Two</option>
-                                    <option value="more">More than two</option>
-                                  </select>
-                                </div>
-                              </>}
-                            </div>
-                          </div>
-
-                          {/* ── Fee line items ── */}
-                          <div style={{ marginBottom: "18px" }}>
-                            <h4 style={{ margin: "0 0 10px", color: "var(--navy)" }}>Quote Line Items</h4>
-                            <p className="form-note" style={{ marginBottom: "10px" }}>
-                              Pre-filled from your saved fee settings. Adjust amounts, edit labels, or add/remove rows as needed.
-                            </p>
-                            {feeConfigItems.length === 0 && (
-                              <p className="form-note" style={{ color: "#dc2626" }}>
-                                No fee config saved for this transaction type. Go to the Fee Settings tab first.
-                              </p>
-                            )}
-
-                            {legalFeeItems.length > 0 && (
-                              <div style={{ marginBottom: "12px" }}>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Legal Fees</div>
-                                {legalFeeItems.map((item) => {
-                                  const idx = feeConfigItems.indexOf(item);
-                                  return (
-                                  <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
-                                    <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
-                                      onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Fee description" />
-                                    <input type="number" step="0.01" min="0" value={item.amount} style={{ width: "110px" }}
-                                      onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))} />
-                                    <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
-                                      onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
-                                  </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {disbursementItems.length > 0 && (
-                              <div style={{ marginBottom: "12px" }}>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Disbursements</div>
-                                {disbursementItems.map((item) => {
-                                  const idx = feeConfigItems.indexOf(item);
-                                  return (
-                                  <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
-                                    <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
-                                      onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Disbursement description" />
-                                    <input type="number" step="0.01" min="0" value={item.amount} style={{ width: "110px" }}
-                                      onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))} />
-                                    <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
-                                      onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
-                                  </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
-                              <button type="button" className="muted-button" style={{ fontSize: "12px", padding: "0 12px", minHeight: 32 }}
-                                onClick={() => addFeeItem(false)}>+ Add Legal Fee</button>
-                              <button type="button" className="muted-button" style={{ fontSize: "12px", padding: "0 12px", minHeight: 32 }}
-                                onClick={() => addFeeItem(true)}>+ Add Disbursement</button>
-                            </div>
-
-                            {firmQuoteForm.transaction_type === "purchase" && (
-                              <div style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "14px 16px", marginBottom: "12px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                                  <strong style={{ fontSize: "13px", color: "var(--navy)" }}>Stamp Duty (SDLT)</strong>
-                                  <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
-                                    <input type="checkbox" checked={includeQuoteSdlt} onChange={(e) => setIncludeQuoteSdlt(e.target.checked)} />
-                                    Include in quote
-                                  </label>
-                                </div>
-                                {includeQuoteSdlt && (
-                                  <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", flexWrap: "wrap" }}>
-                                    <div>
-                                      <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>SDLT amount (£)</label>
-                                      <input type="number" step="0.01" min="0" value={quoteSdltAmount}
-                                        onChange={(e) => setQuoteSdltAmount(e.target.value)}
-                                        placeholder="e.g. 5000.00" style={{ width: "140px" }} />
-                                    </div>
-                                    <button type="button" className="muted-button" style={{ fontSize: "12px", minHeight: 36 }}
-                                      onClick={calcQuoteSdlt}>Auto-calculate from form</button>
-                                    <p className="form-note" style={{ width: "100%", margin: "6px 0 0", fontSize: "11px" }}>
-                                      SDLT is shown separately in the quote email. It is paid to HMRC by your client, not to your firm.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {feeConfigItems.length > 0 && (() => {
-                              const qd = buildFirmQuoteData();
-                              return (
-                                <div style={{ marginTop: "14px", padding: "14px 18px", background: "#f7f9fc", borderRadius: "10px", border: "1px solid var(--border)" }}>
-                                  {[
-                                    ["Legal fees ex VAT", `£${qd.legalFeesExVat.toFixed(2)}`],
-                                    ["VAT (20%)", `£${qd.vat.toFixed(2)}`],
-                                    ["Disbursements", `£${qd.disbursementTotal.toFixed(2)}`],
-                                  ].map(([label, val]) => (
-                                    <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "14px" }}>
-                                      <span style={{ color: "var(--muted)" }}>{label}</span><span>{val}</span>
-                                    </div>
-                                  ))}
-                                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--border)", paddingTop: "8px", marginTop: "6px", fontWeight: 700, fontSize: "15px", color: "var(--navy)" }}>
-                                    <span>Total estimate (ex SDLT)</span><span>£{qd.grandTotal.toFixed(2)}</span>
-                                  </div>
-                                  {qd.sdltAmount !== undefined && (
-                                    <>
-                                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "14px" }}>
-                                        <span style={{ color: "var(--muted)" }}>Estimated SDLT</span><span>£{qd.sdltAmount.toFixed(2)}</span>
-                                      </div>
-                                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontWeight: 700, fontSize: "15px", color: "#065f46" }}>
-                                        <span>Total inc. SDLT</span><span>£{(qd.totalIncludingSdlt ?? 0).toFixed(2)}</span>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="form-footer action-row" style={{ marginTop: "20px" }}>
-                            <button type="button" className="muted-button"
-                              onClick={() => setQuoteBuilderMode("list")}>Cancel</button>
-                            <button type="submit" className="primary-button" disabled={isCreatingQuote || isSavingAndSending}>
-                              {isCreatingQuote ? "Saving…" : "Save Quote"}
-                            </button>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              style={{ background: "var(--teal-dark)" }}
-                              disabled={isCreatingQuote || isSavingAndSending}
-                              onClick={(e) => {
-                                void handleCreateAndSendFirmQuote(e as unknown as FormEvent<HTMLFormElement>);
-                              }}
-                            >
-                              {isSavingAndSending ? "Saving & Sending…" : "Save & Send to Client"}
-                            </button>
-                          </div>
-
-                          {firmQuoteForm.internal_reference && (
-                            <div style={{ marginTop: "14px", padding: "14px 18px", background: "#d1fae5", borderRadius: "10px", border: "1px solid #86efac" }}>
-                              <p style={{ margin: "0 0 10px", color: "#065f46", fontWeight: 600 }}>
-                                ✓ Quote saved — {firmQuoteForm.internal_reference}
-                              </p>
-                              <div style={{ display: "flex", gap: "10px" }}>
-                                <button type="button" className="primary-button" style={{ minHeight: 42, padding: "0 20px" }}
-                                  onClick={() => void handleSendFirmQuote(firmQuoteForm.internal_reference)}>
-                                  Send to Client
-                                </button>
-                                <button type="button" className="muted-button" style={{ minHeight: 42, padding: "0 16px" }}
-                                  onClick={() => { setQuoteBuilderMode("list"); void loadFirmQuotes(); }}>
-                                  Back to List
-                                </button>
-                              </div>
-                              {firmQuoteSendMessage && (
-                                <p style={{ margin: "10px 0 0", fontSize: "13px", color: firmQuoteSendMessage.includes("successfully") || firmQuoteSendMessage.includes("sent") ? "#065f46" : "#dc2626" }}>
-                                  {firmQuoteSendMessage}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </form>
-                      </SummaryCard>
-                    )}
-
-                    {quoteBuilderMode === "edit" && (
-                      <SummaryCard title={`Edit Quote — ${firmQuoteForm.firm_reference || firmQuoteForm.internal_reference}`}>
-                        <div style={{ padding: "10px 14px", background: "#fef3c7", borderRadius: "8px", border: "1px solid #fcd34d", marginBottom: "16px", fontSize: "13px", color: "#92400e" }}>
-                          <strong>Note:</strong> Editing this quote will reset it to Draft status. If it was already sent to the client, you will need to resend it. Accepted quotes cannot be edited.
-                        </div>
-                        <form onSubmit={(e) => void handleUpdateFirmQuote(e)}>
-                          <div style={{ marginBottom: "18px", paddingBottom: "16px", borderBottom: "1px solid var(--border)" }}>
-                            <h4 style={{ margin: "0 0 12px", color: "var(--navy)" }}>Client & Reference</h4>
-                            <div className="form-grid">
-                              <div className="field">
-                                <label>Your reference</label>
-                                <input type="text" value={firmQuoteForm.firm_reference}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, firm_reference: e.target.value }))}
-                                  placeholder="e.g. JS/2026/001" />
-                              </div>
-                              <div className="field">
-                                <label>Client name</label>
-                                <input type="text" value={firmQuoteForm.client_name}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, client_name: e.target.value }))}
-                                  placeholder="Full name" required />
-                              </div>
-                              <div className="field">
-                                <label>Client email</label>
-                                <input type="email" value={firmQuoteForm.client_email}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, client_email: e.target.value }))}
-                                  placeholder="client@example.com" required />
-                              </div>
-                              <div className="field">
-                                <label>Transaction type</label>
-                                <select value={firmQuoteForm.transaction_type}
-                                  onChange={(e) => { setFirmQuoteForm((p) => ({ ...p, transaction_type: e.target.value })); void loadFeeConfig(e.target.value); }}>
-                                  <option value="purchase">Purchase</option>
-                                  <option value="sale">Sale</option>
-                                  <option value="remortgage">Remortgage</option>
-                                  <option value="transfer">Transfer of Equity</option>
-                                </select>
-                              </div>
-                              <div className="field">
-                                <label>Property value (£)</label>
-                                <input type="text" value={firmQuoteForm.price}
-                                  onChange={(e) => setFirmQuoteForm((p) => ({ ...p, price: e.target.value }))}
-                                  placeholder="e.g. 300000" />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{ marginBottom: "18px" }}>
-                            <h4 style={{ margin: "0 0 10px", color: "var(--navy)" }}>Quote Line Items</h4>
-                            <div className="detail-table">
-                              {feeConfigItems.map((item, idx) => (
-                                <div key={idx} className="detail-row">
-                                  <div className="detail-row__label">
-                                    <strong>{item.label}</strong>
-                                    <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                                      {item.is_disbursement ? "Disbursement" : `Legal fee${item.includes_vat ? " (+ VAT)" : ""}`}
-                                    </div>
-                                  </div>
-                                  <div className="detail-row__value">
-                                    <input type="number" step="0.01" value={item.amount} style={{ width: "110px" }}
-                                      onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            {feeConfigItems.length > 0 && (() => {
-                              const qd = buildFirmQuoteData();
-                              return (
-                                <div style={{ marginTop: "14px", padding: "14px 18px", background: "#f7f9fc", borderRadius: "10px", border: "1px solid var(--border)" }}>
-                                  {[["Legal fees ex VAT", `£${qd.legalFeesExVat.toFixed(2)}`], ["VAT (20%)", `£${qd.vat.toFixed(2)}`], ["Disbursements", `£${qd.disbursementTotal.toFixed(2)}`]].map(([label, val]) => (
-                                    <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "14px" }}>
-                                      <span style={{ color: "var(--muted)" }}>{label}</span><span>{val}</span>
-                                    </div>
-                                  ))}
-                                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--border)", paddingTop: "8px", marginTop: "6px", fontWeight: 700, fontSize: "15px", color: "var(--navy)" }}>
-                                    <span>Total estimate</span><span>£{qd.grandTotal.toFixed(2)}</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {firmQuoteManageMessage && (
-                            <p style={{ fontSize: "13px", padding: "10px 14px", borderRadius: "8px", marginBottom: "12px",
-                              background: firmQuoteManageMessage.includes("updated") ? "#d1fae5" : "#fee2e2",
-                              color: firmQuoteManageMessage.includes("updated") ? "#065f46" : "#991b1b" }}>
-                              {firmQuoteManageMessage}
-                            </p>
-                          )}
-
-                          <div className="form-footer action-row">
-                            <button type="button" className="muted-button" onClick={() => { setQuoteBuilderMode("list"); setFirmQuoteManageMessage(""); }}>Cancel</button>
-                            <button type="submit" className="primary-button" disabled={isCreatingQuote}>
-                              {isCreatingQuote ? "Saving…" : "Save Changes"}
-                            </button>
-                          </div>
-                        </form>
-                      </SummaryCard>
-                    )}
-                  </>
-                )}
 
                 {/* ── Issue Quote tab (SaaS firms only) ── */}
                 {firmPortalTab === "issue_quote" && (
@@ -7977,6 +7138,25 @@ function App() {
                                 ? "Preparing PDF…"
                                 : "Download PDF"}
                             </button>
+                            {issueQuoteForm.clientEmail.trim() && (
+                              <button
+                                type="button"
+                                className="primary-button"
+                                onClick={() =>
+                                  void sendFirmIssuedQuote(
+                                    issueQuoteSavedMessage.quoteId,
+                                    issueQuoteForm.clientName
+                                  )
+                                }
+                                disabled={
+                                  firmSendingId === issueQuoteSavedMessage.quoteId
+                                }
+                              >
+                                {firmSendingId === issueQuoteSavedMessage.quoteId
+                                  ? "Sending…"
+                                  : "Send to Client"}
+                              </button>
+                            )}
                             {/* migrated to pushToast in claude/toast-system */}
                           </div>
                         )}
@@ -8457,80 +7637,165 @@ function App() {
                         {/* firmPdfError inline text migrated to pushToast in claude/toast-system */}
 
                         {!isLoadingFirmIssuedHistory && firmHistoryQuotes.length === 0 && !firmHistoryError && (
-                          <div style={{ textAlign: "center", padding: "32px 0" }}>
-                            <p className="form-note" style={{ color: "var(--muted)", marginBottom: "16px" }}>
-                              No quotes issued yet. Issue your first quote.
-                            </p>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              onClick={() => goToFirmTab("issue_quote")}
-                            >
-                              Issue Quote
-                            </button>
+                          <div style={{ textAlign: "center", padding: "40px 16px" }}>
+                            {firmHistorySearch.trim() ? (
+                              <p
+                                className="form-note"
+                                style={{ color: "var(--muted)", marginBottom: "16px" }}
+                              >
+                                No quotes match "{firmHistorySearch.trim()}".
+                              </p>
+                            ) : (
+                              <>
+                                <div
+                                  aria-hidden="true"
+                                  style={{
+                                    fontSize: "40px",
+                                    lineHeight: 1,
+                                    marginBottom: "10px",
+                                    color: "var(--muted)",
+                                  }}
+                                >
+                                  📄
+                                </div>
+                                <p
+                                  className="form-note"
+                                  style={{
+                                    color: "var(--muted)",
+                                    marginBottom: "16px",
+                                  }}
+                                >
+                                  No quotes yet. Use Issue Quote to create your first.
+                                </p>
+                                <button
+                                  type="button"
+                                  className="primary-button"
+                                  onClick={() => goToFirmTab("issue_quote")}
+                                >
+                                  Issue Quote
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
 
                         {firmHistoryQuotes.length > 0 && (
                           <div className="detail-table">
-                            {firmHistoryQuotes.map((q) => (
-                              <div
-                                key={q.id}
-                                className="detail-row"
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => void openFirmHistoryDetail(q.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    void openFirmHistoryDetail(q.id);
-                                  }
-                                }}
-                                style={{
-                                  textAlign: "left",
-                                  width: "100%",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <div className="detail-row__label">
-                                  <strong style={{ color: "var(--navy)" }}>{q.clientName}</strong>
-                                  <div style={{ fontSize: "13px", color: "var(--muted)" }}>
-                                    {TRANSACTION_TYPE_LABEL[
-                                      q.transactionType as FirmIssueTransactionType
-                                    ] || q.transactionType}
-                                  </div>
-                                  <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                                    {q.issuedAt}
-                                  </div>
-                                </div>
+                            {firmHistoryQuotes.map((q) => {
+                              const hasEmail = Boolean(q.clientEmail);
+                              const isSending = firmSendingId === q.id;
+                              const sentRelative = q.clientEmailSentAt
+                                ? formatRelativeTime(q.clientEmailSentAt)
+                                : "";
+                              const showSendFailed =
+                                !q.clientEmailSentAt && Boolean(q.clientEmailLastError);
+                              return (
                                 <div
-                                  className="detail-row__value"
+                                  key={q.id}
+                                  className="detail-row"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => void openFirmHistoryDetail(q.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      void openFirmHistoryDetail(q.id);
+                                    }
+                                  }}
                                   style={{
-                                    textAlign: "right",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                    gap: "8px",
+                                    textAlign: "left",
+                                    width: "100%",
+                                    cursor: "pointer",
                                   }}
                                 >
-                                  <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>
-                                    £{Number(q.grandTotal).toFixed(2)}
+                                  <div className="detail-row__label">
+                                    <strong style={{ color: "var(--navy)" }}>{q.clientName}</strong>
+                                    <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+                                      {TRANSACTION_TYPE_LABEL[
+                                        q.transactionType as FirmIssueTransactionType
+                                      ] || q.transactionType}
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                      {q.issuedAt}
+                                    </div>
+                                    {sentRelative && (
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "var(--muted)",
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        Sent {sentRelative}
+                                      </div>
+                                    )}
+                                    {showSendFailed && (
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#dc2626",
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        Last send failed
+                                      </div>
+                                    )}
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="muted-button"
-                                    style={{ fontSize: "12px", padding: "4px 10px" }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void downloadFirmQuotePdf(q.id, q.clientName);
+                                  <div
+                                    className="detail-row__value"
+                                    style={{
+                                      textAlign: "right",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "flex-end",
+                                      gap: "8px",
                                     }}
-                                    disabled={firmPdfDownloadingId === q.id}
                                   >
-                                    {firmPdfDownloadingId === q.id ? "Preparing…" : "Download PDF"}
-                                  </button>
+                                    <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>
+                                      £{Number(q.grandTotal).toFixed(2)}
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: "6px",
+                                        flexWrap: "wrap",
+                                        justifyContent: "flex-end",
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="muted-button"
+                                        style={{ fontSize: "12px", padding: "4px 10px" }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void downloadFirmQuotePdf(q.id, q.clientName);
+                                        }}
+                                        disabled={firmPdfDownloadingId === q.id}
+                                      >
+                                        {firmPdfDownloadingId === q.id ? "Preparing…" : "Download PDF"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="primary-button"
+                                        style={{ fontSize: "12px", padding: "4px 10px" }}
+                                        title={
+                                          hasEmail
+                                            ? undefined
+                                            : "Add client email when issuing to enable send"
+                                        }
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void sendFirmIssuedQuote(q.id, q.clientName);
+                                        }}
+                                        disabled={!hasEmail || isSending}
+                                      >
+                                        {isSending ? "Sending…" : "Send to Client"}
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
 
