@@ -7852,7 +7852,7 @@ function App() {
                           void loadFeeConfig(e.target.value);
                           setFeeConfigMessage("");
                         }}
-                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}>
+                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
                         <option value="purchase">Purchase</option>
                         <option value="sale">Sale</option>
                         <option value="remortgage">Remortgage</option>
@@ -7869,7 +7869,7 @@ function App() {
                             <div className="detail-row__label" style={{ flex: 2 }}>
                               <input type="text" value={item.label} placeholder="Fee label"
                                 onChange={(e) => updateFeeItem(idx, "label", e.target.value)}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                               <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
                                 <input type="checkbox" checked={item.includes_vat}
                                   onChange={(e) => updateFeeItem(idx, "includes_vat", e.target.checked)} />
@@ -7881,7 +7881,7 @@ function App() {
                                 <span style={{ fontSize: "13px" }}>£</span>
                                 <input type="number" step="0.01" value={item.amount}
                                   onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))}
-                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                                 <button type="button" className="muted-button" style={{ fontSize: "12px" }}
                                   onClick={() => removeFeeItem(idx)}>Remove</button>
                               </div>
@@ -7902,14 +7902,14 @@ function App() {
                             <div className="detail-row__label" style={{ flex: 2 }}>
                               <input type="text" value={item.label} placeholder="Disbursement label"
                                 onChange={(e) => updateFeeItem(idx, "label", e.target.value)}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                             </div>
                             <div className="detail-row__value">
                               <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                 <span style={{ fontSize: "13px" }}>£</span>
                                 <input type="number" step="0.01" value={item.amount}
                                   onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))}
-                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                                 <button type="button" className="muted-button" style={{ fontSize: "12px" }}
                                   onClick={() => removeFeeItem(idx)}>Remove</button>
                               </div>
@@ -7996,7 +7996,7 @@ function App() {
                               accept="image/png,image/jpeg"
                               onChange={(e) => void handleFirmLogoUpload(e)}
                               disabled={isUploadingFirmLogo}
-                              style={{ fontSize: "13px" }}
+                              style={{ fontSize: "16px" }}
                             />
                             {isUploadingFirmLogo && (
                               <span style={{ marginLeft: "10px", fontSize: "13px", color: "#6b7280" }}>
@@ -8017,7 +8017,7 @@ function App() {
                             maxLength={100}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, displayName: e.target.value }))}
                             placeholder="e.g. Cambridge Solicitors LLP"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -8032,7 +8032,7 @@ function App() {
                             rows={3}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, address: e.target.value }))}
                             placeholder="One line per address row"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px", fontFamily: "inherit", resize: "vertical" }}
                           />
                         </div>
 
@@ -8047,7 +8047,7 @@ function App() {
                             maxLength={30}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, phone: e.target.value }))}
                             placeholder="e.g. 01223 555 000"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -8062,7 +8062,7 @@ function App() {
                             maxLength={100}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, email: e.target.value }))}
                             placeholder="e.g. enquiries@cambridgesolicitors.co.uk"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -12241,7 +12241,7 @@ function FirmReferredMatterCard({
     borderBottom: "1px solid #f0f2f5", padding: "6px 0",
   };
   const inputStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "4px 8px", border: "1px solid #d1d5db",
+    fontSize: "16px", padding: "4px 8px", border: "1px solid #d1d5db",
     borderRadius: "5px", background: "#fff",
   };
 
@@ -12336,7 +12336,7 @@ function FirmReferredMatterCard({
                   <div style={{ width: "100%", background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: "8px", padding: "10px 12px" }}>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: "#991b1b", marginBottom: "6px" }}>Reason for falling through</div>
                     <select value={fallThroughReason} onChange={(e) => setFallThroughReason(e.target.value)}
-                      style={{ fontSize: "13px", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: "5px", width: "100%", marginBottom: "6px" }}>
+                      style={{ fontSize: "16px", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: "5px", width: "100%", marginBottom: "6px" }}>
                       <option value="">Select reason…</option>
                       <option value="buyer withdrew">Buyer withdrew</option>
                       <option value="survey issue">Survey issue</option>
@@ -12355,7 +12355,7 @@ function FirmReferredMatterCard({
                 )}
                 {!pendingStatus && (
                   <select
-                    style={{ fontSize: "13px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #d1d5db", width: "100%" }}
+                    style={{ fontSize: "16px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #d1d5db", width: "100%" }}
                     value=""
                     onChange={(e) => { if (e.target.value) { handleStatusSelect(e.target.value); e.currentTarget.value = ""; } }}
                   >
@@ -13117,7 +13117,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
   // ── Form screen ──────────────────────────────────────────────────────────
   const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "4px" };
   const labelStyle: React.CSSProperties = { fontSize: "13px", fontWeight: 600, color: "#374151" };
-  const inputStyle: React.CSSProperties = { padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "14px", width: "100%", boxSizing: "border-box" };
+  const inputStyle: React.CSSProperties = { padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", width: "100%", boxSizing: "border-box" };
   const sectionStyle: React.CSSProperties = { marginBottom: "24px", paddingBottom: "20px", borderBottom: "1px solid var(--border)" };
   const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" };
 
