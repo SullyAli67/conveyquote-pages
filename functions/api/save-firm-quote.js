@@ -76,10 +76,20 @@ export async function onRequestPost(context) {
     // Store the inputs the firm submitted (so we can re-render or audit)
     // alongside the calculated output. Strip auth + housekeeping fields
     // from inputs; everything else is part of the matter record.
+    // mortgageAmount only applies to remortgage / remortgage_transfer —
+    // omit the key entirely otherwise so the PDF block doesn't render a
+    // stale value for transactions where it has no meaning.
+    const mortgageAmountNumeric = Number(body.mortgageAmount);
+    const mortgageAmount =
+      Number.isFinite(mortgageAmountNumeric) && mortgageAmountNumeric > 0
+        ? mortgageAmountNumeric
+        : undefined;
+
     const inputsToStore = {
       transactionType: body.transactionType,
       price: body.price,
       salePrice: body.salePrice,
+      mortgageAmount,
       tenure: body.tenure,
       postcode: body.postcode,
       buyerCount: body.buyerCount,
