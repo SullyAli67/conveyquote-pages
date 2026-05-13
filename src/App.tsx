@@ -6895,12 +6895,12 @@ function App() {
                 : tab === "fees" ? "Fee Settings"
                 : "Profile";
               return (
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px", borderBottom: "2px solid var(--border)", paddingBottom: "0" }}>
                   {allTabs.map((tab) => (
                     <button
                       key={tab}
                       type="button"
-                      className={firmPortalTab === tab ? "primary-button" : "muted-button"}
+                      style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: firmPortalTab === tab ? "var(--teal)" : "var(--muted)", borderBottom: firmPortalTab === tab ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
                       onClick={() => {
                         setFirmPortalTab(tab);
 
@@ -8439,94 +8439,31 @@ function App() {
               );
             })()}
 
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginBottom: "20px",
-              }}
-            >
-              <button
-                type="button"
-                className={adminTab === "dashboard" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("dashboard")}
-              >
-                Overview
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "enquiries" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("enquiries")}
-              >
-                Enquiries
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "firms" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("firms")}
-              >
-                Firms
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "lenders" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("lenders")}
-              >
-                Lenders
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "quote" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("quote")}
-              >
-                Quote Review
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "pipeline" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("pipeline")}
-              >
-                Pipeline
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "referrers" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("referrers")}
-              >
-                Referrers
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "invoices" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("invoices")}
-              >
-                Invoices
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "audit" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("audit")}
-              >
-                Audit Log
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "settings" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("settings")}
-              >
-                Settings
-              </button>
-            </div>
+            {(() => {
+              const adminTabs: { id: AdminTab; label: string }[] = [
+                { id: "dashboard", label: "Overview" },
+                { id: "enquiries", label: "Enquiries" },
+                { id: "firms", label: "Firms" },
+                { id: "lenders", label: "Lenders" },
+                { id: "quote", label: "Quote Review" },
+                { id: "pipeline", label: "Pipeline" },
+                { id: "referrers", label: "Referrers" },
+                { id: "invoices", label: "Invoices" },
+                { id: "audit", label: "Audit Log" },
+                { id: "settings", label: "Settings" },
+              ];
+              return (
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px", borderBottom: "2px solid var(--border)", paddingBottom: "0" }}>
+                  {adminTabs.map((tab) => (
+                    <button key={tab.id} type="button"
+                      style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: adminTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: adminTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
+                      onClick={() => void handleAdminTabChange(tab.id)}>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {adminTab === "quote" && (
             <div style={{ marginBottom: "20px" }}>
