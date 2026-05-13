@@ -7288,9 +7288,9 @@ function App() {
                         )}
                         <div className="field">
                           <label>Tenure</label>
-                          <div style={{ display: "flex", gap: "16px" }}>
+                          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                             {(["freehold", "leasehold"] as const).map((t) => (
-                              <label key={t} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                              <label key={t} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                 <input
                                   type="radio"
                                   name="iq-tenure"
@@ -7341,9 +7341,9 @@ function App() {
                       <div className="form-grid">
                         <div className="field field--full">
                           <label>Mortgage or cash</label>
-                          <div style={{ display: "flex", gap: "16px" }}>
+                          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                             {(["mortgage", "cash"] as const).map((m) => (
-                              <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                              <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                 <input
                                   type="radio"
                                   name="iq-mortgageOrCash"
@@ -7426,9 +7426,9 @@ function App() {
                           ] as const).map(([key, label]) => (
                             <div key={key} className="field field--full">
                               <label>{label}</label>
-                              <div style={{ display: "flex", gap: "16px" }}>
+                              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                                 {([true, false] as const).map((v) => (
-                                  <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                                  <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                     <input
                                       type="radio"
                                       name={`iq-sdlt-${key}`}
