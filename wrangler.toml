@@ -16,10 +16,10 @@ pages_build_output_dir = "dist"
 
 # ── D1 (already provisioned) ─────────────────────────────────────────
 # Binding name in code: env.DB
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "conveyquote"
-# database_id = "<set in dashboard>"
+[[d1_databases]]
+binding = "DB"
+database_name = "conveyquote-db"
+database_id = "b912b34d-b02d-4163-a37f-1dfa27a4b9d7"
 
 # ── R2: firm branding logos (Phase 4) ────────────────────────────────
 # Binding name in code: env.FIRM_LOGOS_BUCKET
