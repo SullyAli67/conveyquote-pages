@@ -810,6 +810,35 @@ function getTransactionLabel(type: string | undefined) {
   return "Not provided";
 }
 
+// "2 minutes ago" / "3 hours ago" / "yesterday" / "2 days ago" — used by
+// the firm portal's email-sent indicators. SQLite datetime values come
+// without timezone, so normalise to UTC the same way the PDF code does.
+function formatRelativeTime(iso: string): string {
+  if (!iso) return "";
+  const normalised = String(iso).includes("T")
+    ? String(iso)
+    : String(iso).replace(" ", "T") + "Z";
+  const t = Date.parse(normalised);
+  if (Number.isNaN(t)) return "";
+  const diffMs = Date.now() - t;
+  if (diffMs < 0) return "just now";
+  const secs = Math.floor(diffMs / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return mins === 1 ? "1 minute ago" : `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? "1 month ago" : `${months} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "1 year ago" : `${years} years ago`;
+}
+
 function getBuyerCountFromOwnershipType(ownershipType?: string) {
   return ownershipType === "joint" ? 2 : 1;
 }
@@ -1463,6 +1492,11 @@ function App() {
     transactionType: string;
     grandTotal: number;
     issuedAt: string;
+    // Phase 5 email tracking (nullable — older rows pre-migration won't
+    // have these set, and a quote that hasn't been sent yet won't either).
+    clientEmailSentAt?: string | null;
+    clientEmailMessageId?: string | null;
+    clientEmailLastError?: string | null;
   };
 
   type FirmIssuedQuoteDetail = {
@@ -3548,6 +3582,99 @@ function App() {
       });
     } finally {
       setFirmPdfDownloadingId(null);
+    }
+  };
+
+  // ── Phase 5: Send firm-issued quote to client via email ──────────────────
+  // Tracks the quote id currently being sent so the relevant row can show a
+  // "Sending…" state without lighting up every button at once.
+  const [firmSendingId, setFirmSendingId] = useState<number | null>(null);
+
+  const applySendSuccessToHistory = (
+    quoteId: number,
+    sentAt: string,
+    messageId: string | null
+  ) => {
+    setFirmHistoryQuotes((prev) =>
+      prev.map((q) =>
+        q.id === quoteId
+          ? {
+              ...q,
+              clientEmailSentAt: sentAt,
+              clientEmailMessageId: messageId,
+              clientEmailLastError: null,
+            }
+          : q
+      )
+    );
+  };
+
+  const sendFirmIssuedQuote = async (
+    quoteId: number,
+    clientName: string,
+    confirmResend = false
+  ): Promise<void> => {
+    if (!firmToken || !quoteId) return;
+    setFirmSendingId(quoteId);
+    try {
+      const res = await fetch("/api/firm-issued-quote-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${firmToken}`,
+        },
+        body: JSON.stringify({ id: quoteId, confirmResend }),
+      });
+      let data: {
+        success?: boolean;
+        error?: string;
+        detail?: string;
+        sentAt?: string;
+        messageId?: string;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {}
+
+      if (res.status === 409 && data.error === "recent_send") {
+        const relative = formatRelativeTime(data.sentAt || "") || "recently";
+        const ok = window.confirm(
+          `This quote was sent ${relative}. Send again?`
+        );
+        if (ok) {
+          await sendFirmIssuedQuote(quoteId, clientName, true);
+        }
+        return;
+      }
+
+      if (!res.ok || !data.success) {
+        pushToast({
+          variant: "error",
+          message:
+            (data.detail && String(data.detail)) ||
+            (data.error && String(data.error)) ||
+            "Could not send — try again",
+        });
+        return;
+      }
+
+      const sentAt = data.sentAt || new Date().toISOString();
+      const messageId = data.messageId || null;
+      applySendSuccessToHistory(quoteId, sentAt, messageId);
+      pushToast({
+        variant: "success",
+        message: clientName
+          ? `Quote sent to ${clientName}`
+          : "Quote sent to client",
+      });
+    } catch (e) {
+      console.error("Send firm-issued quote error:", e);
+      pushToast({
+        variant: "error",
+        message: "Could not send — try again",
+      });
+    } finally {
+      setFirmSendingId(null);
     }
   };
 
@@ -7977,6 +8104,25 @@ function App() {
                                 ? "Preparing PDF…"
                                 : "Download PDF"}
                             </button>
+                            {issueQuoteForm.clientEmail.trim() && (
+                              <button
+                                type="button"
+                                className="primary-button"
+                                onClick={() =>
+                                  void sendFirmIssuedQuote(
+                                    issueQuoteSavedMessage.quoteId,
+                                    issueQuoteForm.clientName
+                                  )
+                                }
+                                disabled={
+                                  firmSendingId === issueQuoteSavedMessage.quoteId
+                                }
+                              >
+                                {firmSendingId === issueQuoteSavedMessage.quoteId
+                                  ? "Sending…"
+                                  : "Send to Client"}
+                              </button>
+                            )}
                             {/* migrated to pushToast in claude/toast-system */}
                           </div>
                         )}
@@ -8473,64 +8619,121 @@ function App() {
 
                         {firmHistoryQuotes.length > 0 && (
                           <div className="detail-table">
-                            {firmHistoryQuotes.map((q) => (
-                              <div
-                                key={q.id}
-                                className="detail-row"
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => void openFirmHistoryDetail(q.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    void openFirmHistoryDetail(q.id);
-                                  }
-                                }}
-                                style={{
-                                  textAlign: "left",
-                                  width: "100%",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <div className="detail-row__label">
-                                  <strong style={{ color: "var(--navy)" }}>{q.clientName}</strong>
-                                  <div style={{ fontSize: "13px", color: "var(--muted)" }}>
-                                    {TRANSACTION_TYPE_LABEL[
-                                      q.transactionType as FirmIssueTransactionType
-                                    ] || q.transactionType}
-                                  </div>
-                                  <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                                    {q.issuedAt}
-                                  </div>
-                                </div>
+                            {firmHistoryQuotes.map((q) => {
+                              const hasEmail = Boolean(q.clientEmail);
+                              const isSending = firmSendingId === q.id;
+                              const sentRelative = q.clientEmailSentAt
+                                ? formatRelativeTime(q.clientEmailSentAt)
+                                : "";
+                              const showSendFailed =
+                                !q.clientEmailSentAt && Boolean(q.clientEmailLastError);
+                              return (
                                 <div
-                                  className="detail-row__value"
+                                  key={q.id}
+                                  className="detail-row"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => void openFirmHistoryDetail(q.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      void openFirmHistoryDetail(q.id);
+                                    }
+                                  }}
                                   style={{
-                                    textAlign: "right",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                    gap: "8px",
+                                    textAlign: "left",
+                                    width: "100%",
+                                    cursor: "pointer",
                                   }}
                                 >
-                                  <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>
-                                    £{Number(q.grandTotal).toFixed(2)}
+                                  <div className="detail-row__label">
+                                    <strong style={{ color: "var(--navy)" }}>{q.clientName}</strong>
+                                    <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+                                      {TRANSACTION_TYPE_LABEL[
+                                        q.transactionType as FirmIssueTransactionType
+                                      ] || q.transactionType}
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                      {q.issuedAt}
+                                    </div>
+                                    {sentRelative && (
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "var(--muted)",
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        Sent {sentRelative}
+                                      </div>
+                                    )}
+                                    {showSendFailed && (
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#dc2626",
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        Last send failed
+                                      </div>
+                                    )}
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="muted-button"
-                                    style={{ fontSize: "12px", padding: "4px 10px" }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      void downloadFirmQuotePdf(q.id, q.clientName);
+                                  <div
+                                    className="detail-row__value"
+                                    style={{
+                                      textAlign: "right",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "flex-end",
+                                      gap: "8px",
                                     }}
-                                    disabled={firmPdfDownloadingId === q.id}
                                   >
-                                    {firmPdfDownloadingId === q.id ? "Preparing…" : "Download PDF"}
-                                  </button>
+                                    <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>
+                                      £{Number(q.grandTotal).toFixed(2)}
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: "6px",
+                                        flexWrap: "wrap",
+                                        justifyContent: "flex-end",
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="muted-button"
+                                        style={{ fontSize: "12px", padding: "4px 10px" }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void downloadFirmQuotePdf(q.id, q.clientName);
+                                        }}
+                                        disabled={firmPdfDownloadingId === q.id}
+                                      >
+                                        {firmPdfDownloadingId === q.id ? "Preparing…" : "Download PDF"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="primary-button"
+                                        style={{ fontSize: "12px", padding: "4px 10px" }}
+                                        title={
+                                          hasEmail
+                                            ? undefined
+                                            : "Add client email when issuing to enable send"
+                                        }
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void sendFirmIssuedQuote(q.id, q.clientName);
+                                        }}
+                                        disabled={!hasEmail || isSending}
+                                      >
+                                        {isSending ? "Sending…" : "Send to Client"}
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
 
