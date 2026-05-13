@@ -7093,7 +7093,7 @@ function App() {
 
                     {quoteBuilderMode === "new" && (
                       <SummaryCard title="New Client Quote">
-                        <form onSubmit={(e) => void handleCreateFirmQuote(e)}>
+                        <form onSubmit={(e) => void handleCreateQuote(e)}>
                           {/* ── Client & reference ── */}
                           <div style={{ marginBottom: "18px", paddingBottom: "16px", borderBottom: "1px solid var(--border)" }}>
                             <h4 style={{ margin: "0 0 12px", color: "var(--navy)" }}>Client & Reference</h4>
