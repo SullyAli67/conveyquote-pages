@@ -1472,6 +1472,35 @@ function App() {
   const [isSavingFees, setIsSavingFees] = useState(false);
   const [feeConfigMessage, setFeeConfigMessage] = useState("");
 
+  // ── Firm branding state (Phase 4) ─────────────────────────────────────────
+  // Lives on the Profile tab for is_saas_firm=1 firms. The logo binary is in
+  // R2; we only hold the object key on the client and render previews via
+  // /api/firm-logo-fetch. Cache-busting query string forces a fresh fetch
+  // after a successful upload so the preview reflects the new logo.
+  type FirmBranding = {
+    displayName: string;
+    address: string;
+    phone: string;
+    email: string;
+    logoKey: string;
+  };
+  const initialFirmBranding: FirmBranding = {
+    displayName: "",
+    address: "",
+    phone: "",
+    email: "",
+    logoKey: "",
+  };
+  const [firmBranding, setFirmBranding] = useState<FirmBranding>(initialFirmBranding);
+  const [firmBrandingLoaded, setFirmBrandingLoaded] = useState(false);
+  const [isLoadingFirmBranding, setIsLoadingFirmBranding] = useState(false);
+  const [isSavingFirmBranding, setIsSavingFirmBranding] = useState(false);
+  const [isUploadingFirmLogo, setIsUploadingFirmLogo] = useState(false);
+  // Logo previewed via authenticated fetch → blob URL. The firm-login
+  // endpoint doesn't set a session cookie, so a plain <img src> can't
+  // pass the Bearer token — same constraint as the PDF download flow.
+  const [firmLogoPreviewUrl, setFirmLogoPreviewUrl] = useState<string>("");
+
   // Quote builder state
   const [isCreatingQuote, setIsCreatingQuote] = useState(false);
   const [isSavingAndSending, setIsSavingAndSending] = useState(false);
@@ -2925,6 +2954,150 @@ function App() {
       setFeeConfigMessage("Something went wrong.");
     } finally {
       setIsSavingFees(false);
+    }
+  };
+
+  // ── Firm branding (Phase 4) ───────────────────────────────────────────────
+
+  const fetchFirmLogoPreview = async (logoKey: string) => {
+    if (!firmToken || !logoKey) {
+      setFirmLogoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return "";
+      });
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/firm-logo-fetch?key=${encodeURIComponent(logoKey)}`,
+        { headers: { Authorization: `Bearer ${firmToken}` } }
+      );
+      if (!res.ok) {
+        setFirmLogoPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return "";
+        });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setFirmLogoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } catch (e) {
+      console.error("Fetch firm logo preview error:", e);
+    }
+  };
+
+  const loadFirmBranding = async () => {
+    if (!firmToken) return;
+    setIsLoadingFirmBranding(true);
+    try {
+      const res = await fetch("/api/firm-branding-get", {
+        headers: { Authorization: `Bearer ${firmToken}` },
+      });
+      const result = await res.json();
+      if (result.success && result.branding) {
+        const logoKey = String(result.branding.logoKey || "");
+        setFirmBranding({
+          displayName: String(result.branding.displayName || ""),
+          address: String(result.branding.address || ""),
+          phone: String(result.branding.phone || ""),
+          email: String(result.branding.email || ""),
+          logoKey,
+        });
+        setFirmBrandingLoaded(true);
+        if (logoKey) void fetchFirmLogoPreview(logoKey);
+      }
+    } catch (e) {
+      console.error("Load firm branding error:", e);
+    } finally {
+      setIsLoadingFirmBranding(false);
+    }
+  };
+
+  const handleSaveFirmBranding = async () => {
+    if (!firmToken || isSavingFirmBranding) return;
+    setIsSavingFirmBranding(true);
+    try {
+      const res = await fetch("/api/firm-update-branding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${firmToken}`,
+        },
+        body: JSON.stringify({
+          displayName: firmBranding.displayName,
+          address: firmBranding.address,
+          phone: firmBranding.phone,
+          email: firmBranding.email,
+        }),
+      });
+      const result = await res.json();
+      if (result.success && result.branding) {
+        setFirmBranding({
+          displayName: String(result.branding.displayName || ""),
+          address: String(result.branding.address || ""),
+          phone: String(result.branding.phone || ""),
+          email: String(result.branding.email || ""),
+          logoKey: String(result.branding.logoKey || ""),
+        });
+        pushToast({ variant: "success", message: "Branding updated." });
+      } else {
+        pushToast({
+          variant: "error",
+          message: result.error || "Could not save branding.",
+        });
+      }
+    } catch (e) {
+      console.error("Save firm branding error:", e);
+      pushToast({
+        variant: "error",
+        message: "Could not save branding — please try again.",
+      });
+    } finally {
+      setIsSavingFirmBranding(false);
+    }
+  };
+
+  const handleFirmLogoUpload = async (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    // Reset the input value so re-uploading the same file fires onChange.
+    event.target.value = "";
+    if (!file || !firmToken || isUploadingFirmLogo) return;
+
+    setIsUploadingFirmLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/firm-upload-logo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${firmToken}` },
+        body: fd,
+      });
+      const result = await res.json();
+      if (result.success && result.key) {
+        const newKey = String(result.key);
+        setFirmBranding((prev) => ({ ...prev, logoKey: newKey }));
+        void fetchFirmLogoPreview(newKey);
+        pushToast({ variant: "success", message: "Logo uploaded." });
+      } else {
+        pushToast({
+          variant: "error",
+          message: result.error || "Logo upload failed.",
+        });
+      }
+    } catch (e) {
+      console.error("Upload firm logo error:", e);
+      pushToast({
+        variant: "error",
+        message: "Logo upload failed — please try again.",
+      });
+    } finally {
+      setIsUploadingFirmLogo(false);
     }
   };
 
@@ -4538,6 +4711,33 @@ function App() {
       void loadFirmPortalData(firmToken);
     }
   }, [isFirmPortalPage, firmToken]);
+
+  // Phase 4: once a SaaS firm's portal data has loaded, fetch branding
+  // once so the Profile tab renders without a flash regardless of the
+  // tab persisted in localStorage on first paint.
+  useEffect(() => {
+    const isSaas = Number((firmPortalData?.firm as Record<string, unknown> | undefined)?.is_saas_firm) === 1;
+    if (
+      isFirmPortalPage &&
+      firmToken &&
+      firmPortalData &&
+      isSaas &&
+      !firmBrandingLoaded &&
+      !isLoadingFirmBranding
+    ) {
+      void loadFirmBranding();
+    }
+  }, [isFirmPortalPage, firmToken, firmPortalData, firmBrandingLoaded, isLoadingFirmBranding]);
+
+  // Release the logo preview blob URL when the component unmounts.
+  useEffect(() => {
+    return () => {
+      setFirmLogoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return "";
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedFirmId && !isAddingNewFirm && dashboardFirms.length > 0 && adminTab === "firms") {
@@ -6625,6 +6825,9 @@ function App() {
                           setIssueQuoteCalcError("");
                           setIssueQuoteFieldError("");
                         }
+                        if (tab === "profile" && !firmBrandingLoaded) {
+                          void loadFirmBranding();
+                        }
                         setFirmQuoteSendMessage("");
                         setFeeConfigMessage("");
                         setFirmRespondMessage("");
@@ -8156,19 +8359,143 @@ function App() {
 
                 {/* ── Profile tab ── */}
                 {firmPortalTab === "profile" && (
-                  <SummaryCard title="Your Firm Profile">
-                    <SummaryGrid rows={[
-                      { label: "Firm name", value: String((firmPortalData.firm as Record<string, unknown>).firm_name || "") },
-                      { label: "Contact name", value: String((firmPortalData.firm as Record<string, unknown>).contact_name || "Not set") },
-                      { label: "Contact email", value: String((firmPortalData.firm as Record<string, unknown>).contact_email || "Not set") },
-                      { label: "Contact phone", value: String((firmPortalData.firm as Record<string, unknown>).contact_phone || "Not set") },
-                      { label: "Panel terms accepted", value: Number((firmPortalData.firm as Record<string, unknown>).panel_terms_accepted) === 1 ? "Yes" : "No" },
-                    ]} />
-                    <p className="form-note" style={{ marginTop: "12px" }}>
-                      To update your profile details, please contact{" "}
-                      <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>.
-                    </p>
-                  </SummaryCard>
+                  <>
+                    <SummaryCard title="Your Firm Profile">
+                      <SummaryGrid rows={[
+                        { label: "Firm name", value: String((firmPortalData.firm as Record<string, unknown>).firm_name || "") },
+                        { label: "Contact name", value: String((firmPortalData.firm as Record<string, unknown>).contact_name || "Not set") },
+                        { label: "Contact email", value: String((firmPortalData.firm as Record<string, unknown>).contact_email || "Not set") },
+                        { label: "Contact phone", value: String((firmPortalData.firm as Record<string, unknown>).contact_phone || "Not set") },
+                        { label: "Panel terms accepted", value: Number((firmPortalData.firm as Record<string, unknown>).panel_terms_accepted) === 1 ? "Yes" : "No" },
+                      ]} />
+                      <p className="form-note" style={{ marginTop: "12px" }}>
+                        To update your profile details, please contact{" "}
+                        <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a>.
+                      </p>
+                    </SummaryCard>
+
+                    {/* ── Branding (Phase 4, SaaS firms only) ── */}
+                    {Number((firmPortalData?.firm as Record<string, unknown> | undefined)?.is_saas_firm) === 1 && (
+                      <SummaryCard title="Branding">
+                        <p className="form-note" style={{ marginTop: 0, marginBottom: "16px" }}>
+                          Customise the PDF quotes you issue to your clients. Your logo, display
+                          name, and contact details appear at the top of every generated PDF.
+                          A small "Powered by ConveyQuote" attribution remains in the footer.
+                        </p>
+
+                        <div style={{ marginBottom: "20px" }}>
+                          <label style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                            Firm logo
+                          </label>
+                          <p className="form-note" style={{ marginTop: 0, marginBottom: "10px", fontSize: "12px", color: "#6b7280" }}>
+                            PNG or JPG, up to 500KB and 800×800 pixels. Replaces the ConveyQuote wordmark in the PDF header.
+                          </p>
+                          {firmBranding.logoKey && firmLogoPreviewUrl ? (
+                            <div style={{ marginBottom: "10px", padding: "12px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#fff", display: "inline-block" }}>
+                              <img
+                                src={firmLogoPreviewUrl}
+                                alt="Firm logo preview"
+                                style={{ maxHeight: "80px", maxWidth: "240px", display: "block" }}
+                              />
+                            </div>
+                          ) : firmBranding.logoKey ? (
+                            <p className="form-note" style={{ marginTop: 0, marginBottom: "10px", color: "#6b7280", fontSize: "13px" }}>
+                              Loading preview…
+                            </p>
+                          ) : (
+                            <p className="form-note" style={{ marginTop: 0, marginBottom: "10px", color: "#6b7280", fontSize: "13px" }}>
+                              No logo uploaded yet.
+                            </p>
+                          )}
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg"
+                              onChange={(e) => void handleFirmLogoUpload(e)}
+                              disabled={isUploadingFirmLogo}
+                              style={{ fontSize: "13px" }}
+                            />
+                            {isUploadingFirmLogo && (
+                              <span style={{ marginLeft: "10px", fontSize: "13px", color: "#6b7280" }}>
+                                Uploading…
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: "14px" }}>
+                          <label htmlFor="brand-display-name" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                            Display name
+                          </label>
+                          <input
+                            id="brand-display-name"
+                            type="text"
+                            value={firmBranding.displayName}
+                            maxLength={100}
+                            onChange={(e) => setFirmBranding((p) => ({ ...p, displayName: e.target.value }))}
+                            placeholder="e.g. Cambridge Solicitors LLP"
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "14px" }}>
+                          <label htmlFor="brand-address" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                            Address
+                          </label>
+                          <textarea
+                            id="brand-address"
+                            value={firmBranding.address}
+                            maxLength={300}
+                            rows={3}
+                            onChange={(e) => setFirmBranding((p) => ({ ...p, address: e.target.value }))}
+                            placeholder="One line per address row"
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "14px" }}>
+                          <label htmlFor="brand-phone" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                            Phone
+                          </label>
+                          <input
+                            id="brand-phone"
+                            type="text"
+                            value={firmBranding.phone}
+                            maxLength={30}
+                            onChange={(e) => setFirmBranding((p) => ({ ...p, phone: e.target.value }))}
+                            placeholder="e.g. 01223 555 000"
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "14px" }}>
+                          <label htmlFor="brand-email" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                            Email
+                          </label>
+                          <input
+                            id="brand-email"
+                            type="email"
+                            value={firmBranding.email}
+                            maxLength={100}
+                            onChange={(e) => setFirmBranding((p) => ({ ...p, email: e.target.value }))}
+                            placeholder="e.g. enquiries@cambridgesolicitors.co.uk"
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                          />
+                        </div>
+
+                        <div className="form-footer action-row" style={{ marginTop: "14px" }}>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            disabled={isSavingFirmBranding || isLoadingFirmBranding}
+                            onClick={() => void handleSaveFirmBranding()}
+                          >
+                            {isSavingFirmBranding ? "Saving…" : "Save Branding"}
+                          </button>
+                        </div>
+                      </SummaryCard>
+                    )}
+                  </>
                 )}
 
               </div>
