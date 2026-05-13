@@ -426,7 +426,7 @@ function buildSaleQuote(input, options = {}) {
   });
 }
 
-function buildRemortgageQuote(input) {
+function buildRemortgageQuote(input, options = {}) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
@@ -444,27 +444,37 @@ function buildRemortgageQuote(input) {
   }
 
   if (input.remortgageTransfer === "yes") {
-    addItem(legalFees, "Simultaneous transfer of equity supplement", 350);
+    addItem(legalFees, "Transfer of equity", 250);
   }
 
   // TS engine adds TT to wire the remortgage advance from the new lender —
   // mirrored here so JS doesn't under-quote.
   addItem(legalFees, "Telegraphic transfer fee - remortgage advance", 45);
 
-  addItem(
-    disbursements,
-    "Office copy entries",
-    getOfficeCopyEntriesAmount(input.tenure)
-  );
-  // HMLR Scale 2 on the new mortgage advance, no VAT.
-  addItem(
-    disbursements,
-    "Land Registry fee",
-    getLandRegistryFee({
-      transactionType: "remortgage",
-      mortgageAmount,
-    })
-  );
+  // Office copy entries: tenure-based estimate. In a combined
+  // remortgage_transfer matter the remortgage leg owns this line; the
+  // transfer leg omits its own copy so the line appears exactly once.
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure)
+    );
+  }
+  // HMLR Scale 2 on the new mortgage advance, no VAT. In a combined
+  // remortgage_transfer matter the LR fee is added once at the parent
+  // level (max-of-two scenarios), so this leg omits its own line in
+  // that case.
+  if (!options.omitLandRegistryFee) {
+    addItem(
+      disbursements,
+      "Land Registry fee",
+      getLandRegistryFee({
+        transactionType: "remortgage",
+        mortgageAmount,
+      })
+    );
+  }
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   addItem(disbursements, "OS1 search", OS1_SEARCH_FEE);
   // Bankruptcy search always required on remortgage
@@ -479,7 +489,7 @@ function buildRemortgageQuote(input) {
   });
 }
 
-function buildTransferQuote(input) {
+function buildTransferQuote(input, options = {}) {
   const legalFees = [];
   const disbursements = [];
   const propertyValue = toNumber(input.price);
@@ -504,20 +514,30 @@ function buildTransferQuote(input) {
     addItem(legalFees, "Complex ownership change supplement", 150);
   }
 
-  addItem(
-    disbursements,
-    "Office copy entries",
-    getOfficeCopyEntriesAmount(input.tenure)
-  );
-  // HMLR Scale 2 — conservative over-estimate, see helper note.
-  addItem(
-    disbursements,
-    "Land Registry fee",
-    getLandRegistryFee({
-      transactionType: "transfer",
-      propertyValue,
-    })
-  );
+  // Office copy entries: tenure-based estimate. In a combined
+  // remortgage_transfer matter the remortgage leg owns this line; this
+  // leg omits its own copy so the line appears exactly once.
+  if (!options.omitOfficeCopies) {
+    addItem(
+      disbursements,
+      "Office copy entries",
+      getOfficeCopyEntriesAmount(input.tenure)
+    );
+  }
+  // HMLR Scale 2 — conservative over-estimate, see helper note. In a
+  // combined remortgage_transfer matter the LR fee is added once at
+  // the parent level (max-of-two scenarios), so this leg omits its
+  // own line in that case.
+  if (!options.omitLandRegistryFee) {
+    addItem(
+      disbursements,
+      "Land Registry fee",
+      getLandRegistryFee({
+        transactionType: "transfer",
+        propertyValue,
+      })
+    );
+  }
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on transfer of equity
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
@@ -537,76 +557,63 @@ function buildTransferQuote(input) {
 }
 
 function buildRemortgageTransferQuote(input) {
-  const legalFees = [];
-  const disbursements = [];
   // Combined matter input field is remortgageTransferPrice — see
-  // PR #19 follow-up; previous reads of input.price returned undefined
-  // and dropped legal fee into lowest bracket.
+  // PR #22; previous reads of input.price returned undefined and dropped
+  // legal fee into the lowest bracket. Preserve the fallback chain.
   const propertyValue =
     toNumber(input.remortgageTransferPrice) ||
     toNumber(input.propertyValue) ||
     toNumber(input.price);
-  // remortgageTransfer-prefixed fields are the canonical form names for
-  // combined matters. Read both directly here for the LR fee — the
-  // legacy `input.price` mapping doesn't always flow on this path.
-  const combinedPropertyValue = toNumber(
-    input.remortgageTransferPrice || input.price
-  );
   const mortgageAmount = toNumber(input.remortgageTransferMortgageAmount);
-  // Use the larger of the two party counts so disbursements aren't
-  // under-charged when more owners are being added than the remortgage
-  // ownership type suggests.
-  const partyCount = Math.max(
-    getBuyerCount(input.remortgageTransferOwnershipType),
-    getOwnersChangingCount(input.remortgageTransferOwnersChanging)
+  const priceArg = String(propertyValue);
+
+  // Both legs reference the same property and tenure. The remortgage
+  // leg owns the office-copies line; the transfer leg omits it. The
+  // Land Registry fee is added once at this parent level using the
+  // max-of-two-scenarios helper, so both legs omit their own LR line.
+  const remortgage = buildRemortgageQuote(
+    {
+      price: priceArg,
+      tenure: input.remortgageTransferTenure,
+      additionalBorrowing: input.remortgageTransferAdditionalBorrowing,
+      remortgageTransfer: "yes",
+      ownershipType: input.remortgageTransferOwnershipType,
+      mortgageAmount: input.remortgageTransferMortgageAmount,
+    },
+    { omitLandRegistryFee: true }
   );
 
-  addItem(legalFees, "Remortgage legal fee", getRemortgageBaseFee(propertyValue));
-  addItem(legalFees, "Transfer of equity supplement", 350);
-
-  if (input.remortgageTransferTenure === "leasehold") {
-    addItem(legalFees, "Leasehold supplement", 250);
-  }
-
-  if (input.remortgageTransferAdditionalBorrowing === "yes") {
-    addItem(legalFees, "Additional borrowing supplement", 75);
-  }
-
-  if (input.remortgageTransferOwnersChanging === "two") {
-    addItem(legalFees, "Additional ownership change supplement", 75);
-  }
-
-  if (input.remortgageTransferOwnersChanging === "more") {
-    addItem(legalFees, "Complex ownership change supplement", 150);
-  }
-
-  addItem(
-    disbursements,
-    "Office copy entries",
-    getOfficeCopyEntriesAmount(input.remortgageTransferTenure)
+  const transfer = buildTransferQuote(
+    {
+      price: priceArg,
+      tenure: input.remortgageTransferTenure,
+      transferMortgage: input.remortgageTransferHasMortgage,
+      ownersChanging: input.remortgageTransferOwnersChanging,
+    },
+    { omitOfficeCopies: true, omitLandRegistryFee: true }
   );
+
   // HMLR: combined applications attract ONE fee — the higher of
   // Scale 2 on the new mortgage and Scale 2 on the property value.
-  addItem(
-    disbursements,
-    "Land Registry fee",
-    getLandRegistryFee({
-      transactionType: "remortgage_transfer",
-      mortgageAmount,
-      propertyValue: combinedPropertyValue,
-    })
-  );
-  addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
-  // Bankruptcy search always required
-  addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
-  addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
-
-  return finaliseQuote({
-    legalFees,
-    disbursements,
-    bespokeNote: getBespokeNote(propertyValue),
-    breakdownTitle: "REMORTGAGE AND TRANSFER OF EQUITY QUOTE",
+  const combinedLandRegistryFee = getLandRegistryFee({
+    transactionType: "remortgage_transfer",
+    mortgageAmount,
+    propertyValue,
   });
+  if (combinedLandRegistryFee > 0) {
+    remortgage.disbursements.push({
+      label: "Land Registry fee",
+      amount: combinedLandRegistryFee,
+    });
+  }
+
+  return combineQuotes(
+    "REMORTGAGE AND TRANSFER OF EQUITY QUOTE",
+    remortgage,
+    transfer,
+    false,
+    getBespokeNote(propertyValue)
+  );
 }
 
 function mergeDisbursements(items) {
