@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /firm-login
+Disallow: /firm-portal
+Disallow: /firm-portal/
+Disallow: /referrer-login
+Disallow: /referrer-portal
+Disallow: /referrer-portal/
+Disallow: /api/
+Disallow: /firm-quote-accept
+
+Sitemap: https://conveyquote.uk/sitemap.xml
