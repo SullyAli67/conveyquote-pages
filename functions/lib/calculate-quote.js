@@ -48,10 +48,11 @@ function getOwnersChangingCount(value) {
 }
 
 // Per-person disbursements scale linearly with the number of buyers /
-// borrowers / parties on the matter. Label includes the multiplier so the
-// admin can see at a glance what's been applied.
+// borrowers / parties on the matter. Label format mirrors TS engine —
+// "(N)" suffix on every count so the customer-facing rail and the
+// admin / firm rail emit character-identical strings.
 function perPersonLabel(base, count) {
-  return count > 1 ? `${base} (${count} buyers)` : base;
+  return `${base} (${count})`;
 }
 
 function addItem(items, label, amount, note) {
@@ -302,12 +303,12 @@ function buildPurchaseQuote(input, options = {}) {
   addItem(legalFees, "Purchase legal fee", getPurchaseBaseFee(price));
 
   if (input.tenure === "leasehold") {
-    addItem(legalFees, "Leasehold supplement", 350);
+    addItem(legalFees, "Purchase leasehold supplement", 300);
   }
 
   // Telegraphic transfer fee applies to all purchases
   // (completion funds must be wired to the seller's solicitor regardless of mortgage)
-  addItem(legalFees, "Telegraphic transfer fee", 45);
+  addItem(legalFees, "Telegraphic transfer fee - completion funds", 45);
 
   if (input.mortgage === "mortgage") {
     addItem(legalFees, "Acting for lender", 125);
@@ -380,7 +381,7 @@ function buildSaleQuote(input, options = {}) {
   addItem(legalFees, "Sale legal fee", getSaleBaseFee(price));
 
   if (input.tenure === "leasehold") {
-    addItem(legalFees, "Leasehold supplement", 300);
+    addItem(legalFees, "Sale leasehold supplement", 300);
   }
 
   // Telegraphic transfer fee: always 1x to send net sale proceeds to seller.
@@ -413,7 +414,7 @@ function buildSaleQuote(input, options = {}) {
   }
   addItem(
     disbursements,
-    sellerCount > 1 ? `ID checks (x${sellerCount})` : "ID checks",
+    `ID checks (${sellerCount})`,
     14.4 * sellerCount
   );
 
@@ -446,6 +447,10 @@ function buildRemortgageQuote(input) {
     addItem(legalFees, "Simultaneous transfer of equity supplement", 350);
   }
 
+  // TS engine adds TT to wire the remortgage advance from the new lender —
+  // mirrored here so JS doesn't under-quote.
+  addItem(legalFees, "Telegraphic transfer fee - remortgage advance", 45);
+
   addItem(
     disbursements,
     "Office copy entries",
@@ -461,8 +466,10 @@ function buildRemortgageQuote(input) {
     })
   );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
+  addItem(disbursements, "OS1 search", OS1_SEARCH_FEE);
   // Bankruptcy search always required on remortgage
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
     legalFees,
@@ -478,14 +485,15 @@ function buildTransferQuote(input) {
   const propertyValue = toNumber(input.price);
   const partyCount = getOwnersChangingCount(input.ownersChanging);
 
-  addItem(legalFees, "Transfer of equity legal fee", getTransferBaseFee(propertyValue));
+  addItem(legalFees, "Transfer legal fee", getTransferBaseFee(propertyValue));
 
   if (input.tenure === "leasehold") {
     addItem(legalFees, "Leasehold supplement", 250);
   }
 
   if (input.transferMortgage === "yes") {
-    addItem(legalFees, "Lender consent / mortgage element", 125);
+    addItem(legalFees, "Mortgage supplement", 150);
+    addItem(legalFees, "Telegraphic transfer fee - transfer completion", 45);
   }
 
   if (input.ownersChanging === "two") {
@@ -513,6 +521,11 @@ function buildTransferQuote(input) {
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on transfer of equity
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  // Firm has to assess SDLT applicability on every transfer of equity —
+  // Phase 1 firm engine already charges this; central engine now matches.
+  if (propertyValue > 0) {
+    addItem(disbursements, "SDLT submission", SDLT_SUBMISSION_FEE);
+  }
   addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
@@ -596,9 +609,28 @@ function buildRemortgageTransferQuote(input) {
   });
 }
 
+function mergeDisbursements(items) {
+  const map = new Map();
+  for (const item of items) {
+    const existing = map.get(item.label);
+    if (!existing) {
+      map.set(item.label, { ...item });
+      continue;
+    }
+    existing.amount = Number((existing.amount + Number(item.amount || 0)).toFixed(2));
+  }
+  return Array.from(map.values());
+}
+
 function combineQuotes(title, first, second, sdltFromSecond = false, bespokeNote) {
   const legalFees = [...first.legalFees, ...second.legalFees];
-  const disbursements = [...first.disbursements, ...second.disbursements];
+  // Mirror TS engine: combined matters merge duplicate disbursement lines
+  // (e.g. ID checks from both legs) into a single summed row so the rails
+  // emit identical itemisations.
+  const disbursements = mergeDisbursements([
+    ...first.disbursements,
+    ...second.disbursements,
+  ]);
   const sdltAmount = sdltFromSecond ? second.sdltAmount : undefined;
   const sdltNote = sdltFromSecond ? second.sdltNote : undefined;
 

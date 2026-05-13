@@ -803,6 +803,16 @@ function buildTransferQuote(
     config.disbursements.bankruptcySearchPerName * partyCount
   );
 
+  // Firm assesses SDLT applicability on every transfer of equity —
+  // matches the Phase 1 firm engine and the central JS engine.
+  if (propertyValue > 0) {
+    addItem(
+      disbursements,
+      "SDLT submission",
+      config.disbursements.sdltSubmissionFee
+    );
+  }
+
   addItem(
     disbursements,
     "AP1 submission",
