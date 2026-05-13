@@ -8,9 +8,9 @@
 // quote ids.
 //
 // Route: GET /api/firm-quote-saved?id=<id>
-// Flat-file pattern matching the rest of functions/api/. The Type 1
-// rail uses /api/firm-quote-detail for its own purposes — this endpoint
-// is for Type 2 firm-issued quotes only.
+// Flat-file pattern matching the rest of functions/api/. This endpoint
+// is for Type 2 firm-issued quotes only (the Type 1 firm-quote-detail
+// endpoint was retired in the Path B email-to-client batch).
 //
 // Firm-role session, is_saas_firm = 1 required.
 
