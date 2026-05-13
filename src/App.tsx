@@ -7637,17 +7637,45 @@ function App() {
                         {/* firmPdfError inline text migrated to pushToast in claude/toast-system */}
 
                         {!isLoadingFirmIssuedHistory && firmHistoryQuotes.length === 0 && !firmHistoryError && (
-                          <div style={{ textAlign: "center", padding: "32px 0" }}>
-                            <p className="form-note" style={{ color: "var(--muted)", marginBottom: "16px" }}>
-                              No quotes issued yet. Issue your first quote.
-                            </p>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              onClick={() => goToFirmTab("issue_quote")}
-                            >
-                              Issue Quote
-                            </button>
+                          <div style={{ textAlign: "center", padding: "40px 16px" }}>
+                            {firmHistorySearch.trim() ? (
+                              <p
+                                className="form-note"
+                                style={{ color: "var(--muted)", marginBottom: "16px" }}
+                              >
+                                No quotes match "{firmHistorySearch.trim()}".
+                              </p>
+                            ) : (
+                              <>
+                                <div
+                                  aria-hidden="true"
+                                  style={{
+                                    fontSize: "40px",
+                                    lineHeight: 1,
+                                    marginBottom: "10px",
+                                    color: "var(--muted)",
+                                  }}
+                                >
+                                  📄
+                                </div>
+                                <p
+                                  className="form-note"
+                                  style={{
+                                    color: "var(--muted)",
+                                    marginBottom: "16px",
+                                  }}
+                                >
+                                  No quotes yet. Use Issue Quote to create your first.
+                                </p>
+                                <button
+                                  type="button"
+                                  className="primary-button"
+                                  onClick={() => goToFirmTab("issue_quote")}
+                                >
+                                  Issue Quote
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
 
