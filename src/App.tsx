@@ -1316,6 +1316,13 @@ function App() {
     localStorage.setItem("cq_firm_tab", tab);
     setFirmPortalTabRaw(tab);
   };
+  // Session-level "already loaded" flags so tab clicks don't refetch
+  // (firmBrandingLoaded already exists below). A manual Refresh button
+  // resets these to force a reload.
+  const [firmQuotesLoaded, setFirmQuotesLoaded] = useState(false);
+  const [firmHistoryLoaded, setFirmHistoryLoaded] = useState(false);
+  const [firmFeesLoaded, setFirmFeesLoaded] = useState(false);
+  const [isFirmRefreshing, setIsFirmRefreshing] = useState(false);
   const [firmQuotes, setFirmQuotes] = useState<FirmQuoteRow[]>([]);
   const [isLoadingFirmQuotes, setIsLoadingFirmQuotes] = useState(false);
   const [firmQuotesMessage, setFirmQuotesMessage] = useState("");
@@ -1611,6 +1618,14 @@ function App() {
     localStorage.setItem("cq_admin_tab", tab);
     setAdminTabRaw(tab);
   };
+  // Session-level "already loaded" flags for admin tabs whose data is
+  // separate from the main dashboard payload. Cleared by the Refresh button.
+  const [adminReferrersLoaded, setAdminReferrersLoaded] = useState(false);
+  const [adminInvoicesLoaded, setAdminInvoicesLoaded] = useState(false);
+  const [adminPipelineLoaded, setAdminPipelineLoaded] = useState(false);
+  const [adminSettingsLoaded, setAdminSettingsLoaded] = useState(false);
+  const [adminAuditLoaded, setAdminAuditLoaded] = useState(false);
+  const [isAdminRefreshing, setIsAdminRefreshing] = useState(false);
   const [selectedFirmId, setSelectedFirmId] = useState<number | null>(null);
   const [isAddingNewFirm, setIsAddingNewFirm] = useState(false);
   const [firmEditor, setFirmEditor] = useState<FirmEditorState>(
@@ -2022,9 +2037,8 @@ function App() {
       window.history.replaceState({}, "", cleanUrl.toString());
     }
 
-    if (tab !== "quote" && tab !== "referrers" && tab !== "invoices" && tab !== "pipeline" && tab !== "settings" && tab !== "audit") {
-      await loadDashboardData();
-    }
+    // Dashboard data is loaded once on portal entry and on explicit
+    // Refresh. Tab switches no longer trigger a network round-trip.
 
     if (tab === "firms" && dashboardFirms.length === 0) {
       startNewFirm();
@@ -2035,24 +2049,73 @@ function App() {
       setLenderSaveMessage("");
     }
 
-    if (tab === "referrers") {
+    if (tab === "referrers" && !adminReferrersLoaded) {
+      setAdminReferrersLoaded(true);
       void loadAllReferrers();
     }
 
-    if (tab === "invoices") {
+    if (tab === "invoices" && !adminInvoicesLoaded) {
+      setAdminInvoicesLoaded(true);
       void loadAllInvoices();
     }
 
-    if (tab === "pipeline") {
+    if (tab === "pipeline" && !adminPipelineLoaded) {
+      setAdminPipelineLoaded(true);
       void loadPipeline();
     }
 
-    if (tab === "settings") {
+    if (tab === "settings" && !adminSettingsLoaded) {
+      setAdminSettingsLoaded(true);
       void loadAdminSettings();
     }
 
-    if (tab === "audit") {
+    if (tab === "audit" && !adminAuditLoaded) {
+      setAdminAuditLoaded(true);
       void handleLoadAuditLog();
+    }
+  };
+
+  const handleAdminRefresh = async () => {
+    if (isAdminRefreshing) return;
+    setIsAdminRefreshing(true);
+    try {
+      // Clear per-tab loaded flags so other tabs also refetch on next visit.
+      setAdminReferrersLoaded(false);
+      setAdminInvoicesLoaded(false);
+      setAdminPipelineLoaded(false);
+      setAdminSettingsLoaded(false);
+      setAdminAuditLoaded(false);
+
+      await loadDashboardData();
+
+      // Reload the data for the currently-active tab if it has its own
+      // dataset outside the main dashboard payload.
+      if (adminTab === "referrers") {
+        setAdminReferrersLoaded(true);
+        await loadAllReferrers();
+      } else if (adminTab === "invoices") {
+        setAdminInvoicesLoaded(true);
+        await loadAllInvoices();
+      } else if (adminTab === "pipeline") {
+        setAdminPipelineLoaded(true);
+        await loadPipeline();
+      } else if (adminTab === "settings") {
+        setAdminSettingsLoaded(true);
+        await loadAdminSettings();
+      } else if (adminTab === "audit") {
+        setAdminAuditLoaded(true);
+        await handleLoadAuditLog();
+      }
+
+      pushToast({ variant: "success", message: "Data refreshed" });
+    } catch (error) {
+      console.error("Admin refresh error:", error);
+      pushToast({
+        variant: "error",
+        message: "Couldn't refresh — please try again.",
+      });
+    } finally {
+      setIsAdminRefreshing(false);
     }
   };
 
@@ -2599,6 +2662,46 @@ function App() {
       setFirmPortalError("Something went wrong loading your data.");
     } finally {
       setIsLoadingFirmPortal(false);
+    }
+  };
+
+  const handleFirmRefresh = async () => {
+    if (isFirmRefreshing || !firmToken) return;
+    setIsFirmRefreshing(true);
+    try {
+      // Clear per-tab loaded flags so other tabs also refetch on next visit.
+      setFirmQuotesLoaded(false);
+      setFirmHistoryLoaded(false);
+      setFirmFeesLoaded(false);
+      setFirmBrandingLoaded(false);
+
+      await loadFirmPortalData(firmToken);
+
+      // Reload the data for the currently-active tab.
+      if (firmPortalTab === "quotes") {
+        setFirmQuotesLoaded(true);
+        await loadFirmQuotes();
+      } else if (firmPortalTab === "fees") {
+        setFirmFeesLoaded(true);
+        await loadFeeConfig(feeConfigType);
+      } else if (firmPortalTab === "history") {
+        setFirmHistoryLoaded(true);
+        setFirmHistoryDetail(null);
+        await loadFirmHistory({ offset: 0 });
+      } else if (firmPortalTab === "profile") {
+        await loadFirmBranding();
+      }
+      // referrals and issue_quote tabs don't have separate per-tab fetches.
+
+      pushToast({ variant: "success", message: "Data refreshed" });
+    } catch (error) {
+      console.error("Firm refresh error:", error);
+      pushToast({
+        variant: "error",
+        message: "Couldn't refresh — please try again.",
+      });
+    } finally {
+      setIsFirmRefreshing(false);
     }
   };
 
@@ -6847,13 +6950,24 @@ function App() {
                 <h2>{firmSession.firm_name}</h2>
                 <p>Firm portal</p>
               </div>
-              <button
-                type="button"
-                className="muted-button"
-                onClick={() => void handleFirmLogout()}
-              >
-                Log out
-              </button>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleFirmRefresh()}
+                  disabled={isFirmRefreshing}
+                  style={{ fontSize: "13px", padding: "6px 14px", minHeight: "auto" }}
+                >
+                  {isFirmRefreshing ? "Refreshing…" : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleFirmLogout()}
+                >
+                  Log out
+                </button>
+              </div>
             </div>
 
             {/* Tab nav. issue_quote and history only render for SaaS-enabled firms. */}
@@ -6880,9 +6994,16 @@ function App() {
                       className={firmPortalTab === tab ? "primary-button" : "muted-button"}
                       onClick={() => {
                         setFirmPortalTab(tab);
-                        if (tab === "quotes") void loadFirmQuotes();
-                        if (tab === "fees") void loadFeeConfig(feeConfigType);
-                        if (tab === "history") {
+                        if (tab === "quotes" && !firmQuotesLoaded) {
+                          setFirmQuotesLoaded(true);
+                          void loadFirmQuotes();
+                        }
+                        if (tab === "fees" && !firmFeesLoaded) {
+                          setFirmFeesLoaded(true);
+                          void loadFeeConfig(feeConfigType);
+                        }
+                        if (tab === "history" && !firmHistoryLoaded) {
+                          setFirmHistoryLoaded(true);
                           setFirmHistoryDetail(null);
                           void loadFirmHistory({ offset: 0 });
                         }
@@ -8787,21 +8908,32 @@ function App() {
               <div>
                 <h2>Admin Dashboard</h2>
               </div>
-              <button
-                type="button"
-                onClick={() => void handleAdminLogout()}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  color: "var(--teal)",
-                  fontSize: "14px",
-                  textDecoration: "underline",
-                  cursor: "pointer",
-                }}
-              >
-                Log out
-              </button>
+              <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleAdminRefresh()}
+                  disabled={isAdminRefreshing}
+                  style={{ fontSize: "13px", padding: "6px 14px", minHeight: "auto" }}
+                >
+                  {isAdminRefreshing ? "Refreshing…" : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleAdminLogout()}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--teal)",
+                    fontSize: "14px",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
             </div>
 
             {/* ── Pending quotes badge ── */}
