@@ -526,7 +526,13 @@ function buildTransferQuote(input) {
 function buildRemortgageTransferQuote(input) {
   const legalFees = [];
   const disbursements = [];
-  const propertyValue = toNumber(input.price);
+  // Combined matter input field is remortgageTransferPrice — see
+  // PR #19 follow-up; previous reads of input.price returned undefined
+  // and dropped legal fee into lowest bracket.
+  const propertyValue =
+    toNumber(input.remortgageTransferPrice) ||
+    toNumber(input.propertyValue) ||
+    toNumber(input.price);
   // remortgageTransfer-prefixed fields are the canonical form names for
   // combined matters. Read both directly here for the LR fee — the
   // legacy `input.price` mapping doesn't always flow on this path.
