@@ -302,7 +302,7 @@ function buildPurchaseQuote(input, options = {}) {
   addItem(legalFees, "Purchase legal fee", getPurchaseBaseFee(price));
 
   if (input.tenure === "leasehold") {
-    addItem(legalFees, "Leasehold supplement", 350);
+    addItem(legalFees, "Leasehold supplement", 300);
   }
 
   // Telegraphic transfer fee applies to all purchases
