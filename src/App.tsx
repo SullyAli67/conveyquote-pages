@@ -1,6 +1,10 @@
 import {
+  createContext,
+  useCallback,
+  useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -9,6 +13,237 @@ import {
 import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
+
+// ── Toast notification system ─────────────────────────────────────────────
+// Single global context for transient feedback (success/error/info).
+// Bottom-right on desktop, bottom-centre on mobile. Stacks up to 3 toasts;
+// older ones drop off when a 4th arrives. Auto-dismiss: 4s for success/info,
+// 8s for error. Manual dismiss via × button.
+type ToastVariant = "success" | "error" | "info";
+
+type ToastItem = {
+  id: number;
+  variant: ToastVariant;
+  message: string;
+};
+
+type PushToastInput = {
+  variant: ToastVariant;
+  message: string;
+  duration?: number;
+};
+
+type ToastContextValue = {
+  pushToast: (input: PushToastInput) => void;
+};
+
+const ToastContext = createContext<ToastContextValue | null>(null);
+
+const TOAST_MAX_VISIBLE = 3;
+const TOAST_DEFAULT_DURATIONS: Record<ToastVariant, number> = {
+  success: 4000,
+  info: 4000,
+  error: 8000,
+};
+
+const TOAST_VARIANT_STYLES: Record<
+  ToastVariant,
+  { background: string; color: string; accent: string }
+> = {
+  success: { background: "#d1fae5", color: "#065f46", accent: "#065f46" },
+  error: { background: "#fee2e2", color: "#991b1b", accent: "#991b1b" },
+  info: { background: "#e0e7ff", color: "#062a63", accent: "#062a63" },
+};
+
+export function useToast(): ToastContextValue {
+  const ctx = useContext(ToastContext);
+  if (!ctx) {
+    throw new Error("useToast must be used inside a ToastProvider");
+  }
+  return ctx;
+}
+
+function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const nextIdRef = useRef(1);
+  const timersRef = useRef<Map<number, number>>(new Map());
+
+  const dismissToast = useCallback((id: number) => {
+    const handle = timersRef.current.get(id);
+    if (handle !== undefined) {
+      window.clearTimeout(handle);
+      timersRef.current.delete(id);
+    }
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const scheduleDismiss = useCallback(
+    (id: number, duration: number) => {
+      const existing = timersRef.current.get(id);
+      if (existing !== undefined) window.clearTimeout(existing);
+      const handle = window.setTimeout(() => dismissToast(id), duration);
+      timersRef.current.set(id, handle);
+    },
+    [dismissToast]
+  );
+
+  const pushToast = useCallback(
+    ({ variant, message, duration }: PushToastInput) => {
+      const id = nextIdRef.current++;
+      const ttl = duration ?? TOAST_DEFAULT_DURATIONS[variant];
+      setToasts((prev) => {
+        const next = [...prev, { id, variant, message }];
+        // Drop oldest when over cap.
+        if (next.length > TOAST_MAX_VISIBLE) {
+          const dropped = next.splice(0, next.length - TOAST_MAX_VISIBLE);
+          for (const d of dropped) {
+            const h = timersRef.current.get(d.id);
+            if (h !== undefined) {
+              window.clearTimeout(h);
+              timersRef.current.delete(d.id);
+            }
+          }
+        }
+        return next;
+      });
+      if (ttl > 0) scheduleDismiss(id, ttl);
+    },
+    [scheduleDismiss]
+  );
+
+  useEffect(() => {
+    return () => {
+      for (const handle of timersRef.current.values()) {
+        window.clearTimeout(handle);
+      }
+      timersRef.current.clear();
+    };
+  }, []);
+
+  const value = useMemo<ToastContextValue>(() => ({ pushToast }), [pushToast]);
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </ToastContext.Provider>
+  );
+}
+
+function ToastContainer({
+  toasts,
+  onDismiss,
+}: {
+  toasts: ToastItem[];
+  onDismiss: (id: number) => void;
+}) {
+  return (
+    <>
+      <style>{TOAST_CSS}</style>
+      <div className="cq-toast-container" role="region" aria-label="Notifications">
+        {toasts.map((t) => (
+          <ToastView key={t.id} toast={t} onDismiss={onDismiss} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ToastView({
+  toast,
+  onDismiss,
+}: {
+  toast: ToastItem;
+  onDismiss: (id: number) => void;
+}) {
+  const palette = TOAST_VARIANT_STYLES[toast.variant];
+  return (
+    <div
+      role={toast.variant === "error" ? "alert" : "status"}
+      aria-live={toast.variant === "error" ? "assertive" : "polite"}
+      className="cq-toast"
+      style={{
+        background: palette.background,
+        color: palette.color,
+        borderLeft: `4px solid ${palette.accent}`,
+      }}
+    >
+      <span className="cq-toast__message">{toast.message}</span>
+      <button
+        type="button"
+        className="cq-toast__close"
+        onClick={() => onDismiss(toast.id)}
+        aria-label="Dismiss notification"
+        style={{ color: palette.accent }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+const TOAST_CSS = `
+.cq-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  z-index: 2000;
+  pointer-events: none;
+  max-width: min(90vw, 420px);
+}
+@media (max-width: 767px) {
+  .cq-toast-container {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    align-items: center;
+    max-width: none;
+  }
+}
+.cq-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 18px;
+  padding: 12px 16px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+  min-width: 240px;
+  max-width: 100%;
+  animation: cq-toast-in 200ms ease-out;
+}
+.cq-toast__message {
+  flex: 1;
+  word-break: break-word;
+}
+.cq-toast__close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+.cq-toast__close:hover,
+.cq-toast__close:focus {
+  opacity: 1;
+}
+@keyframes cq-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+`;
+// ──────────────────────────────────────────────────────────────────────────
 
 // MUST STAY IN SYNC with the REASONS mapping in
 // functions/api/reject-quote.js. Same keys, same labels.
@@ -960,6 +1195,7 @@ function AdminPasswordForm({ adminFetch }: { adminFetch: (url: string, opts?: Re
 }
 
 function App() {
+  const { pushToast } = useToast();
   const [form, setForm] = useState<QuoteForm>(initialFormState);
   const [submissionResult, setSubmissionResult] = useState<
     { reference: string; email: string } | null
@@ -1226,7 +1462,7 @@ function App() {
   // an anchor href) because firm auth uses a Bearer token in localStorage —
   // links / new windows can't carry that header.
   const [firmPdfDownloadingId, setFirmPdfDownloadingId] = useState<number | null>(null);
-  const [firmPdfError, setFirmPdfError] = useState("");
+  // firmPdfError inline text migrated to pushToast in claude/toast-system
 
   // Fee config state
   const [feeConfigType, setFeeConfigType] = useState("purchase");
@@ -1336,7 +1572,7 @@ function App() {
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isDeletingLoadedEnquiry, setIsDeletingLoadedEnquiry] = useState(false);
-  const [adminToast, setAdminToast] = useState<string>("");
+  // adminToast inline banner migrated to pushToast in claude/toast-system
 
   const [adminTab, setAdminTabRaw] = useState<AdminTab>(
     () => (localStorage.getItem("cq_admin_tab") as AdminTab) || "dashboard"
@@ -1988,9 +2224,12 @@ function App() {
     "instructed",
   ]);
 
-  const showAdminToast = (text: string) => {
-    setAdminToast(text);
-    window.setTimeout(() => setAdminToast(""), 4000);
+  // migrated to pushToast in claude/toast-system — keep wrapper so existing
+  // admin call sites don't need to change shape. Variant is inferred from
+  // the text where possible; callers that need explicit variants call
+  // pushToast directly.
+  const showAdminToast = (text: string, variant: ToastVariant = "success") => {
+    pushToast({ variant, message: text });
   };
 
   // After a terminal action, fetch the next pending enquiry. Loads it
@@ -2025,6 +2264,7 @@ function App() {
       window.history.replaceState({}, "", nextUrl.toString());
       setManualReference("");
       await loadDashboardData();
+      // migrated to pushToast in claude/toast-system (via showAdminToast wrapper)
       showAdminToast("All pending quotes cleared.");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
@@ -2105,20 +2345,28 @@ function App() {
       ).length;
       const otherSkipCount = skipped.length - invoiceSkipCount;
 
-      let toast = `${deletedCount} ${
-        deletedCount === 1 ? "enquiry" : "enquiries"
-      } deleted.`;
-      if (invoiceSkipCount > 0) {
-        toast += ` ${invoiceSkipCount} skipped — invoice exists.`;
-      }
-      if (otherSkipCount > 0) {
-        toast += ` ${otherSkipCount} skipped.`;
-      }
-
       setBulkSelectedRefs(new Set());
       setBulkDeleteConfirmOpen(false);
       await loadDashboardData();
-      showAdminToast(toast);
+
+      // migrated to pushToast in claude/toast-system — success for the
+      // deletion count, then a second error-variant toast if anything
+      // was skipped so the contrast is unmistakable.
+      const deletedMessage = `${deletedCount} ${
+        deletedCount === 1 ? "enquiry" : "enquiries"
+      } deleted.`;
+      pushToast({ variant: "success", message: deletedMessage });
+
+      if (invoiceSkipCount > 0 || otherSkipCount > 0) {
+        const parts: string[] = [];
+        if (invoiceSkipCount > 0) {
+          parts.push(`${invoiceSkipCount} skipped — invoice exists.`);
+        }
+        if (otherSkipCount > 0) {
+          parts.push(`${otherSkipCount} skipped.`);
+        }
+        pushToast({ variant: "error", message: parts.join(" ") });
+      }
     } catch (error) {
       console.error("Bulk delete error:", error);
       alert("Bulk delete failed — please try again.");
@@ -2906,7 +3154,6 @@ function App() {
 
   const downloadFirmQuotePdf = async (quoteId: number, fallbackName?: string) => {
     if (!firmToken || !quoteId) return;
-    setFirmPdfError("");
     setFirmPdfDownloadingId(quoteId);
     try {
       const res = await fetch(`/api/firm-quote-pdf?id=${quoteId}`, {
@@ -2921,7 +3168,8 @@ function App() {
             message = data.error;
           }
         } catch {}
-        setFirmPdfError(message);
+        // migrated to pushToast in claude/toast-system
+        pushToast({ variant: "error", message });
         return;
       }
 
@@ -2947,7 +3195,11 @@ function App() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       console.error("Download firm quote PDF error:", e);
-      setFirmPdfError("Could not generate PDF — try again or contact support.");
+      // migrated to pushToast in claude/toast-system
+      pushToast({
+        variant: "error",
+        message: "Could not generate PDF — try again or contact support.",
+      });
     } finally {
       setFirmPdfDownloadingId(null);
     }
@@ -3924,11 +4176,18 @@ function App() {
 
       if (result.success) {
         const sentRef = approvedQuote.quoteReference;
+        const sentClientName = approvedQuote.clientName?.trim();
         setEmailPreviewOpen(false);
         setApprovedQuote(initialApprovedQuoteState);
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
-        showAdminToast("Approved quote sent.");
+        // migrated to pushToast in claude/toast-system
+        pushToast({
+          variant: "success",
+          message: sentClientName
+            ? `Approved quote sent to ${sentClientName}.`
+            : "Approved quote sent.",
+        });
         // Auto-advance to the next pending matter rather than bouncing
         // back to the dashboard.
         await navigateToNextPendingQuote(sentRef);
@@ -7197,11 +7456,7 @@ function App() {
                                 ? "Preparing PDF…"
                                 : "Download PDF"}
                             </button>
-                            {firmPdfError && (
-                              <span style={{ color: "#dc2626", fontSize: "13px" }}>
-                                {firmPdfError}
-                              </span>
-                            )}
+                            {/* migrated to pushToast in claude/toast-system */}
                           </div>
                         )}
                       </div>
@@ -7593,11 +7848,7 @@ function App() {
                             ← Back to History
                           </button>
                         </div>
-                        {firmPdfError && (
-                          <p className="form-note" style={{ color: "#dc2626", marginTop: 0 }}>
-                            {firmPdfError}
-                          </p>
-                        )}
+                        {/* firmPdfError inline text migrated to pushToast in claude/toast-system */}
                         {firmHistoryDetail.output ? (
                           <FirmIssueQuotePreview
                             clientName={firmHistoryDetail.clientName}
@@ -7682,9 +7933,7 @@ function App() {
                         {firmHistoryDetailError && (
                           <p className="form-note" style={{ color: "#dc2626" }}>{firmHistoryDetailError}</p>
                         )}
-                        {firmPdfError && (
-                          <p className="form-note" style={{ color: "#dc2626" }}>{firmPdfError}</p>
-                        )}
+                        {/* firmPdfError inline text migrated to pushToast in claude/toast-system */}
 
                         {!isLoadingFirmIssuedHistory && firmHistoryQuotes.length === 0 && !firmHistoryError && (
                           <div style={{ textAlign: "center", padding: "32px 0" }}>
@@ -8049,29 +8298,8 @@ function App() {
           </section>
         )}
 
-        {isAdminPage && isAdminUnlocked && adminToast && (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              position: "fixed",
-              bottom: "24px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "#f1f5f9",
-              color: "var(--navy)",
-              borderRadius: "18px",
-              padding: "12px 22px",
-              fontSize: "14px",
-              boxShadow: "0 4px 16px rgba(15, 23, 42, 0.18)",
-              zIndex: 100,
-              maxWidth: "90vw",
-              textAlign: "center",
-            }}
-          >
-            {adminToast}
-          </div>
-        )}
+        {/* admin inline toast banner migrated to global pushToast in
+            claude/toast-system — see ToastProvider at top of file. */}
 
         {/* Custom confirm modal for bulk delete — native confirm()
             can't show a count nicely. */}
@@ -11879,7 +12107,15 @@ function App() {
   );
 }
 
-export default App;
+function AppWithProviders() {
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+}
+
+export default AppWithProviders;
 
 // ── FirmReferredMatterCard ────────────────────────────────────────────────────
 // Displays a referred matter for the firm portal with:
