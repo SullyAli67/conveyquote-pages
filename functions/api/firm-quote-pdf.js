@@ -1,11 +1,23 @@
 // functions/api/firm-quote-pdf.js
 //
-// Phase 3 of Type 2 firm-quoting product.
+// Phase 3 + Phase 4 of Type 2 firm-quoting product.
 //
-// Generates a ConveyQuote-branded PDF of a saved firm-issued quote.
-// PDFs are not stored — every request renders fresh from the
-// firm_issued_quotes row. Neutral template (Phase 3); firm-specific
-// branding (logo, contact details) is Phase 4.
+// Generates a PDF of a saved firm-issued quote. PDFs are not stored —
+// every request renders fresh from the firm_issued_quotes row.
+//
+// Phase 4 layered firm branding on top of the Phase 3 template:
+//   - If brand_logo_key is set, the firm's logo is embedded top-left of
+//     the header band, replacing the "ConveyQuote" wordmark.
+//   - If brand_display_name is set, it replaces "ConveyQuote" wherever
+//     the wordmark text appears (except the small attribution footer).
+//   - If brand_address / brand_phone / brand_email are set, a contact
+//     block is drawn below the header band before the quote metadata.
+//   - "Powered by ConveyQuote — conveyquote.uk" moves to the bottom-right
+//     of every page footer in small grey text.
+//
+// Backwards compatible: a firm with no branding set renders exactly the
+// Phase 3 PDF — no regression. A logo R2 fetch failure logs and falls
+// back to the ConveyQuote wordmark; PDF generation never blocks on it.
 //
 // Route: GET /api/firm-quote-pdf?id=<id>
 // Auth: firm session (Bearer token), is_saas_firm = 1 required, firm
@@ -129,7 +141,12 @@ const drawCenteredText = (page, text, centerX, y, font, size, color) => {
   page.drawText(clean, { x: centerX - width / 2, y, font, size, color });
 };
 
-const drawHeaderBand = (page, fonts) => {
+// Logo target box inside the header band. Logos are scaled to fit while
+// preserving aspect ratio; the upload pipeline caps them at 800x800.
+const LOGO_BOX_HEIGHT = HEADER_BAND_HEIGHT - 20; // 50pt
+const LOGO_BOX_MAX_WIDTH = 200;
+
+const drawHeaderBand = (page, fonts, branding) => {
   page.drawRectangle({
     x: 0,
     y: PAGE_HEIGHT - HEADER_BAND_HEIGHT,
@@ -137,11 +154,33 @@ const drawHeaderBand = (page, fonts) => {
     height: HEADER_BAND_HEIGHT,
     color: NAVY,
   });
-  drawText(page, "ConveyQuote", MARGIN_X, PAGE_HEIGHT - 45, {
-    font: fonts.bold,
-    size: 26,
-    color: WHITE,
-  });
+
+  const wordmark = branding?.displayName || "ConveyQuote";
+
+  if (branding?.logoImage) {
+    const img = branding.logoImage;
+    // Scale to fit within (LOGO_BOX_MAX_WIDTH x LOGO_BOX_HEIGHT).
+    const scale = Math.min(
+      LOGO_BOX_MAX_WIDTH / img.width,
+      LOGO_BOX_HEIGHT / img.height
+    );
+    const drawW = img.width * scale;
+    const drawH = img.height * scale;
+    const y = PAGE_HEIGHT - HEADER_BAND_HEIGHT + (HEADER_BAND_HEIGHT - drawH) / 2;
+    page.drawImage(img, {
+      x: MARGIN_X,
+      y,
+      width: drawW,
+      height: drawH,
+    });
+  } else {
+    drawText(page, wordmark, MARGIN_X, PAGE_HEIGHT - 45, {
+      font: fonts.bold,
+      size: 26,
+      color: WHITE,
+    });
+  }
+
   drawRightAlignedText(
     page,
     "Quote summary",
@@ -236,13 +275,13 @@ const curateTransactionDetails = (transactionType, inputs) => {
 };
 
 // Renderer with cursor management + automatic page break.
-const createRenderer = (pdfDoc, fonts) => {
+const createRenderer = (pdfDoc, fonts, branding) => {
   const pages = [];
   let state = null;
 
   const startPage = () => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeaderBand(page, fonts);
+    drawHeaderBand(page, fonts, branding);
     pages.push(page);
     state = { page, y: CONTENT_TOP };
   };
@@ -264,6 +303,63 @@ const createRenderer = (pdfDoc, fonts) => {
     get: () => state,
     getPages: () => pages,
   };
+};
+
+// Firm contact block — sits below the header band, before the quote
+// metadata. Lines: address (wrapped), phone, email. If a firm has no
+// contact details set, nothing is drawn and the metadata block keeps
+// its Phase 3 position.
+const drawFirmContactBlock = (renderer, fonts, branding) => {
+  if (!branding) return;
+  const addressLines = (branding.address || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const hasContact =
+    addressLines.length > 0 ||
+    Boolean(branding.phone) ||
+    Boolean(branding.email);
+  if (!hasContact) return;
+
+  const totalLines =
+    addressLines.length + (branding.phone ? 1 : 0) + (branding.email ? 1 : 0);
+  renderer.ensureRoom(14 * totalLines + 14);
+
+  const lineHeight = 13;
+  for (const line of addressLines) {
+    if (renderer.get().y - lineHeight < CONTENT_BOTTOM) renderer.newPage();
+    drawText(renderer.get().page, line, MARGIN_X, renderer.get().y, {
+      font: fonts.regular,
+      size: 10,
+      color: NAVY,
+    });
+    renderer.advance(lineHeight);
+  }
+  if (branding.phone) {
+    if (renderer.get().y - lineHeight < CONTENT_BOTTOM) renderer.newPage();
+    drawText(
+      renderer.get().page,
+      `Tel: ${branding.phone}`,
+      MARGIN_X,
+      renderer.get().y,
+      { font: fonts.regular, size: 10, color: NAVY }
+    );
+    renderer.advance(lineHeight);
+  }
+  if (branding.email) {
+    if (renderer.get().y - lineHeight < CONTENT_BOTTOM) renderer.newPage();
+    drawText(
+      renderer.get().page,
+      `Email: ${branding.email}`,
+      MARGIN_X,
+      renderer.get().y,
+      { font: fonts.regular, size: 10, color: NAVY }
+    );
+    renderer.advance(lineHeight);
+  }
+  renderer.advance(6);
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(14);
 };
 
 const drawMetadataBlock = (renderer, fonts, meta) => {
@@ -447,40 +543,59 @@ const drawDisclaimerOnEveryPage = (renderer, fonts) => {
 const drawPageFooters = (renderer, fonts) => {
   const pages = renderer.getPages();
   const total = pages.length;
+  // Phase 4: attribution moved to bottom-right grey; page numbers (when
+  // applicable) go bottom-left so they don't collide with the attribution.
   pages.forEach((page, idx) => {
-    drawCenteredText(
+    drawRightAlignedText(
       page,
-      "Generated by ConveyQuote - conveyquote.uk",
-      PAGE_WIDTH / 2,
+      "Powered by ConveyQuote - conveyquote.uk",
+      PAGE_WIDTH - MARGIN_X,
       12,
       fonts.regular,
       8,
       MUTED
     );
     if (total > 1) {
-      drawRightAlignedText(
-        page,
-        `Page ${idx + 1} of ${total}`,
-        PAGE_WIDTH - MARGIN_X,
-        12,
-        fonts.regular,
-        8,
-        MUTED
-      );
+      drawText(page, `Page ${idx + 1} of ${total}`, MARGIN_X, 12, {
+        font: fonts.regular,
+        size: 8,
+        color: MUTED,
+      });
     }
   });
 };
 
 // ── Main PDF builder ─────────────────────────────────────────────────
 
-async function buildQuotePdf({ id, clientName, clientEmail, issuedAt, transactionType, inputs, output }) {
+async function buildQuotePdf({ id, clientName, clientEmail, issuedAt, transactionType, inputs, output, branding }) {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
   };
 
-  const renderer = createRenderer(pdfDoc, fonts);
+  // Embed the logo image once at the top of the document. If embedding
+  // fails (e.g. corrupt bytes that slipped past upload validation), log
+  // and fall back to the wordmark header — never block the PDF.
+  let logoImage = null;
+  if (branding?.logoBytes && branding.logoMimeType) {
+    try {
+      logoImage =
+        branding.logoMimeType === "image/png"
+          ? await pdfDoc.embedPng(branding.logoBytes)
+          : await pdfDoc.embedJpg(branding.logoBytes);
+    } catch (err) {
+      console.error("firm-quote-pdf: embed logo failed:", err);
+      logoImage = null;
+    }
+  }
+
+  const renderBranding = branding ? { ...branding, logoImage } : null;
+
+  const renderer = createRenderer(pdfDoc, fonts, renderBranding);
+
+  // Firm contact block (only renders if any branding contact fields set).
+  drawFirmContactBlock(renderer, fonts, renderBranding);
 
   // Metadata
   drawMetadataBlock(renderer, fonts, {
@@ -561,7 +676,12 @@ export async function onRequestGet(context) {
     const firmId = session.user_id;
 
     const firm = await env.DB.prepare(
-      `SELECT id, is_saas_firm FROM panel_firms WHERE id = ? LIMIT 1`
+      `SELECT id, is_saas_firm,
+              brand_display_name, brand_address,
+              brand_phone, brand_email, brand_logo_key
+         FROM panel_firms
+        WHERE id = ?
+        LIMIT 1`
     )
       .bind(firmId)
       .first();
@@ -637,6 +757,43 @@ export async function onRequestGet(context) {
     const issuedAt = String(row.issued_at || "");
     const transactionType = String(row.transaction_type || "");
 
+    // Build the branding payload. Logo bytes are fetched from R2 here so
+    // a failure can be caught and logged without blocking PDF generation
+    // (per Phase 4 spec — fall back to the ConveyQuote wordmark).
+    const branding = {
+      displayName: firm.brand_display_name || "",
+      address: firm.brand_address || "",
+      phone: firm.brand_phone || "",
+      email: firm.brand_email || "",
+      logoBytes: null,
+      logoMimeType: null,
+    };
+    const logoKey =
+      typeof firm.brand_logo_key === "string" && firm.brand_logo_key
+        ? firm.brand_logo_key
+        : null;
+    if (logoKey && env.FIRM_LOGOS_BUCKET) {
+      try {
+        const obj = await env.FIRM_LOGOS_BUCKET.get(logoKey);
+        if (obj) {
+          const arrayBuffer = await obj.arrayBuffer();
+          branding.logoBytes = new Uint8Array(arrayBuffer);
+          branding.logoMimeType =
+            obj.httpMetadata?.contentType ||
+            (logoKey.endsWith(".png") ? "image/png" : "image/jpeg");
+        } else {
+          console.error(
+            `firm-quote-pdf: logo key ${logoKey} not found in R2 — falling back to wordmark.`
+          );
+        }
+      } catch (err) {
+        console.error(
+          `firm-quote-pdf: logo fetch for ${logoKey} failed — falling back to wordmark:`,
+          err
+        );
+      }
+    }
+
     const pdfBytes = await buildQuotePdf({
       id: Number(row.id),
       clientName,
@@ -645,6 +802,7 @@ export async function onRequestGet(context) {
       transactionType,
       inputs,
       output,
+      branding,
     });
 
     const filename = buildFilename(Number(row.id), clientName, issuedAt);
