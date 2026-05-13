@@ -8918,12 +8918,8 @@ function App() {
 
             {adminTab === "firms" && !loadedEnquiry && !isLoadingDashboard && (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(300px, 1fr) minmax(380px, 1.4fr)",
-                  gap: "20px",
-                  alignItems: "start",
-                }}
+                className="admin-two-col admin-two-col--wide-right"
+                style={{ alignItems: "start" }}
               >
                 <div className="admin-stack">
                   <SummaryCard title="Panel Firms">
@@ -9477,13 +9473,8 @@ function App() {
 
             {adminTab === "lenders" && !loadedEnquiry && !isLoadingDashboard && (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(300px, 1fr) minmax(360px, 1.2fr)",
-                  gap: "20px",
-                  alignItems: "start",
-                  marginTop: "20px",
-                }}
+                className="admin-two-col admin-two-col--wide-right"
+                style={{ alignItems: "start", marginTop: "20px" }}
               >
                 <div className="admin-stack">
                   <SummaryCard title="Panel Lenders">
@@ -9708,7 +9699,7 @@ function App() {
 
             {/* ── Referrers tab ── */}
             {adminTab === "referrers" && (
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(300px,1fr) minmax(380px,1.4fr)", gap: "20px", alignItems: "start", marginTop: "20px" }}>
+              <div className="admin-two-col admin-two-col--wide-right" style={{ alignItems: "start", marginTop: "20px" }}>
 
                 {/* Left: referrer list */}
                 <div className="admin-stack">
