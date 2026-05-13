@@ -1220,6 +1220,14 @@ function App() {
     useState(false);
   const [firmHistoryDetailError, setFirmHistoryDetailError] = useState("");
 
+  // ── Firm PDF download state ───────────────────────────────────────────────
+  // Shared by Quote History list, Quote History detail, and Issue Quote
+  // success state. We download via fetch + Blob (rather than window.open or
+  // an anchor href) because firm auth uses a Bearer token in localStorage —
+  // links / new windows can't carry that header.
+  const [firmPdfDownloadingId, setFirmPdfDownloadingId] = useState<number | null>(null);
+  const [firmPdfError, setFirmPdfError] = useState("");
+
   // Fee config state
   const [feeConfigType, setFeeConfigType] = useState("purchase");
   const [feeConfigItems, setFeeConfigItems] = useState<FirmFeeItem[]>([]);
@@ -2893,6 +2901,55 @@ function App() {
       setFirmHistoryError("Couldn't load quote history — please try again.");
     } finally {
       setIsLoadingFirmIssuedHistory(false);
+    }
+  };
+
+  const downloadFirmQuotePdf = async (quoteId: number, fallbackName?: string) => {
+    if (!firmToken || !quoteId) return;
+    setFirmPdfError("");
+    setFirmPdfDownloadingId(quoteId);
+    try {
+      const res = await fetch(`/api/firm-quote-pdf?id=${quoteId}`, {
+        headers: { Authorization: `Bearer ${firmToken}` },
+      });
+      if (!res.ok) {
+        // Try to read the JSON error body, but tolerate non-JSON.
+        let message = "Could not generate PDF — try again or contact support.";
+        try {
+          const data = await res.json();
+          if (data && typeof data.error === "string" && data.error) {
+            message = data.error;
+          }
+        } catch {}
+        setFirmPdfError(message);
+        return;
+      }
+
+      // Prefer the Content-Disposition filename the server set.
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename =
+        (match && match[1]) ||
+        (fallbackName
+          ? `ConveyQuote-${fallbackName.replace(/[^a-zA-Z0-9-_]+/g, "-")}-${quoteId}.pdf`
+          : `ConveyQuote-${quoteId}.pdf`);
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Release the blob URL on the next tick to give the browser time to
+      // start the download.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error("Download firm quote PDF error:", e);
+      setFirmPdfError("Could not generate PDF — try again or contact support.");
+    } finally {
+      setFirmPdfDownloadingId(null);
     }
   };
 
@@ -7096,31 +7153,57 @@ function App() {
                           fontSize: "14px",
                         }}
                       >
-                        {issueQuoteSavedMessage.text}{" "}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFirmPortalTab("history");
-                            setFirmHistoryDetail(null);
-                            void loadFirmHistory({ offset: 0 });
-                            if (issueQuoteSavedMessage.quoteId) {
-                              void openFirmHistoryDetail(
-                                issueQuoteSavedMessage.quoteId
-                              );
-                            }
-                          }}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: 0,
-                            color: "var(--teal-dark)",
-                            textDecoration: "underline",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                          }}
-                        >
-                          View in History
-                        </button>
+                        <div>
+                          {issueQuoteSavedMessage.text}{" "}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFirmPortalTab("history");
+                              setFirmHistoryDetail(null);
+                              void loadFirmHistory({ offset: 0 });
+                              if (issueQuoteSavedMessage.quoteId) {
+                                void openFirmHistoryDetail(
+                                  issueQuoteSavedMessage.quoteId
+                                );
+                              }
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: 0,
+                              color: "var(--teal-dark)",
+                              textDecoration: "underline",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                            }}
+                          >
+                            View in History
+                          </button>
+                        </div>
+                        {issueQuoteSavedMessage.quoteId > 0 && (
+                          <div style={{ marginTop: "10px", display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="muted-button"
+                              onClick={() =>
+                                void downloadFirmQuotePdf(
+                                  issueQuoteSavedMessage.quoteId,
+                                  issueQuoteForm.clientName
+                                )
+                              }
+                              disabled={firmPdfDownloadingId === issueQuoteSavedMessage.quoteId}
+                            >
+                              {firmPdfDownloadingId === issueQuoteSavedMessage.quoteId
+                                ? "Preparing PDF…"
+                                : "Download PDF"}
+                            </button>
+                            {firmPdfError && (
+                              <span style={{ color: "#dc2626", fontSize: "13px" }}>
+                                {firmPdfError}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -7510,6 +7593,11 @@ function App() {
                             ← Back to History
                           </button>
                         </div>
+                        {firmPdfError && (
+                          <p className="form-note" style={{ color: "#dc2626", marginTop: 0 }}>
+                            {firmPdfError}
+                          </p>
+                        )}
                         {firmHistoryDetail.output ? (
                           <FirmIssueQuotePreview
                             clientName={firmHistoryDetail.clientName}
@@ -7523,15 +7611,21 @@ function App() {
                             result={firmHistoryDetail.output}
                             actions={
                               <div className="form-footer action-row">
-                                <span style={{ flex: 1, color: "var(--muted)", fontSize: "13px" }}>
-                                  PDF download coming soon
-                                </span>
+                                <span style={{ flex: 1 }} />
                                 <button
                                   type="button"
                                   className="muted-button"
-                                  disabled
+                                  onClick={() =>
+                                    void downloadFirmQuotePdf(
+                                      firmHistoryDetail.id,
+                                      firmHistoryDetail.clientName
+                                    )
+                                  }
+                                  disabled={firmPdfDownloadingId === firmHistoryDetail.id}
                                 >
-                                  Download as PDF
+                                  {firmPdfDownloadingId === firmHistoryDetail.id
+                                    ? "Preparing PDF…"
+                                    : "Download PDF"}
                                 </button>
                               </div>
                             }
@@ -7588,6 +7682,9 @@ function App() {
                         {firmHistoryDetailError && (
                           <p className="form-note" style={{ color: "#dc2626" }}>{firmHistoryDetailError}</p>
                         )}
+                        {firmPdfError && (
+                          <p className="form-note" style={{ color: "#dc2626" }}>{firmPdfError}</p>
+                        )}
 
                         {!isLoadingFirmIssuedHistory && firmHistoryQuotes.length === 0 && !firmHistoryError && (
                           <div style={{ textAlign: "center", padding: "32px 0" }}>
@@ -7607,18 +7704,22 @@ function App() {
                         {firmHistoryQuotes.length > 0 && (
                           <div className="detail-table">
                             {firmHistoryQuotes.map((q) => (
-                              <button
+                              <div
                                 key={q.id}
-                                type="button"
                                 className="detail-row"
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => void openFirmHistoryDetail(q.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    void openFirmHistoryDetail(q.id);
+                                  }
+                                }}
                                 style={{
                                   textAlign: "left",
                                   width: "100%",
-                                  background: "transparent",
-                                  border: "none",
                                   cursor: "pointer",
-                                  padding: 0,
                                 }}
                               >
                                 <div className="detail-row__label">
@@ -7634,11 +7735,31 @@ function App() {
                                 </div>
                                 <div
                                   className="detail-row__value"
-                                  style={{ textAlign: "right", fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}
+                                  style={{
+                                    textAlign: "right",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-end",
+                                    gap: "8px",
+                                  }}
                                 >
-                                  £{Number(q.grandTotal).toFixed(2)}
+                                  <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>
+                                    £{Number(q.grandTotal).toFixed(2)}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="muted-button"
+                                    style={{ fontSize: "12px", padding: "4px 10px" }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void downloadFirmQuotePdf(q.id, q.clientName);
+                                    }}
+                                    disabled={firmPdfDownloadingId === q.id}
+                                  >
+                                    {firmPdfDownloadingId === q.id ? "Preparing…" : "Download PDF"}
+                                  </button>
                                 </div>
-                              </button>
+                              </div>
                             ))}
                           </div>
                         )}
