@@ -1506,6 +1506,7 @@ function App() {
   const [isSavingAndSending, setIsSavingAndSending] = useState(false);
   const [quoteBuilderMode, setQuoteBuilderMode] = useState<"list" | "new" | "edit">("list");
   const [isDeletingFirmQuote, setIsDeletingFirmQuote] = useState<string | null>(null);
+  const [isLoadingFirmQuoteForEdit, setIsLoadingFirmQuoteForEdit] = useState<string | null>(null);
   const [firmQuoteManageMessage, setFirmQuoteManageMessage] = useState("");
   const [firmQuoteForm, setFirmQuoteForm] = useState({
     firm_reference: "",
@@ -3588,24 +3589,89 @@ function App() {
     }
   };
 
-  // Load a quote into the form for editing
-  const handleLoadFirmQuoteForEdit = (q: FirmQuoteRow) => {
-    setFirmQuoteForm({
-      firm_reference: q.firm_reference || "",
-      client_name: q.client_name || "",
-      client_email: q.client_email || "",
-      client_phone: "",
-      transaction_type: q.transaction_type || "purchase",
-      tenure: "freehold",
-      price: q.price ? String(q.price) : "",
-      postcode: "",
-      email_signature: "",
-      internal_reference: q.internal_reference,
-    });
-    void loadFeeConfig(q.transaction_type || "purchase");
-    setQuoteBuilderMode("edit");
-    setFirmQuoteSendMessage("");
-    setFirmQuoteManageMessage("");
+  // Load a quote into the form for editing. Pulls the full saved row
+  // (including quote_json -> quote_data) from /api/firm-quote-detail so
+  // edits round-trip correctly. Falls back to the firm's default fee
+  // config only for pre-feature quotes that have no saved line items.
+  const handleLoadFirmQuoteForEdit = async (q: FirmQuoteRow) => {
+    setIsLoadingFirmQuoteForEdit(q.internal_reference);
+    try {
+      const res = await fetch(
+        `/api/firm-quote-detail?ref=${encodeURIComponent(q.internal_reference)}`,
+        { headers: { Authorization: `Bearer ${firmToken}` } }
+      );
+      const result = (await res.json()) as {
+        success: boolean;
+        error?: string;
+        quote?: Record<string, unknown> & {
+          quote_data?: {
+            legalFees?: { label: string; amount: number; includesVat?: boolean }[];
+            disbursements?: { label: string; amount: number }[];
+          } | null;
+        };
+      };
+      if (!res.ok || !result.success || !result.quote) {
+        pushToast({
+          variant: "error",
+          message: result.error || "Couldn't load the saved quote — please try again.",
+        });
+        return;
+      }
+
+      const full = result.quote;
+      const transactionType = String(full.transaction_type || q.transaction_type || "purchase");
+
+      setFirmQuoteForm({
+        firm_reference: String(full.firm_reference || ""),
+        client_name: String(full.client_name || ""),
+        client_email: String(full.client_email || ""),
+        client_phone: String(full.client_phone || ""),
+        transaction_type: transactionType,
+        tenure: String(full.tenure || "freehold"),
+        price: full.price != null ? String(full.price) : "",
+        postcode: String(full.postcode || ""),
+        email_signature: String(full.email_signature || ""),
+        internal_reference: String(full.internal_reference || q.internal_reference),
+      });
+
+      const savedQuoteData = full.quote_data;
+      const hasSavedItems =
+        !!savedQuoteData &&
+        ((Array.isArray(savedQuoteData.legalFees) && savedQuoteData.legalFees.length > 0) ||
+          (Array.isArray(savedQuoteData.disbursements) && savedQuoteData.disbursements.length > 0));
+
+      if (hasSavedItems) {
+        const legal: FirmFeeItem[] = (savedQuoteData?.legalFees ?? []).map((f) => ({
+          label: String(f.label || ""),
+          amount: Number(f.amount || 0),
+          includes_vat: Boolean(f.includesVat),
+          is_disbursement: false,
+        }));
+        const disb: FirmFeeItem[] = (savedQuoteData?.disbursements ?? []).map((d) => ({
+          label: String(d.label || ""),
+          amount: Number(d.amount || 0),
+          includes_vat: false,
+          is_disbursement: true,
+        }));
+        setFeeConfigItems([...legal, ...disb]);
+      } else {
+        // Pre-feature quote with no saved line items — fall back to the
+        // firm's current fee config so the form has something to render.
+        await loadFeeConfig(transactionType);
+      }
+
+      setQuoteBuilderMode("edit");
+      setFirmQuoteSendMessage("");
+      setFirmQuoteManageMessage("");
+    } catch (e) {
+      console.error("Load firm quote for edit error:", e);
+      pushToast({
+        variant: "error",
+        message: "Couldn't load the saved quote — please try again.",
+      });
+    } finally {
+      setIsLoadingFirmQuoteForEdit(null);
+    }
   };
 
   // Save edits to an existing quote
@@ -7027,8 +7093,9 @@ function App() {
                                       )}
                                       {q.status !== "accepted" && (
                                         <button type="button" className="muted-button" style={{ fontSize: "12px" }}
-                                          onClick={() => handleLoadFirmQuoteForEdit(q)}>
-                                          Edit Quote
+                                          disabled={isLoadingFirmQuoteForEdit === q.internal_reference}
+                                          onClick={() => void handleLoadFirmQuoteForEdit(q)}>
+                                          {isLoadingFirmQuoteForEdit === q.internal_reference ? "Loading…" : "Edit Quote"}
                                         </button>
                                       )}
                                       <button type="button" className="muted-button" style={{ fontSize: "12px" }}
