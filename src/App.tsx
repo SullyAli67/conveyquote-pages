@@ -1315,6 +1315,15 @@ function App() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
 
+  // Admin bulk-delete + auto-nav (Batch: admin-bulk-delete-and-nav).
+  const [bulkSelectedRefs, setBulkSelectedRefs] = useState<Set<string>>(
+    () => new Set<string>()
+  );
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isDeletingLoadedEnquiry, setIsDeletingLoadedEnquiry] = useState(false);
+  const [adminToast, setAdminToast] = useState<string>("");
+
   const [adminTab, setAdminTabRaw] = useState<AdminTab>(
     () => (localStorage.getItem("cq_admin_tab") as AdminTab) || "dashboard"
   );
@@ -1938,11 +1947,169 @@ function App() {
       setStatusUpdateMessage(`Status updated to "${prettifyValue(newStatus)}".`);
       // Optimistically update local state
       setLoadedEnquiry((prev) => prev ? { ...prev, status: newStatus } : prev);
+
+      // Terminal statuses dispose of the quote — auto-advance to the
+      // next pending matter. Intermediate states (reviewed, on_hold,
+      // quote_sent) leave the admin on the current quote.
+      if (TERMINAL_STATUSES_FOR_NAV.has(newStatus)) {
+        const currentRef = loadedEnquiry.reference;
+        await navigateToNextPendingQuote(currentRef);
+      }
     } catch (error) {
       console.error("Status update error:", error);
       setStatusUpdateMessage("Something went wrong updating the status.");
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  // ── Admin bulk-delete + auto-nav helpers ──────────────────────────
+
+  // Statuses that dispose of a quote — these trigger the next-pending
+  // auto-advance. Intermediate states like `reviewed`, `on_hold`, and
+  // `quote_sent` don't dispose; admin may still want to edit or wait.
+  const TERMINAL_STATUSES_FOR_NAV = new Set([
+    "accepted",
+    "rejected",
+    "instructed",
+  ]);
+
+  const showAdminToast = (text: string) => {
+    setAdminToast(text);
+    window.setTimeout(() => setAdminToast(""), 4000);
+  };
+
+  // After a terminal action, fetch the next pending enquiry. Loads it
+  // into Quote Review if there is one; otherwise routes back to the
+  // dashboard with a toast.
+  const navigateToNextPendingQuote = async (excludeRef?: string) => {
+    try {
+      const url = new URL(
+        "/api/admin-next-pending-quote",
+        window.location.origin
+      );
+      if (excludeRef) url.searchParams.set("exclude", excludeRef);
+      const response = await adminFetch(url.pathname + url.search);
+      const result = await response.json();
+
+      const nextRef =
+        result?.success && typeof result.reference === "string"
+          ? result.reference
+          : null;
+
+      if (nextRef) {
+        await handleOpenDashboardEnquiry(nextRef);
+        return;
+      }
+
+      // Queue empty — back to dashboard + toast.
+      setAdminTab("dashboard");
+      setLoadedEnquiry(null);
+      setLoadedEnquiryMessage("");
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("ref");
+      window.history.replaceState({}, "", nextUrl.toString());
+      setManualReference("");
+      await loadDashboardData();
+      showAdminToast("All pending quotes cleared.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Next-pending navigation error:", error);
+    }
+  };
+
+  // Delete from Quote Review. Same confirm text + invoice guardrail as
+  // the per-row Delete on the Enquiries list, then auto-advances to
+  // the next pending quote.
+  const handleDeleteLoadedEnquiry = async () => {
+    if (!loadedEnquiry?.reference || isDeletingLoadedEnquiry) return;
+    const ref = loadedEnquiry.reference;
+    if (
+      !window.confirm(
+        `Permanently delete enquiry ${ref}? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingLoadedEnquiry(true);
+    try {
+      const response = await adminFetch("/api/delete-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: ref }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        alert(result.error || "Couldn't delete — please try again.");
+        return;
+      }
+      showAdminToast("Enquiry deleted.");
+      await navigateToNextPendingQuote(ref);
+    } catch (error) {
+      console.error("Delete loaded enquiry error:", error);
+      alert("Couldn't delete — please try again.");
+    } finally {
+      setIsDeletingLoadedEnquiry(false);
+    }
+  };
+
+  const toggleBulkSelectRef = (reference: string) => {
+    setBulkSelectedRefs((prev) => {
+      const next = new Set(prev);
+      if (next.has(reference)) next.delete(reference);
+      else next.add(reference);
+      return next;
+    });
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    const refs = Array.from(bulkSelectedRefs);
+    if (refs.length === 0 || isBulkDeleting) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await adminFetch(
+        "/api/admin-delete-enquiries-bulk",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ references: refs }),
+        }
+      );
+      const result = await response.json();
+      if (!result.success) {
+        alert(result.error || "Bulk delete failed — please try again.");
+        return;
+      }
+
+      const deletedCount = Number(result.deleted) || 0;
+      const skipped: Array<{ reference: string; reason: string }> =
+        Array.isArray(result.skipped) ? result.skipped : [];
+      const invoiceSkipCount = skipped.filter((s) =>
+        String(s.reason || "").toLowerCase().includes("invoice")
+      ).length;
+      const otherSkipCount = skipped.length - invoiceSkipCount;
+
+      let toast = `${deletedCount} ${
+        deletedCount === 1 ? "enquiry" : "enquiries"
+      } deleted.`;
+      if (invoiceSkipCount > 0) {
+        toast += ` ${invoiceSkipCount} skipped — invoice exists.`;
+      }
+      if (otherSkipCount > 0) {
+        toast += ` ${otherSkipCount} skipped.`;
+      }
+
+      setBulkSelectedRefs(new Set());
+      setBulkDeleteConfirmOpen(false);
+      await loadDashboardData();
+      showAdminToast(toast);
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      alert("Bulk delete failed — please try again.");
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -3680,20 +3847,15 @@ function App() {
       const result = await response.json();
 
       if (result.success) {
-        alert("Approved client quote sent successfully.");
+        const sentRef = approvedQuote.quoteReference;
         setEmailPreviewOpen(false);
         setApprovedQuote(initialApprovedQuoteState);
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
-        setAdminTab("dashboard");
-
-        const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.delete("ref");
-        window.history.replaceState({}, "", nextUrl.toString());
-
-        setManualReference("");
-        await loadDashboardData();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        showAdminToast("Approved quote sent.");
+        // Auto-advance to the next pending matter rather than bouncing
+        // back to the dashboard.
+        await navigateToNextPendingQuote(sentRef);
       } else {
         alert("Sorry, there was a problem sending the approved quote.");
         console.error("Approved quote send error:", result);
@@ -7699,6 +7861,116 @@ function App() {
           </section>
         )}
 
+        {isAdminPage && isAdminUnlocked && adminToast && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: "fixed",
+              bottom: "24px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "#f1f5f9",
+              color: "var(--navy)",
+              borderRadius: "18px",
+              padding: "12px 22px",
+              fontSize: "14px",
+              boxShadow: "0 4px 16px rgba(15, 23, 42, 0.18)",
+              zIndex: 100,
+              maxWidth: "90vw",
+              textAlign: "center",
+            }}
+          >
+            {adminToast}
+          </div>
+        )}
+
+        {/* Custom confirm modal for bulk delete — native confirm()
+            can't show a count nicely. */}
+        {isAdminPage && isAdminUnlocked && bulkDeleteConfirmOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-delete-modal-title"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15, 23, 42, 0.55)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "24px",
+              zIndex: 200,
+            }}
+            onClick={(e) => {
+              if (!isBulkDeleting && e.target === e.currentTarget) {
+                setBulkDeleteConfirmOpen(false);
+              }
+            }}
+          >
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: "18px",
+                maxWidth: "480px",
+                width: "100%",
+                padding: "24px 26px",
+                boxShadow: "0 12px 32px rgba(15, 23, 42, 0.25)",
+              }}
+            >
+              <h3
+                id="bulk-delete-modal-title"
+                style={{ margin: "0 0 12px 0", color: "var(--navy)" }}
+              >
+                Permanently delete {bulkSelectedRefs.size}{" "}
+                {bulkSelectedRefs.size === 1 ? "enquiry" : "enquiries"}?
+              </h3>
+              <p style={{ margin: "0 0 8px 0", color: "var(--navy)", fontSize: "14px" }}>
+                This cannot be undone.
+              </p>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "13px" }}>
+                Enquiries with invoices will be skipped — void the invoice first.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  justifyContent: "flex-end",
+                  marginTop: "20px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => setBulkDeleteConfirmOpen(false)}
+                  disabled={isBulkDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmBulkDelete()}
+                  disabled={isBulkDeleting}
+                  style={{
+                    background: "#991b1b",
+                    border: "1px solid #991b1b",
+                    color: "#ffffff",
+                    padding: "8px 18px",
+                    borderRadius: "18px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: isBulkDeleting ? "default" : "pointer",
+                    opacity: isBulkDeleting ? 0.6 : 1,
+                  }}
+                >
+                  {isBulkDeleting ? "Deleting…" : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isAdminPage && isAdminUnlocked && (
           <section className="card card--form" style={{ marginTop: "24px" }}>
             <div className="section-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
@@ -8051,7 +8323,31 @@ function App() {
               </div>
             )}
 
-            {adminTab === "enquiries" && !loadedEnquiry && !isLoadingDashboard && (
+            {adminTab === "enquiries" && !loadedEnquiry && !isLoadingDashboard && (() => {
+              // Visible enquiries = whatever the dashboard currently
+              // shows. Select-all toggles only this set, not the whole DB.
+              const visibleRefs = dashboardEnquiries
+                .map((e) => e.reference)
+                .filter((r): r is string => typeof r === "string" && r.length > 0);
+              const allVisibleSelected =
+                visibleRefs.length > 0 &&
+                visibleRefs.every((r) => bulkSelectedRefs.has(r));
+              const someVisibleSelected =
+                visibleRefs.some((r) => bulkSelectedRefs.has(r));
+
+              const handleSelectAllVisible = (next: boolean) => {
+                setBulkSelectedRefs((prev) => {
+                  const out = new Set(prev);
+                  if (next) {
+                    for (const r of visibleRefs) out.add(r);
+                  } else {
+                    for (const r of visibleRefs) out.delete(r);
+                  }
+                  return out;
+                });
+              };
+
+              return (
               <div className="admin-stack" style={{ marginTop: "20px" }}>
                 <SummaryCard title="All Recent Enquiries">
                   <div className="form-grid" style={{ marginBottom: "16px" }}>
@@ -8092,32 +8388,127 @@ function App() {
                     </div>
                   </div>
 
+                  {visibleRefs.length > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: "16px",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <label
+                        style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "var(--muted)" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected;
+                          }}
+                          onChange={(e) => handleSelectAllVisible(e.target.checked)}
+                        />
+                        Select all visible
+                      </label>
+                    </div>
+                  )}
+
+                  {bulkSelectedRefs.size > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "10px 14px",
+                        background: "#f1f5f9",
+                        borderRadius: "18px",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <span style={{ color: "var(--navy)", fontWeight: 600, fontSize: "14px" }}>
+                        {bulkSelectedRefs.size} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setBulkDeleteConfirmOpen(true)}
+                        disabled={isBulkDeleting}
+                        style={{
+                          background: "transparent",
+                          border: "1px solid #fca5a5",
+                          color: "#991b1b",
+                          padding: "6px 14px",
+                          borderRadius: "18px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: isBulkDeleting ? "default" : "pointer",
+                          opacity: isBulkDeleting ? 0.6 : 1,
+                        }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkSelectedRefs(new Set())}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          color: "var(--teal)",
+                          fontSize: "13px",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                  )}
+
                   {dashboardEnquiries.length === 0 ? (
                     <p className="form-note">No enquiries found.</p>
                   ) : (
                     <div className="detail-table">
-                      {dashboardEnquiries.map((enquiry) => (
+                      {dashboardEnquiries.map((enquiry) => {
+                        const ref = enquiry.reference || "";
+                        const selectable = ref.length > 0;
+                        const checked = selectable && bulkSelectedRefs.has(ref);
+                        return (
                         <div
                           key={`${enquiry.id}-${enquiry.reference}`}
                           className="detail-row"
                         >
-                          <div className="detail-row__label">
-                            <strong>{enquiry.reference || "No reference"}</strong>
-                            <div>{prettifyValue(enquiry.client_name)}</div>
-                            <div>{prettifyValue(enquiry.client_email)}</div>
-                            <div>{getTransactionLabel(enquiry.transaction_type)}</div>
-                            {enquiry.referrer_name && (
-                              <div style={{ fontSize: "11px", marginTop: "3px" }}>
-                                <span style={{ background: "#ede9fe", color: "#5b21b6", padding: "1px 7px", borderRadius: "10px", fontWeight: 600 }}>
-                                  Via: {enquiry.referrer_name}
-                                </span>
-                                {Number(enquiry.referral_fee_payable) === 1 && Number(enquiry.referral_fee_amount) > 0 && (
-                                  <span style={{ marginLeft: "5px", background: "#f0fdf4", color: "#15803d", padding: "1px 7px", borderRadius: "10px", fontWeight: 600 }}>
-                                    £{Number(enquiry.referral_fee_amount).toFixed(2)} fee
+                          <div
+                            className="detail-row__label"
+                            style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!selectable}
+                              onChange={() => ref && toggleBulkSelectRef(ref)}
+                              style={{ marginTop: "4px" }}
+                              aria-label={`Select ${ref}`}
+                            />
+                            <div>
+                              <strong>{enquiry.reference || "No reference"}</strong>
+                              <div>{prettifyValue(enquiry.client_name)}</div>
+                              <div>{prettifyValue(enquiry.client_email)}</div>
+                              <div>{getTransactionLabel(enquiry.transaction_type)}</div>
+                              {enquiry.referrer_name && (
+                                <div style={{ fontSize: "11px", marginTop: "3px" }}>
+                                  <span style={{ background: "#ede9fe", color: "#5b21b6", padding: "1px 7px", borderRadius: "10px", fontWeight: 600 }}>
+                                    Via: {enquiry.referrer_name}
                                   </span>
-                                )}
-                              </div>
-                            )}
+                                  {Number(enquiry.referral_fee_payable) === 1 && Number(enquiry.referral_fee_amount) > 0 && (
+                                    <span style={{ marginLeft: "5px", background: "#f0fdf4", color: "#15803d", padding: "1px 7px", borderRadius: "10px", fontWeight: 600 }}>
+                                      £{Number(enquiry.referral_fee_amount).toFixed(2)} fee
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="detail-row__value">
                             <div
@@ -8179,12 +8570,14 @@ function App() {
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </SummaryCard>
               </div>
-            )}
+              );
+            })()}
 
             {adminTab === "firms" && !loadedEnquiry && !isLoadingDashboard && (
               <div
@@ -9726,6 +10119,46 @@ function App() {
                       {statusUpdateMessage && (
                         <p className="form-note">{statusUpdateMessage}</p>
                       )}
+
+                      {/* Destructive action — visually separated from
+                          the status buttons. Same red-outline style as
+                          the per-row Delete on the Enquiries list. */}
+                      <div
+                        style={{
+                          marginTop: "14px",
+                          paddingTop: "14px",
+                          borderTop: "1px solid #e5e7eb",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          gap: "12px",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteLoadedEnquiry()}
+                          disabled={isDeletingLoadedEnquiry}
+                          style={{
+                            background: "transparent",
+                            border: "1px solid #fca5a5",
+                            color: "#991b1b",
+                            padding: "6px 14px",
+                            borderRadius: "18px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            cursor: isDeletingLoadedEnquiry ? "default" : "pointer",
+                            opacity: isDeletingLoadedEnquiry ? 0.6 : 1,
+                          }}
+                        >
+                          {isDeletingLoadedEnquiry ? "Deleting…" : "Delete enquiry"}
+                        </button>
+                        <p
+                          className="form-note"
+                          style={{ margin: 0, fontSize: "12px", color: "var(--muted)" }}
+                        >
+                          Permanently removes this enquiry. Blocked if an invoice exists.
+                        </p>
+                      </div>
                     </SummaryCard>
 
                     <SummaryCard title="Assign to Panel Firm">

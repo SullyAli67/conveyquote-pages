@@ -2,6 +2,12 @@
 // Permanently deletes a quote (enquiry row) from the database.
 // Admin only. Refuses to delete if the enquiry already has an active invoice
 // (void the invoice first). This protects against accidental financial data loss.
+//
+// Behaviour preserved — same response shape, same error strings, same
+// audit log entry. The underlying logic now lives in
+// functions/lib/delete-enquiry-core.js so the bulk endpoint
+// (admin-delete-enquiries-bulk) can reuse it row-by-row without
+// duplication.
 
 import {
   getTokenFromRequest,
@@ -9,6 +15,11 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+import {
+  deleteEnquiryCore,
+  deleteReasonLong,
+  deleteReasonStatus,
+} from "../lib/delete-enquiry-core.js";
 
 export async function onRequestPost(context) {
   try {
@@ -20,37 +31,14 @@ export async function onRequestPost(context) {
 
     const { reference } = await request.json();
 
-    if (!reference) {
-      return jsonResponse({ success: false, error: "Reference is required." }, 400);
+    const result = await deleteEnquiryCore(env.DB, reference);
+
+    if (!result.ok) {
+      return jsonResponse(
+        { success: false, error: deleteReasonLong(result.code) },
+        deleteReasonStatus(result.code)
+      );
     }
-
-    // Safety check — block deletion if a live invoice exists
-    const enquiry = await env.DB.prepare(
-      `SELECT invoice_ref FROM enquiries WHERE reference = ? LIMIT 1`
-    ).bind(reference).first();
-
-    if (!enquiry) {
-      return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
-    }
-
-    if (enquiry.invoice_ref) {
-      return jsonResponse({
-        success: false,
-        error: "This enquiry has an active invoice. Please void the invoice first before deleting.",
-      }, 400);
-    }
-
-    await env.DB.prepare(
-      `DELETE FROM enquiries WHERE reference = ?`
-    ).bind(reference).run();
-
-    // Audit log
-    try {
-      await env.DB.prepare(
-        `INSERT INTO audit_log (action, reference, actor, details)
-         VALUES ('quote_deleted', ?, 'admin', 'Enquiry permanently deleted')`
-      ).bind(reference).run();
-    } catch (e) { console.error("Audit log error:", e); }
 
     return jsonResponse({ success: true, reference });
   } catch (error) {
