@@ -1,0 +1,40 @@
+# ConveyQuote — Cloudflare Pages bindings.
+#
+# NOTE: ConveyQuote deploys via Cloudflare Pages (not Workers), so the
+# authoritative binding configuration lives in the Cloudflare Pages
+# dashboard under Settings → Functions → Bindings, NOT in this file.
+# This wrangler.toml exists primarily as documentation of the bindings
+# the codebase expects, and to enable `wrangler pages dev` for local
+# previews of /functions.
+#
+# Sully — after creating bindings in the dashboard, the Pages deployment
+# picks them up automatically. No deploy of this file required.
+
+name = "conveyquote-pages"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "dist"
+
+# ── D1 (already provisioned) ─────────────────────────────────────────
+# Binding name in code: env.DB
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "conveyquote"
+# database_id = "<set in dashboard>"
+
+# ── R2: firm branding logos (Phase 4) ────────────────────────────────
+# Binding name in code: env.FIRM_LOGOS_BUCKET
+# Bucket suggestion: conveyquote-firm-logos
+#
+# Manual setup steps (Cloudflare dashboard):
+#   1. R2 → Create bucket → "conveyquote-firm-logos" (default settings)
+#   2. Pages → conveyquote-pages → Settings → Functions → Bindings →
+#      R2 bucket bindings → Add binding
+#        - Variable name: FIRM_LOGOS_BUCKET
+#        - R2 bucket: conveyquote-firm-logos
+#   3. Add the same binding under Production AND Preview environments
+#      so preview deployments can render firm-branded PDFs too.
+#   4. Redeploy Pages so the new binding takes effect.
+[[r2_buckets]]
+binding = "FIRM_LOGOS_BUCKET"
+bucket_name = "conveyquote-firm-logos"
+preview_bucket_name = "conveyquote-firm-logos"
