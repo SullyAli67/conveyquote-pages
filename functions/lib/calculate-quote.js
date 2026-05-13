@@ -491,7 +491,8 @@ function buildTransferQuote(input) {
   }
 
   if (input.transferMortgage === "yes") {
-    addItem(legalFees, "Lender consent / mortgage element", 125);
+    addItem(legalFees, "Mortgage supplement", 150);
+    addItem(legalFees, "Telegraphic transfer fee - transfer completion", 45);
   }
 
   if (input.ownersChanging === "two") {
