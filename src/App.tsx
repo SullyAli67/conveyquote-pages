@@ -11041,6 +11041,32 @@ function App() {
             )}
           </section>
         )}
+        {isHomePage && (
+          <section className="city-coverage" aria-labelledby="city-coverage-heading">
+            <h2 id="city-coverage-heading">Conveyancing solicitors across England &amp; Wales</h2>
+            <p>
+              We work with SRA-regulated firms covering these areas. Click for
+              local information and a fixed-fee quote.
+            </p>
+            <div className="city-coverage__grid">
+              <a href="/conveyancing-solicitors-birmingham">Birmingham</a>
+              <a href="/conveyancing-solicitors-dudley">Dudley</a>
+              <a href="/conveyancing-solicitors-edgbaston">Edgbaston</a>
+              <a href="/conveyancing-solicitors-harborne">Harborne</a>
+              <a href="/conveyancing-solicitors-hinckley">Hinckley</a>
+              <a href="/conveyancing-solicitors-kings-heath">Kings Heath</a>
+              <a href="/conveyancing-solicitors-leicester">Leicester</a>
+              <a href="/conveyancing-solicitors-loughborough">Loughborough</a>
+              <a href="/conveyancing-solicitors-market-harborough">Market Harborough</a>
+              <a href="/conveyancing-solicitors-moseley">Moseley</a>
+              <a href="/conveyancing-solicitors-oldbury">Oldbury</a>
+              <a href="/conveyancing-solicitors-solihull">Solihull</a>
+              <a href="/conveyancing-solicitors-sutton-coldfield">Sutton Coldfield</a>
+              <a href="/conveyancing-solicitors-walsall">Walsall</a>
+              <a href="/conveyancing-solicitors-west-bromwich">West Bromwich</a>
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ── Referrer Login ── */}
