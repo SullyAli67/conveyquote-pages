@@ -32,4 +32,6 @@
 /firm-quote-accept/ /index.html 200
 /firm-quote-accept/* /index.html 200
 /conveyancing-solicitors-birmingham /conveyancing-solicitors-birmingham.html 200
+/sitemap.xml /sitemap.xml 200
+/robots.txt /robots.txt 200
 /* /index.html 200
