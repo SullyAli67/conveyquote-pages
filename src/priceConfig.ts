@@ -123,6 +123,7 @@ export const PRICE_CONFIG = {
       // functions/lib/disbursement-constants.js.
       idChecks: 14.4,
       bankruptcySearchPerName: 7.6,
+      sdltSubmissionFee: 6,
       ap1SubmissionFee: 6,
     },
   },

@@ -520,6 +520,11 @@ function buildTransferQuote(input) {
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
   // Bankruptcy search always required on transfer of equity
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  // Firm has to assess SDLT applicability on every transfer of equity —
+  // Phase 1 firm engine already charges this; central engine now matches.
+  if (propertyValue > 0) {
+    addItem(disbursements, "SDLT submission", SDLT_SUBMISSION_FEE);
+  }
   addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
