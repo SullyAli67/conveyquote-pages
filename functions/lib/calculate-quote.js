@@ -465,8 +465,10 @@ function buildRemortgageQuote(input) {
     })
   );
   addItem(disbursements, perPersonLabel("ID checks", partyCount), ID_CHECKS_PER_BUYER * partyCount);
+  addItem(disbursements, "OS1 search", OS1_SEARCH_FEE);
   // Bankruptcy search always required on remortgage
   addItem(disbursements, perPersonLabel("Bankruptcy search", partyCount), BANKRUPTCY_SEARCH_PER_BUYER * partyCount);
+  addItem(disbursements, "AP1 submission", AP1_SUBMISSION_FEE);
 
   return finaliseQuote({
     legalFees,
