@@ -17,14 +17,16 @@
 import {
   calculateSdlt,
   SEARCH_PACK_FEE,
-  LAND_REGISTRY_FEE,
   ID_CHECKS_PER_BUYER,
   OS1_SEARCH_FEE,
   BANKRUPTCY_SEARCH_PER_BUYER,
   SDLT_SUBMISSION_FEE,
   AP1_SUBMISSION_FEE,
 } from "./calculate-quote.js";
-import { getOfficeCopyEntriesAmount } from "./disbursement-constants.js";
+import {
+  getOfficeCopyEntriesAmount,
+  getLandRegistryFee,
+} from "./disbursement-constants.js";
 
 const VAT_RATE = 0.2;
 
@@ -134,6 +136,7 @@ export async function calculateFirmQuote({ db, firmId, body }) {
   }
 
   const price = Number(body.price) || 0;
+  const mortgageAmount = Number(body.mortgageAmount) || 0;
   const tenure = body.tenure === "leasehold" ? "leasehold" : "freehold";
   const buyerCount = Math.max(1, Math.floor(Number(body.buyerCount) || 1));
   const mortgageOrCash =
@@ -219,16 +222,19 @@ export async function calculateFirmQuote({ db, firmId, body }) {
     disbursements.push({ label: "Search pack", amount: SEARCH_PACK_FEE });
   }
 
-  if (
-    transactionType === "purchase" ||
-    transactionType === "sale_purchase" ||
-    transactionType === "transfer" ||
-    transactionType === "remortgage" ||
-    transactionType === "remortgage_transfer"
-  ) {
+  // HMLR statutory sliding scale, no VAT. Single source of truth in
+  // ./disbursement-constants.js (Scale 1 / Scale 2 / dispatcher). For
+  // sale-only matters the helper returns 0 (no LR fee on a sale).
+  const landRegistryFee = getLandRegistryFee({
+    transactionType,
+    purchasePrice: price,
+    mortgageAmount,
+    propertyValue: price,
+  });
+  if (landRegistryFee > 0) {
     disbursements.push({
       label: "Land Registry fee",
-      amount: LAND_REGISTRY_FEE,
+      amount: landRegistryFee,
     });
   }
 

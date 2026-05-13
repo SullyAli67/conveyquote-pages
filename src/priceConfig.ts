@@ -83,7 +83,9 @@ export const PRICE_CONFIG = {
     },
     disbursements: {
       searchPack: 350,
-      landRegistryRegistrationFee: 150,
+      // Land Registry: see getLandRegistryFee in
+      // functions/lib/disbursement-constants.js — tenure-agnostic
+      // sliding scale, no VAT, shared with the server-side JS engine.
       idChecks: 14.4,
       os1PrioritySearch: 8.8,
       bankruptcySearchPerName: 7.6,
