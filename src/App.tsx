@@ -548,6 +548,22 @@ type LoadedEnquiry = {
 
 type AdminTab = "dashboard" | "enquiries" | "firms" | "lenders" | "quote" | "settings" | "referrers" | "invoices" | "pipeline" | "audit";
 
+const ADMIN_TABS = [
+  "dashboard",
+  "enquiries",
+  "firms",
+  "lenders",
+  "quote",
+  "settings",
+  "referrers",
+  "invoices",
+  "pipeline",
+  "audit",
+] as const satisfies readonly AdminTab[];
+
+const isValidAdminTab = (value: string | null | undefined): value is AdminTab =>
+  !!value && (ADMIN_TABS as readonly string[]).includes(value);
+
 type LenderEditorState = {
   id: number | null;
   lender_name: string;
@@ -1309,6 +1325,18 @@ function App() {
   type FirmQuoteRow = { id: number; firm_reference: string; internal_reference: string; client_name: string; client_email: string; transaction_type: string; price: number; status: string; sent_at: string; accepted_at: string; created_at: string };
 
   type FirmPortalTab = "referrals" | "quotes" | "issue_quote" | "history" | "fees" | "profile";
+  const FIRM_PORTAL_TABS = [
+    "referrals",
+    "quotes",
+    "issue_quote",
+    "history",
+    "fees",
+    "profile",
+  ] as const satisfies readonly FirmPortalTab[];
+  const isValidFirmPortalTab = (
+    value: string | null | undefined
+  ): value is FirmPortalTab =>
+    !!value && (FIRM_PORTAL_TABS as readonly string[]).includes(value);
   const [firmPortalTab, setFirmPortalTabRaw] = useState<FirmPortalTab>(
     () => (localStorage.getItem("cq_firm_tab") as FirmPortalTab) || "referrals"
   );
@@ -1316,6 +1344,13 @@ function App() {
     localStorage.setItem("cq_firm_tab", tab);
     setFirmPortalTabRaw(tab);
   };
+  // Session-level "already loaded" flags so tab clicks don't refetch
+  // (firmBrandingLoaded already exists below). A manual Refresh button
+  // resets these to force a reload.
+  const [firmQuotesLoaded, setFirmQuotesLoaded] = useState(false);
+  const [firmHistoryLoaded, setFirmHistoryLoaded] = useState(false);
+  const [firmFeesLoaded, setFirmFeesLoaded] = useState(false);
+  const [isFirmRefreshing, setIsFirmRefreshing] = useState(false);
   const [firmQuotes, setFirmQuotes] = useState<FirmQuoteRow[]>([]);
   const [isLoadingFirmQuotes, setIsLoadingFirmQuotes] = useState(false);
   const [firmQuotesMessage, setFirmQuotesMessage] = useState("");
@@ -1472,6 +1507,15 @@ function App() {
   const [isSavingFees, setIsSavingFees] = useState(false);
   const [feeConfigMessage, setFeeConfigMessage] = useState("");
 
+  const legalFeeItems = useMemo(
+    () => feeConfigItems.filter((f) => !f.is_disbursement),
+    [feeConfigItems]
+  );
+  const disbursementItems = useMemo(
+    () => feeConfigItems.filter((f) => f.is_disbursement),
+    [feeConfigItems]
+  );
+
   // ── Firm branding state (Phase 4) ─────────────────────────────────────────
   // Lives on the Profile tab for is_saas_firm=1 firms. The logo binary is in
   // R2; we only hold the object key on the client and render previews via
@@ -1611,6 +1655,14 @@ function App() {
     localStorage.setItem("cq_admin_tab", tab);
     setAdminTabRaw(tab);
   };
+  // Session-level "already loaded" flags for admin tabs whose data is
+  // separate from the main dashboard payload. Cleared by the Refresh button.
+  const [adminReferrersLoaded, setAdminReferrersLoaded] = useState(false);
+  const [adminInvoicesLoaded, setAdminInvoicesLoaded] = useState(false);
+  const [adminPipelineLoaded, setAdminPipelineLoaded] = useState(false);
+  const [adminSettingsLoaded, setAdminSettingsLoaded] = useState(false);
+  const [adminAuditLoaded, setAdminAuditLoaded] = useState(false);
+  const [isAdminRefreshing, setIsAdminRefreshing] = useState(false);
   const [selectedFirmId, setSelectedFirmId] = useState<number | null>(null);
   const [isAddingNewFirm, setIsAddingNewFirm] = useState(false);
   const [firmEditor, setFirmEditor] = useState<FirmEditorState>(
@@ -2016,15 +2068,29 @@ function App() {
     if (tab !== "quote") {
       setLoadedEnquiry(null);
       setLoadedEnquiryMessage("");
-      // Remove ?ref= from the URL without adding to history
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete("ref");
-      window.history.replaceState({}, "", cleanUrl.toString());
     }
 
-    if (tab !== "quote" && tab !== "referrers" && tab !== "invoices" && tab !== "pipeline" && tab !== "settings" && tab !== "audit") {
-      await loadDashboardData();
+    // Push tab to the URL so the browser back button moves between tabs.
+    // Skip the push when the URL already reflects the same tab (idempotent
+    // re-clicks shouldn't pile up history entries).
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("tab", tab);
+    if (tab !== "quote") {
+      nextUrl.searchParams.delete("ref");
     }
+    const currentTab = new URL(window.location.href).searchParams.get("tab");
+    const currentRef = new URL(window.location.href).searchParams.get("ref");
+    const sameTab = currentTab === tab;
+    const sameRef =
+      tab === "quote"
+        ? currentRef === nextUrl.searchParams.get("ref")
+        : !currentRef;
+    if (!sameTab || !sameRef) {
+      window.history.pushState({ adminTab: tab }, "", nextUrl.toString());
+    }
+
+    // Dashboard data is loaded once on portal entry and on explicit
+    // Refresh. Tab switches no longer trigger a network round-trip.
 
     if (tab === "firms" && dashboardFirms.length === 0) {
       startNewFirm();
@@ -2035,24 +2101,73 @@ function App() {
       setLenderSaveMessage("");
     }
 
-    if (tab === "referrers") {
+    if (tab === "referrers" && !adminReferrersLoaded) {
+      setAdminReferrersLoaded(true);
       void loadAllReferrers();
     }
 
-    if (tab === "invoices") {
+    if (tab === "invoices" && !adminInvoicesLoaded) {
+      setAdminInvoicesLoaded(true);
       void loadAllInvoices();
     }
 
-    if (tab === "pipeline") {
+    if (tab === "pipeline" && !adminPipelineLoaded) {
+      setAdminPipelineLoaded(true);
       void loadPipeline();
     }
 
-    if (tab === "settings") {
+    if (tab === "settings" && !adminSettingsLoaded) {
+      setAdminSettingsLoaded(true);
       void loadAdminSettings();
     }
 
-    if (tab === "audit") {
+    if (tab === "audit" && !adminAuditLoaded) {
+      setAdminAuditLoaded(true);
       void handleLoadAuditLog();
+    }
+  };
+
+  const handleAdminRefresh = async () => {
+    if (isAdminRefreshing) return;
+    setIsAdminRefreshing(true);
+    try {
+      // Clear per-tab loaded flags so other tabs also refetch on next visit.
+      setAdminReferrersLoaded(false);
+      setAdminInvoicesLoaded(false);
+      setAdminPipelineLoaded(false);
+      setAdminSettingsLoaded(false);
+      setAdminAuditLoaded(false);
+
+      await loadDashboardData();
+
+      // Reload the data for the currently-active tab if it has its own
+      // dataset outside the main dashboard payload.
+      if (adminTab === "referrers") {
+        setAdminReferrersLoaded(true);
+        await loadAllReferrers();
+      } else if (adminTab === "invoices") {
+        setAdminInvoicesLoaded(true);
+        await loadAllInvoices();
+      } else if (adminTab === "pipeline") {
+        setAdminPipelineLoaded(true);
+        await loadPipeline();
+      } else if (adminTab === "settings") {
+        setAdminSettingsLoaded(true);
+        await loadAdminSettings();
+      } else if (adminTab === "audit") {
+        setAdminAuditLoaded(true);
+        await handleLoadAuditLog();
+      }
+
+      pushToast({ variant: "success", message: "Data refreshed" });
+    } catch (error) {
+      console.error("Admin refresh error:", error);
+      pushToast({
+        variant: "error",
+        message: "Couldn't refresh — please try again.",
+      });
+    } finally {
+      setIsAdminRefreshing(false);
     }
   };
 
@@ -2599,6 +2714,63 @@ function App() {
       setFirmPortalError("Something went wrong loading your data.");
     } finally {
       setIsLoadingFirmPortal(false);
+    }
+  };
+
+  // Shared by CTAs that change the firm-portal tab from outside the main tab
+  // nav. Mirrors the URL push logic in the tab-button onClick so the browser
+  // back button still works after a CTA-driven tab switch.
+  const goToFirmTab = (tab: FirmPortalTab) => {
+    setFirmPortalTab(tab);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("tab", tab);
+    const currentUrlTab = new URL(window.location.href).searchParams.get("tab");
+    if (currentUrlTab !== tab) {
+      window.history.pushState(
+        { firmPortalTab: tab },
+        "",
+        nextUrl.toString()
+      );
+    }
+  };
+
+  const handleFirmRefresh = async () => {
+    if (isFirmRefreshing || !firmToken) return;
+    setIsFirmRefreshing(true);
+    try {
+      // Clear per-tab loaded flags so other tabs also refetch on next visit.
+      setFirmQuotesLoaded(false);
+      setFirmHistoryLoaded(false);
+      setFirmFeesLoaded(false);
+      setFirmBrandingLoaded(false);
+
+      await loadFirmPortalData(firmToken);
+
+      // Reload the data for the currently-active tab.
+      if (firmPortalTab === "quotes") {
+        setFirmQuotesLoaded(true);
+        await loadFirmQuotes();
+      } else if (firmPortalTab === "fees") {
+        setFirmFeesLoaded(true);
+        await loadFeeConfig(feeConfigType);
+      } else if (firmPortalTab === "history") {
+        setFirmHistoryLoaded(true);
+        setFirmHistoryDetail(null);
+        await loadFirmHistory({ offset: 0 });
+      } else if (firmPortalTab === "profile") {
+        await loadFirmBranding();
+      }
+      // referrals and issue_quote tabs don't have separate per-tab fetches.
+
+      pushToast({ variant: "success", message: "Data refreshed" });
+    } catch (error) {
+      console.error("Firm refresh error:", error);
+      pushToast({
+        variant: "error",
+        message: "Couldn't refresh — please try again.",
+      });
+    } finally {
+      setIsFirmRefreshing(false);
     }
   };
 
@@ -4743,28 +4915,38 @@ function App() {
       setAdminTab("quote");
       void loadEnquiryByReference(refFromUrl);
     } else {
-      setAdminTab("dashboard");
-      void loadDashboardData();
+      // Restore tab from URL ?tab= if valid, else fall through to
+      // the persisted/default value already set by useState.
+      const urlTab = new URLSearchParams(window.location.search).get("tab");
+      if (isValidAdminTab(urlTab)) {
+        setAdminTab(urlTab);
+      }
     }
+    void loadDashboardData();
   }, [isAdminPage, isAdminUnlocked, refFromUrl]);
 
-  // Listen for browser back/forward — when user presses Back from a quote,
-  // the URL loses the ?ref= param and we restore the dashboard view.
+  // Listen for browser back/forward — restore tab + loaded enquiry from
+  // the URL so back/forward across tab changes works as expected.
   useEffect(() => {
     if (!isAdminPage) return;
     const onPopState = () => {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref") || "";
+      const urlTab = params.get("tab");
       if (ref) {
         setManualReference(ref);
         setAdminTab("quote");
         void loadEnquiryByReference(ref);
+      } else if (isValidAdminTab(urlTab)) {
+        setAdminTab(urlTab);
+        setLoadedEnquiry(null);
+        setLoadedEnquiryMessage("");
+        setManualReference("");
       } else {
         setAdminTab("dashboard");
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
-        void loadDashboardData();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -4777,6 +4959,31 @@ function App() {
       void loadFirmPortalData(firmToken);
     }
   }, [isFirmPortalPage, firmToken]);
+
+  // Restore the firm portal active tab from the URL on entry, so a bookmark
+  // such as /firm-portal/?tab=issue_quote lands on the right tab.
+  useEffect(() => {
+    if (!isFirmPortalPage) return;
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    if (isValidFirmPortalTab(urlTab)) {
+      setFirmPortalTab(urlTab);
+    }
+  }, [isFirmPortalPage]);
+
+  // Listen for browser back/forward inside the firm portal — restore the tab
+  // state from the URL without re-pushing history.
+  useEffect(() => {
+    if (!isFirmPortalPage) return;
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab");
+      if (isValidFirmPortalTab(urlTab)) {
+        setFirmPortalTab(urlTab);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [isFirmPortalPage]);
 
   // Phase 4: once a SaaS firm's portal data has loaded, fetch branding
   // once so the Profile tab renders without a flash regardless of the
@@ -5293,45 +5500,49 @@ function App() {
     };
   }, [dashboardEnquiries]);
 
-  const dashboardSummaryRows: SummaryRow[] = [
-    {
-      label: "Recent enquiries",
-      value: String(dashboardEnquiries.length),
-    },
-    {
-      label: "Active panel firms",
-      value: String(
-        dashboardFirms.filter((firm) => Number(firm.active) === 1).length
-      ),
-    },
-    {
-      label: "Panel lenders",
-      value: String(activePanelLenders.length),
-    },
-    {
-      label: "Active lender memberships",
-      value: String(
-        panelMemberships.filter((membership) => Number(membership.active) === 1)
-          .length
-      ),
-    },
-    {
-      label: "Purchase enquiries",
-      value: String(
-        dashboardEnquiries.filter(
-          (enquiry) => enquiry.transaction_type === "purchase"
-        ).length
-      ),
-    },
-    {
-      label: "Sale enquiries",
-      value: String(
-        dashboardEnquiries.filter(
-          (enquiry) => enquiry.transaction_type === "sale"
-        ).length
-      ),
-    },
-  ];
+  const dashboardSummaryRows: SummaryRow[] = useMemo(
+    () => [
+      {
+        label: "Recent enquiries",
+        value: String(dashboardEnquiries.length),
+      },
+      {
+        label: "Active panel firms",
+        value: String(
+          dashboardFirms.filter((firm) => Number(firm.active) === 1).length
+        ),
+      },
+      {
+        label: "Panel lenders",
+        value: String(activePanelLenders.length),
+      },
+      {
+        label: "Active lender memberships",
+        value: String(
+          panelMemberships.filter(
+            (membership) => Number(membership.active) === 1
+          ).length
+        ),
+      },
+      {
+        label: "Purchase enquiries",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) => enquiry.transaction_type === "purchase"
+          ).length
+        ),
+      },
+      {
+        label: "Sale enquiries",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) => enquiry.transaction_type === "sale"
+          ).length
+        ),
+      },
+    ],
+    [dashboardEnquiries, dashboardFirms, activePanelLenders, panelMemberships]
+  );
 
   const activeAdjustment =
     approvedQuote.quoteData.manualAdjustment &&
@@ -6847,13 +7058,24 @@ function App() {
                 <h2>{firmSession.firm_name}</h2>
                 <p>Firm portal</p>
               </div>
-              <button
-                type="button"
-                className="muted-button"
-                onClick={() => void handleFirmLogout()}
-              >
-                Log out
-              </button>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleFirmRefresh()}
+                  disabled={isFirmRefreshing}
+                  style={{ fontSize: "13px", padding: "6px 14px", minHeight: "auto" }}
+                >
+                  {isFirmRefreshing ? "Refreshing…" : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleFirmLogout()}
+                >
+                  Log out
+                </button>
+              </div>
             </div>
 
             {/* Tab nav. issue_quote and history only render for SaaS-enabled firms. */}
@@ -6880,9 +7102,32 @@ function App() {
                       className={firmPortalTab === tab ? "primary-button" : "muted-button"}
                       onClick={() => {
                         setFirmPortalTab(tab);
-                        if (tab === "quotes") void loadFirmQuotes();
-                        if (tab === "fees") void loadFeeConfig(feeConfigType);
-                        if (tab === "history") {
+
+                        // Push tab to URL so browser back/forward navigates
+                        // between firm portal tabs. Skip if already current.
+                        const nextUrl = new URL(window.location.href);
+                        nextUrl.searchParams.set("tab", tab);
+                        const currentUrlTab = new URL(
+                          window.location.href
+                        ).searchParams.get("tab");
+                        if (currentUrlTab !== tab) {
+                          window.history.pushState(
+                            { firmPortalTab: tab },
+                            "",
+                            nextUrl.toString()
+                          );
+                        }
+
+                        if (tab === "quotes" && !firmQuotesLoaded) {
+                          setFirmQuotesLoaded(true);
+                          void loadFirmQuotes();
+                        }
+                        if (tab === "fees" && !firmFeesLoaded) {
+                          setFirmFeesLoaded(true);
+                          void loadFeeConfig(feeConfigType);
+                        }
+                        if (tab === "history" && !firmHistoryLoaded) {
+                          setFirmHistoryLoaded(true);
                           setFirmHistoryDetail(null);
                           void loadFirmHistory({ offset: 0 });
                         }
@@ -7425,10 +7670,12 @@ function App() {
                               </p>
                             )}
 
-                            {feeConfigItems.some((f) => !f.is_disbursement) && (
+                            {legalFeeItems.length > 0 && (
                               <div style={{ marginBottom: "12px" }}>
                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Legal Fees</div>
-                                {feeConfigItems.map((item, idx) => !item.is_disbursement ? (
+                                {legalFeeItems.map((item) => {
+                                  const idx = feeConfigItems.indexOf(item);
+                                  return (
                                   <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
                                     <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
                                       onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Fee description" />
@@ -7437,14 +7684,17 @@ function App() {
                                     <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
                                       onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
                                   </div>
-                                ) : null)}
+                                  );
+                                })}
                               </div>
                             )}
 
-                            {feeConfigItems.some((f) => f.is_disbursement) && (
+                            {disbursementItems.length > 0 && (
                               <div style={{ marginBottom: "12px" }}>
                                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>Disbursements</div>
-                                {feeConfigItems.map((item, idx) => item.is_disbursement ? (
+                                {disbursementItems.map((item) => {
+                                  const idx = feeConfigItems.indexOf(item);
+                                  return (
                                   <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
                                     <input type="text" value={item.label} style={{ flex: 1, minWidth: "140px" }}
                                       onChange={(e) => updateFeeItem(idx, "label", e.target.value)} placeholder="Disbursement description" />
@@ -7453,7 +7703,8 @@ function App() {
                                     <button type="button" style={{ padding: "0 8px", minHeight: 36, border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#991b1b", cursor: "pointer", fontSize: "14px" }}
                                       onClick={() => removeFeeItem(idx)} title="Remove">✕</button>
                                   </div>
-                                ) : null)}
+                                  );
+                                })}
                               </div>
                             )}
 
@@ -8191,7 +8442,7 @@ function App() {
                           <button
                             type="button"
                             className="primary-button"
-                            onClick={() => setFirmPortalTab("issue_quote")}
+                            onClick={() => goToFirmTab("issue_quote")}
                           >
                             Issue New Quote
                           </button>
@@ -8213,7 +8464,7 @@ function App() {
                             <button
                               type="button"
                               className="primary-button"
-                              onClick={() => setFirmPortalTab("issue_quote")}
+                              onClick={() => goToFirmTab("issue_quote")}
                             >
                               Issue Quote
                             </button>
@@ -8346,7 +8597,7 @@ function App() {
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
-                      {feeConfigItems.filter((f) => !f.is_disbursement).map((item, globalIdx) => {
+                      {legalFeeItems.map((item, globalIdx) => {
                         const idx = feeConfigItems.indexOf(item);
                         return (
                           <div key={globalIdx} className="detail-row">
@@ -8379,7 +8630,7 @@ function App() {
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Disbursements</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
-                      {feeConfigItems.filter((f) => f.is_disbursement).map((item, localIdx) => {
+                      {disbursementItems.map((item, localIdx) => {
                         const idx = feeConfigItems.indexOf(item);
                         return (
                           <div key={localIdx} className="detail-row">
@@ -8787,21 +9038,32 @@ function App() {
               <div>
                 <h2>Admin Dashboard</h2>
               </div>
-              <button
-                type="button"
-                onClick={() => void handleAdminLogout()}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  color: "var(--teal)",
-                  fontSize: "14px",
-                  textDecoration: "underline",
-                  cursor: "pointer",
-                }}
-              >
-                Log out
-              </button>
+              <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="muted-button"
+                  onClick={() => void handleAdminRefresh()}
+                  disabled={isAdminRefreshing}
+                  style={{ fontSize: "13px", padding: "6px 14px", minHeight: "auto" }}
+                >
+                  {isAdminRefreshing ? "Refreshing…" : "Refresh"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleAdminLogout()}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--teal)",
+                    fontSize: "14px",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
             </div>
 
             {/* ── Pending quotes badge ── */}
@@ -8955,7 +9217,7 @@ function App() {
               <button
                 type="button"
                 className={adminTab === "quote" ? "primary-button" : "muted-button"}
-                onClick={() => setAdminTab("quote")}
+                onClick={() => void handleAdminTabChange("quote")}
               >
                 Quote Review
               </button>
