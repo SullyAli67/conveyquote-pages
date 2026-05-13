@@ -2717,6 +2717,23 @@ function App() {
     }
   };
 
+  // Shared by CTAs that change the firm-portal tab from outside the main tab
+  // nav. Mirrors the URL push logic in the tab-button onClick so the browser
+  // back button still works after a CTA-driven tab switch.
+  const goToFirmTab = (tab: FirmPortalTab) => {
+    setFirmPortalTab(tab);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("tab", tab);
+    const currentUrlTab = new URL(window.location.href).searchParams.get("tab");
+    if (currentUrlTab !== tab) {
+      window.history.pushState(
+        { firmPortalTab: tab },
+        "",
+        nextUrl.toString()
+      );
+    }
+  };
+
   const handleFirmRefresh = async () => {
     if (isFirmRefreshing || !firmToken) return;
     setIsFirmRefreshing(true);
@@ -8425,7 +8442,7 @@ function App() {
                           <button
                             type="button"
                             className="primary-button"
-                            onClick={() => setFirmPortalTab("issue_quote")}
+                            onClick={() => goToFirmTab("issue_quote")}
                           >
                             Issue New Quote
                           </button>
@@ -8447,7 +8464,7 @@ function App() {
                             <button
                               type="button"
                               className="primary-button"
-                              onClick={() => setFirmPortalTab("issue_quote")}
+                              onClick={() => goToFirmTab("issue_quote")}
                             >
                               Issue Quote
                             </button>
@@ -9200,7 +9217,7 @@ function App() {
               <button
                 type="button"
                 className={adminTab === "quote" ? "primary-button" : "muted-button"}
-                onClick={() => setAdminTab("quote")}
+                onClick={() => void handleAdminTabChange("quote")}
               >
                 Quote Review
               </button>
