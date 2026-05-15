@@ -308,6 +308,11 @@ type DashboardEnquiry = {
   referral_fee_payable?: number;
   referral_fee_amount?: number;
   created_at?: string;
+  allocation_requested_at?: string | null;
+  allocated_at?: string | null;
+  successor_reference?: string | null;
+  parent_enquiry_id?: number | null;
+  referrer_note?: string | null;
 };
 
 type PanelFirm = {
@@ -550,6 +555,15 @@ type LoadedEnquiry = {
   remortgage_transfer_ownership_type?: string;
 
   quote?: LoadedQuote | null;
+
+  // Pattern B referrer-allocation fields
+  referrer_id?: number | null;
+  referrer_name?: string | null;
+  referrer_note?: string | null;
+  allocation_requested_at?: string | null;
+  allocated_at?: string | null;
+  successor_reference?: string | null;
+  parent_enquiry_id?: number | null;
 };
 
 type AdminTab = "dashboard" | "enquiries" | "firms" | "lenders" | "quote" | "settings" | "referrers" | "invoices" | "pipeline" | "audit";
@@ -1407,6 +1421,19 @@ function App() {
   const [referrerSaveMessage, setReferrerSaveMessage] = useState("");
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
 
+  // Per-referrer pricing config (Pattern B). Mirrors the firm Fee
+  // Settings state shape (FirmFeeItem) so the Pricing UI on the
+  // Referrers tab can reuse the same line-item editing pattern. The
+  // active config is keyed by (referrerEditor.id, referrerPricingType).
+  const [referrerPricingType, setReferrerPricingType] = useState("purchase");
+  const [referrerPricingItems, setReferrerPricingItems] = useState<
+    { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean; supplement_key?: string | null }[]
+  >([]);
+  const [isLoadingReferrerPricing, setIsLoadingReferrerPricing] = useState(false);
+  const [isSavingReferrerPricing, setIsSavingReferrerPricing] = useState(false);
+  const [referrerPricingMessage, setReferrerPricingMessage] = useState("");
+  const [referrerPricingPickerOpen, setReferrerPricingPickerOpen] = useState(false);
+
   // Invoices state
   type InvoiceRow = { reference: string; invoice_ref: string; invoice_json: string; invoice_status: string; voided_invoice_ref: string; voided_invoice_json: string; client_name: string; assigned_firm_name: string; case_status: string; created_at: string };
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
@@ -1432,7 +1459,7 @@ function App() {
   const [showFirmHistory, setShowFirmHistory] = useState(false);
 
   // Pipeline state
-  type PipelineRow = { reference: string; client_name: string; transaction_type: string; assigned_firm_name: string; case_status: string; eta_date: string; firm_response: string; invoice_ref: string; referrer_id: number; created_at: string; property_address: string; target_completion_date: string; fall_through_reason: string; negotiator_name: string; referrer_name: string; };
+  type PipelineRow = { reference: string; client_name: string; transaction_type: string; assigned_firm_name: string; case_status: string; eta_date: string; firm_response: string; invoice_ref: string; referrer_id: number; created_at: string; property_address: string; target_completion_date: string; fall_through_reason: string; negotiator_name: string; referrer_name: string; successor_reference?: string | null; allocated_at?: string | null; allocation_requested_at?: string | null; parent_enquiry_id?: number | null; };
   const [pipeline, setPipeline] = useState<PipelineRow[]>([]);
   const [isLoadingPipeline, setIsLoadingPipeline] = useState(false);
   const [pipelineFilter, setPipelineFilter] = useState("all");
@@ -1718,6 +1745,13 @@ function App() {
   const [openCase, setOpenCase] = useState<string | null>(null);
   const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
   const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
+  // Re-quote (Pattern B) — keyed by the parent matter's reference. When
+  // set, the matching matter card renders an inline ReferrerSimpleForm
+  // pre-filled with the parent's inputs.
+  const [requoteOpen, setRequoteOpen] = useState<string | null>(null);
+  // Allocation request — inline status messages keyed by reference.
+  const [allocationMsg, setAllocationMsg] = useState<Record<string, string>>({});
+  const [allocationBusy, setAllocationBusy] = useState<string | null>(null);
 
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
@@ -2384,6 +2418,43 @@ function App() {
       return;
     }
     setPanelAssignment((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ── Pattern B admin allocation handlers ────────────────────────────
+  const [allocationDeclineReason, setAllocationDeclineReason] = useState("");
+  const [allocationDeclineMessage, setAllocationDeclineMessage] = useState("");
+  const [isDecliningAllocation, setIsDecliningAllocation] = useState(false);
+
+  const handleDeclineAllocation = async () => {
+    if (!loadedEnquiry?.reference) return;
+    if (!window.confirm("Decline this allocation request? The referrer will be emailed and can re-request later.")) return;
+    setIsDecliningAllocation(true);
+    setAllocationDeclineMessage("");
+    try {
+      const response = await adminFetch("/api/referrer-decline-allocation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: loadedEnquiry.reference,
+          reason: allocationDeclineReason.trim(),
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setAllocationDeclineMessage("Allocation request declined. Referrer notified.");
+        setAllocationDeclineReason("");
+        if (loadedEnquiry?.reference) {
+          await handleOpenDashboardEnquiry(loadedEnquiry.reference);
+        }
+      } else {
+        setAllocationDeclineMessage(result.error || "Failed to decline.");
+      }
+    } catch (error) {
+      console.error("Decline allocation error:", error);
+      setAllocationDeclineMessage("Something went wrong.");
+    } finally {
+      setIsDecliningAllocation(false);
+    }
   };
 
   const handleAssignPanelFirm = async (e: FormEvent<HTMLFormElement>) => {
@@ -3183,13 +3254,23 @@ function App() {
                 is_disbursement: Number(f.is_disbursement) === 1,
                 supplement_key: f.supplement_key ? String(f.supplement_key) : null,
               }))
-            : getDefaultFeeItems(type)
+            : getDefaultFeeItems(type, "firm")
         );
       }
     } catch {}
   };
 
-  const getDefaultFeeItems = (type: string): { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[] => {
+  // Default fee structures used when seeding a new Fee Settings config.
+  // The `audience` argument exists so the same source-of-truth feeds the
+  // firm Fee Settings tab and the admin-managed referrer Pricing section
+  // (Pattern B): both rails currently share the same seed values, with
+  // admin tweaking from there. If referrer defaults ever diverge, branch
+  // on `audience` here rather than duplicating defaults at the call site.
+  const getDefaultFeeItems = (
+    type: string,
+    audience: "firm" | "referrer"
+  ): { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[] => {
+    void audience;
     const defaults: Record<string, { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[]> = {
       purchase: [
         { label: "Legal fee", amount: 1025, includes_vat: true, is_disbursement: false },
@@ -3225,6 +3306,111 @@ function App() {
       ],
     };
     return defaults[type] || [{ label: "Legal fee", amount: 0, includes_vat: true, is_disbursement: false }];
+  };
+
+  // ── Per-referrer pricing handlers (admin Pricing section on the
+  // Referrers tab — Pattern B) ─────────────────────────────────────────
+  const loadReferrerPricing = async (referrerId: number, type: string) => {
+    setIsLoadingReferrerPricing(true);
+    try {
+      const res = await adminFetch(
+        `/api/referrer-fee-config?referrer_id=${referrerId}&type=${encodeURIComponent(type)}`
+      );
+      const result = await res.json();
+      if (result.success) {
+        setReferrerPricingItems(
+          (result.fees || []).map((f: Record<string, unknown>) => ({
+            label: String(f.label || ""),
+            amount: Number(f.amount || 0),
+            includes_vat: Number(f.includes_vat) === 1,
+            is_disbursement: Number(f.is_disbursement) === 1,
+            supplement_key: f.supplement_key ? String(f.supplement_key) : null,
+          }))
+        );
+      } else {
+        setReferrerPricingItems([]);
+      }
+    } catch {
+      setReferrerPricingItems([]);
+    } finally {
+      setIsLoadingReferrerPricing(false);
+    }
+  };
+
+  const handleSaveReferrerPricing = async () => {
+    if (!referrerEditor.id) {
+      setReferrerPricingMessage("Save the referrer first, then configure pricing.");
+      return;
+    }
+    const seenKeys = new Set<string>();
+    for (const item of referrerPricingItems) {
+      if (!item.supplement_key) continue;
+      if (seenKeys.has(item.supplement_key)) {
+        setReferrerPricingMessage(
+          `Duplicate supplement: "${item.label}" is configured more than once. Remove the duplicate before saving.`
+        );
+        return;
+      }
+      seenKeys.add(item.supplement_key);
+    }
+    setIsSavingReferrerPricing(true);
+    setReferrerPricingMessage("");
+    try {
+      const res = await adminFetch("/api/referrer-fee-config", {
+        method: "POST",
+        body: JSON.stringify({
+          referrer_id: referrerEditor.id,
+          transaction_type: referrerPricingType,
+          fees: referrerPricingItems,
+        }),
+      });
+      const result = await res.json();
+      setReferrerPricingMessage(result.success ? "Pricing saved." : result.error || "Failed to save.");
+    } catch {
+      setReferrerPricingMessage("Something went wrong.");
+    } finally {
+      setIsSavingReferrerPricing(false);
+    }
+  };
+
+  const addReferrerPricingItem = (isDisbursement: boolean) => {
+    setReferrerPricingItems((prev) => [
+      ...prev,
+      { label: "", amount: 0, includes_vat: !isDisbursement, is_disbursement: isDisbursement, supplement_key: null },
+    ]);
+  };
+
+  const addReferrerPricingSupplement = (key: string) => {
+    const option = SUPPLEMENT_OPTIONS.find((o) => o.key === key);
+    if (!option) return;
+    setReferrerPricingItems((prev) => {
+      if (prev.some((item) => item.supplement_key === key)) return prev;
+      return [
+        ...prev,
+        {
+          label: option.label,
+          amount: 0,
+          includes_vat: true,
+          is_disbursement: false,
+          supplement_key: key,
+        },
+      ];
+    });
+    setReferrerPricingPickerOpen(false);
+  };
+
+  const updateReferrerPricingItem = (
+    index: number,
+    field: string,
+    value: string | number | boolean
+  ) => {
+    setReferrerPricingItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const removeReferrerPricingItem = (index: number) => {
+    setReferrerPricingItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveFeeConfig = async () => {
@@ -5487,6 +5673,16 @@ function App() {
         value: String(
           dashboardEnquiries.filter(
             (enquiry) => enquiry.transaction_type === "sale"
+          ).length
+        ),
+      },
+      {
+        label: "Allocation requests pending",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) =>
+              Boolean((enquiry as Record<string, unknown>).allocation_requested_at) &&
+              !((enquiry as Record<string, unknown>).allocated_at)
           ).length
         ),
       },
@@ -8161,7 +8357,7 @@ function App() {
                             type="button"
                             className="muted-button"
                             style={{ fontSize: "13px" }}
-                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}
+                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType, "firm"))}
                           >
                             Reset to Defaults
                           </button>
@@ -8330,7 +8526,7 @@ function App() {
 
                     <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                       <button type="button" className="muted-button"
-                        onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}>
+                        onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType, "firm"))}>
                         Reset to Defaults
                       </button>
                       <button type="button" className="primary-button" disabled={isSavingFees}
@@ -9981,6 +10177,9 @@ function App() {
                               {c.referrer_name && (
                                 <div style={{ fontSize: "11px", color: "#7c3aed" }}>Via: {c.referrer_name}{c.negotiator_name ? ` · ${c.negotiator_name}` : ""}</div>
                               )}
+                              {c.successor_reference && (
+                                <div style={{ fontSize: "11px", color: "#5b21b6", marginTop: "2px" }}>Superseded by: <span style={{ fontFamily: "monospace" }}>{c.successor_reference}</span></div>
+                              )}
                             </div>
                             <div className="detail-row__value">
                               <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--navy)", marginBottom: "4px" }}>
@@ -9990,6 +10189,11 @@ function App() {
                                 <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, background: statusBg, color: statusCol }}>
                                   {c.case_status ? c.case_status.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()) : "Assigned"}
                                 </span>
+                                {c.allocation_requested_at && !c.allocated_at && (
+                                  <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, background: "#fef3c7", color: "#92400e" }}>
+                                    Allocation requested
+                                  </span>
+                                )}
                                 {/* Target completion date — urgent if ≤5 days */}
                                 {targetDate && !isCompleted && (
                                   <span style={{ fontSize: "11px", fontWeight: completionUrgent ? 700 : 400, color: completionUrgent ? "#dc2626" : "#5b21b6", background: completionUrgent ? "#fee2e2" : "#ede9fe", padding: "2px 6px", borderRadius: "6px" }}>
@@ -10047,6 +10251,9 @@ function App() {
                         onClick={() => {
                           setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
                           setReferrerSaveMessage("");
+                          setReferrerPricingItems([]);
+                          setReferrerPricingMessage("");
+                          setReferrerPricingType("purchase");
                         }}>
                         + Add Referrer
                       </button>
@@ -10085,6 +10292,10 @@ function App() {
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
                                   });
                                   setReferrerSaveMessage("");
+                                  setReferrerPricingType("purchase");
+                                  setReferrerPricingMessage("");
+                                  setReferrerPricingPickerOpen(false);
+                                  void loadReferrerPricing(r.id, "purchase");
                                 }}>Edit</button>
                             </div>
                           </div>
@@ -10165,7 +10376,13 @@ function App() {
                       )}
                       <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                         <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
-                          onClick={() => { setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" }); setReferrerSaveMessage(""); }}>
+                          onClick={() => {
+                            setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                            setReferrerSaveMessage("");
+                            setReferrerPricingItems([]);
+                            setReferrerPricingMessage("");
+                            setReferrerPricingType("purchase");
+                          }}>
                           Clear
                         </button>
                         <button type="submit" className="primary-button" style={{ minHeight: 40, padding: "0 20px" }} disabled={isSavingReferrer}>
@@ -10173,6 +10390,257 @@ function App() {
                         </button>
                       </div>
                     </form>
+                  </SummaryCard>
+
+                  {/* Pricing — per-referrer fee config (Pattern B) */}
+                  <SummaryCard title="Pricing">
+                    <p className="form-note" style={{ marginTop: 0, marginBottom: "16px" }}>
+                      Set the legal fees, disbursements, and supplements applied when this referrer issues a quote. These replace the global price book for matters submitted via the referrer portal.
+                    </p>
+
+                    {!referrerEditor.id && (
+                      <div
+                        style={{
+                          background: "#fef3c7",
+                          border: "1px solid #fde68a",
+                          color: "#92400e",
+                          borderRadius: "18px",
+                          padding: "12px 16px",
+                          fontSize: "13px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        Save the referrer first, then return here to configure their pricing.
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <label htmlFor="referrerPricingType" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                        Transaction type
+                      </label>
+                      <select id="referrerPricingType" value={referrerPricingType}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setReferrerPricingType(next);
+                          setReferrerPricingMessage("");
+                          setReferrerPricingPickerOpen(false);
+                          if (referrerEditor.id) void loadReferrerPricing(referrerEditor.id, next);
+                          else setReferrerPricingItems([]);
+                        }}
+                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
+                        <option value="purchase">Purchase</option>
+                        <option value="sale">Sale</option>
+                        <option value="remortgage">Remortgage</option>
+                        <option value="transfer">Transfer of Equity</option>
+                        <option value="sale_purchase">Sale and purchase</option>
+                        <option value="remortgage_transfer">Remortgage and transfer of equity</option>
+                      </select>
+                    </div>
+
+                    {isLoadingReferrerPricing && (
+                      <p className="form-note">Loading pricing…</p>
+                    )}
+
+                    {!isLoadingReferrerPricing && referrerPricingItems.length === 0 && (
+                      <div
+                        style={{
+                          background: "#f1f5f9",
+                          border: "1px solid #cbd5e1",
+                          color: "var(--navy)",
+                          borderRadius: "18px",
+                          padding: "14px 18px",
+                          fontSize: "13px",
+                          marginBottom: "16px",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: "200px" }}>
+                          No pricing configured for {referrerPricingType.replace(/_/g, " ")} yet. Click <strong>Reset to Defaults</strong> to seed from the firm-portal defaults, then adjust each line and click Save Pricing.
+                        </div>
+                        <button
+                          type="button"
+                          className="primary-button"
+                          style={{ fontSize: "13px", minHeight: 36, padding: "0 14px" }}
+                          onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}
+                        >
+                          Reset to Defaults
+                        </button>
+                      </div>
+                    )}
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => !item.is_disbursement && !item.supplement_key)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <input type="text" value={item.label} placeholder="Fee label"
+                                onChange={(e) => updateReferrerPricingItem(idx, "label", e.target.value)}
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
+                                <input type="checkbox" checked={item.includes_vat}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "includes_vat", e.target.checked)} />
+                                VAT applicable (adds 20%)
+                              </label>
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    <button type="button" className="muted-button" style={{ fontSize: "13px", marginBottom: "20px" }}
+                      onClick={() => addReferrerPricingItem(false)}>+ Add legal fee</button>
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Disbursements</h4>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => item.is_disbursement)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <input type="text" value={item.label} placeholder="Disbursement label"
+                                onChange={(e) => updateReferrerPricingItem(idx, "label", e.target.value)}
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    <button type="button" className="muted-button" style={{ fontSize: "13px", marginBottom: "20px" }}
+                      onClick={() => addReferrerPricingItem(true)}>+ Add disbursement</button>
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "4px" }}>Supplements</h4>
+                    <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                      Charges added when the referrer ticks property characteristics on the form. Same canonical 11 keys as firm Fee Settings.
+                    </p>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => !!item.supplement_key)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <div style={{ fontSize: "14px", fontWeight: 600 }}>{item.label}</div>
+                              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
+                                <input type="checkbox" checked={item.includes_vat}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "includes_vat", e.target.checked)} />
+                                VAT applicable (adds 20%)
+                              </label>
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    {(() => {
+                      const configuredKeys = new Set(
+                        referrerPricingItems
+                          .map((f) => f.supplement_key)
+                          .filter((k): k is string => !!k)
+                      );
+                      const availableSupplements = SUPPLEMENT_OPTIONS.filter(
+                        (o) => !configuredKeys.has(o.key)
+                      );
+                      if (availableSupplements.length === 0) {
+                        return (
+                          <p className="form-note" style={{ marginBottom: "20px", fontSize: "13px" }}>
+                            All supplements are configured for this transaction type.
+                          </p>
+                        );
+                      }
+                      if (!referrerPricingPickerOpen) {
+                        return (
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "13px", marginBottom: "20px" }}
+                            onClick={() => setReferrerPricingPickerOpen(true)}
+                          >
+                            + Add supplement
+                          </button>
+                        );
+                      }
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            alignItems: "center",
+                            marginBottom: "20px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <select
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) addReferrerPricingSupplement(e.target.value);
+                            }}
+                            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
+                          >
+                            <option value="" disabled>Choose a supplement…</option>
+                            {availableSupplements.map((o) => (
+                              <option key={o.key} value={o.key}>{o.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "12px" }}
+                            onClick={() => setReferrerPricingPickerOpen(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {referrerPricingMessage && (
+                      <p className="form-note" style={{ color: referrerPricingMessage.includes("saved") ? "#065f46" : "#dc2626" }}>
+                        {referrerPricingMessage}
+                      </p>
+                    )}
+
+                    <div className="form-footer action-row" style={{ marginTop: "14px" }}>
+                      <button type="button" className="muted-button"
+                        onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}>
+                        Reset to Defaults
+                      </button>
+                      <button type="button" className="primary-button" disabled={isSavingReferrerPricing || !referrerEditor.id}
+                        onClick={() => void handleSaveReferrerPricing()}>
+                        {isSavingReferrerPricing ? "Saving…" : "Save Pricing"}
+                      </button>
+                    </div>
                   </SummaryCard>
                 </div>
               </div>
@@ -10826,6 +11294,65 @@ function App() {
                         </p>
                       </div>
                     </SummaryCard>
+
+                    {/* Pattern B: Allocation request from referrer */}
+                    {loadedEnquiry.allocation_requested_at && !loadedEnquiry.allocated_at && (
+                      <SummaryCard title={`Allocation request from ${loadedEnquiry.referrer_name || "referrer"}`}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px 24px", marginBottom: "14px" }}>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Requested</div>
+                            <div style={{ fontSize: "13px", color: "#111827" }}>
+                              {new Date(String(loadedEnquiry.allocation_requested_at)).toLocaleString("en-GB")}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Referrer</div>
+                            <div style={{ fontSize: "13px", color: "#111827", fontWeight: 600 }}>
+                              {loadedEnquiry.referrer_name || "—"}
+                            </div>
+                          </div>
+                        </div>
+                        {loadedEnquiry.referrer_note && (
+                          <div style={{ marginBottom: "14px" }}>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Referrer note</div>
+                            <div style={{ fontSize: "13px", color: "#334155", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px 12px", whiteSpace: "pre-wrap" }}>
+                              {loadedEnquiry.referrer_note}
+                            </div>
+                          </div>
+                        )}
+                        <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                          To approve, pick a panel firm in the section below and click <strong>Assign Firm</strong> — that will mark this matter as allocated and email the referrer. To decline, leave a reason and click below.
+                        </p>
+                        <div className="field field--full">
+                          <label htmlFor="declineReason" style={{ fontSize: "13px", fontWeight: 600 }}>Decline reason (optional)</label>
+                          <textarea
+                            id="declineReason"
+                            value={allocationDeclineReason}
+                            onChange={(e) => setAllocationDeclineReason(e.target.value.slice(0, 500))}
+                            maxLength={500}
+                            rows={2}
+                            placeholder="e.g. Need more details on the property before allocating."
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }}
+                          />
+                        </div>
+                        {allocationDeclineMessage && (
+                          <p className="form-note" style={{ marginTop: "10px", color: allocationDeclineMessage.toLowerCase().includes("declined") ? "#065f46" : "#dc2626" }}>
+                            {allocationDeclineMessage}
+                          </p>
+                        )}
+                        <div className="form-footer action-row" style={{ marginTop: "12px" }}>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ minHeight: 36, padding: "0 14px", fontSize: "13px", color: "#991b1b", borderColor: "#fca5a5" }}
+                            disabled={isDecliningAllocation}
+                            onClick={() => void handleDeclineAllocation()}
+                          >
+                            {isDecliningAllocation ? "Declining…" : "Decline allocation"}
+                          </button>
+                        </div>
+                      </SummaryCard>
+                    )}
 
                     <SummaryCard title="Assign to Panel Firm">
                       <form onSubmit={(e) => void handleAssignPanelFirm(e)}>
@@ -11911,6 +12438,26 @@ function App() {
                 }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })));
               };
 
+              const handleRequestAllocation = (enquiryId: number, ref: string) => {
+                if (!window.confirm("Request that this matter is allocated to a panel firm? You can't undo this.")) return;
+                setAllocationBusy(ref);
+                setAllocationMsg((p) => { const n = { ...p }; delete n[ref]; return n; });
+                fetch("/api/referrer-request-allocation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
+                  body: JSON.stringify({ enquiry_id: enquiryId }),
+                }).then((r) => r.json()).then((res: unknown) => {
+                  const r = res as { success: boolean; error?: string };
+                  if (r.success) {
+                    setAllocationMsg((p) => ({ ...p, [ref]: "\u2713 Allocation requested \u2014 admin notified." }));
+                    refreshPortal();
+                  } else {
+                    setAllocationMsg((p) => ({ ...p, [ref]: r.error || "Failed." }));
+                  }
+                }).catch(() => setAllocationMsg((p) => ({ ...p, [ref]: "Something went wrong." })))
+                  .finally(() => setAllocationBusy(null));
+              };
+
               return (
                 <div>
                   {!referrerPortalData && <p className="form-note">Loading\u2026</p>}
@@ -12002,6 +12549,32 @@ function App() {
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
                                       onClick={() => handleRequestUpdate(ref)}>Request update</button>
                                   )}
+                                  {!enq.allocated_at && !enq.successor_reference && (
+                                    <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
+                                      onClick={() => { setOpenCase(ref); setRequoteOpen(requoteOpen === ref ? null : ref); }}>
+                                      {requoteOpen === ref ? "Cancel re-quote" : "Re-quote"}
+                                    </button>
+                                  )}
+                                  {!enq.allocated_at && !enq.successor_reference && !enq.allocation_requested_at && (
+                                    <button type="button" className="primary-button" style={{ minHeight: 30, padding: "0 12px", fontSize: "12px" }}
+                                      disabled={allocationBusy === ref}
+                                      onClick={() => handleRequestAllocation(Number(enq.id), ref)}>
+                                      {allocationBusy === ref ? "Requesting…" : "Request allocation"}
+                                    </button>
+                                  )}
+                                  {Boolean(enq.allocation_requested_at) && !enq.allocated_at && (
+                                    <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: "#fef3c7", color: "#92400e", fontWeight: 600 }}>
+                                      Allocation requested
+                                    </span>
+                                  )}
+                                  {allocationMsg[ref] && (
+                                    <span style={{ fontSize: "12px", color: allocationMsg[ref].startsWith("✓") ? "#065f46" : "#dc2626" }}>{allocationMsg[ref]}</span>
+                                  )}
+                                  {Boolean(enq.successor_reference) && (
+                                    <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: "#ede9fe", color: "#5b21b6", fontWeight: 600 }}>
+                                      Re-quoted &rarr; {String(enq.successor_reference)}
+                                    </span>
+                                  )}
                                   {isDraft && (
                                     <button type="button"
                                       style={{ minHeight: 30, padding: "0 10px", fontSize: "12px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fff1f2", color: "#991b1b", cursor: "pointer" }}
@@ -12054,7 +12627,7 @@ function App() {
                                   </div>
                                 </div>
                                 {/* Status */}
-                                <div style={{ padding: "14px 20px", borderBottom: Number(enq.referral_fee_payable) === 1 ? "1px solid #e5e7eb" : undefined }}>
+                                <div style={{ padding: "14px 20px", borderBottom: (Number(enq.referral_fee_payable) === 1 || enq.referrer_note) ? "1px solid #e5e7eb" : undefined }}>
                                   <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Status</div>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px 20px" }}>
                                     <div>
@@ -12079,11 +12652,36 @@ function App() {
                                       <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Submitted</div>
                                       <div style={{ fontSize: "13px", color: "#111827" }}>{enq.created_at ? new Date(String(enq.created_at)).toLocaleDateString("en-GB") : "\u2014"}</div>
                                     </div>
+                                    {Boolean(enq.allocation_requested_at) && !enq.allocated_at && (
+                                      <div>
+                                        <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Allocation</div>
+                                        <div style={{ fontSize: "13px", color: "#92400e", fontWeight: 600 }}>
+                                          Requested on {new Date(String(enq.allocation_requested_at)).toLocaleDateString("en-GB")}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {Boolean(enq.allocated_at) && (
+                                      <div>
+                                        <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Allocated</div>
+                                        <div style={{ fontSize: "13px", color: "#065f46", fontWeight: 600 }}>
+                                          {new Date(String(enq.allocated_at)).toLocaleDateString("en-GB")}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
+                                {/* Your note */}
+                                {Boolean(enq.referrer_note) && (
+                                  <div style={{ padding: "14px 20px", borderBottom: Number(enq.referral_fee_payable) === 1 ? "1px solid #e5e7eb" : undefined }}>
+                                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Your note</div>
+                                    <div style={{ fontSize: "13px", color: "#334155", whiteSpace: "pre-wrap", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px 12px" }}>
+                                      {String(enq.referrer_note)}
+                                    </div>
+                                  </div>
+                                )}
                                 {/* Payments */}
                                 {Number(enq.referral_fee_payable) === 1 && (
-                                  <div style={{ padding: "14px 20px" }}>
+                                  <div style={{ padding: "14px 20px", borderBottom: requoteOpen === ref ? "1px solid #e5e7eb" : undefined }}>
                                     <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Payments</div>
                                     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-end" }}>
                                       <div>
@@ -12097,6 +12695,56 @@ function App() {
                                         </span>
                                       </div>
                                     </div>
+                                  </div>
+                                )}
+                                {/* Re-quote inline form (Pattern B) */}
+                                {requoteOpen === ref && (
+                                  <div style={{ padding: "20px", background: "#fff" }}>
+                                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Re-quote</div>
+                                    <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                                      Adjust the inputs below and send a fresh quote to {String(enq.client_name || enq.client_email || "the client")}. The original quote is kept for audit; the new one becomes the active referral.
+                                    </p>
+                                    <ReferrerSimpleForm
+                                      referrerToken={referrerToken ?? ""}
+                                      parentEnquiryId={Number(enq.id)}
+                                      submitLabel="Send new quote"
+                                      onCancel={() => setRequoteOpen(null)}
+                                      onSuccess={() => { setRequoteOpen(null); refreshPortal(); }}
+                                      initialValues={{
+                                        property_address: String(enq.property_address || ""),
+                                        type: String(enq.transaction_type || "purchase"),
+                                        tenure: String(enq.tenure || "freehold"),
+                                        price: enq.price != null ? String(enq.price) : "",
+                                        postcode: String(enq.postcode || ""),
+                                        negotiator_name: String(enq.negotiator_name || ""),
+                                        name: String(enq.client_name || ""),
+                                        email: String(enq.client_email || ""),
+                                        phone: String(enq.client_phone || ""),
+                                        mortgage: String(enq.mortgage || "mortgage"),
+                                        lender: String(enq.lender || ""),
+                                        ownershipType: String(enq.ownership_type || "individual"),
+                                        firstTimeBuyer: String(enq.first_time_buyer || "no"),
+                                        additionalProperty: String(enq.additional_property || "no"),
+                                        ukResidentForSdlt: String(enq.uk_resident_for_sdlt || "yes"),
+                                        newBuild: String(enq.new_build || "no"),
+                                        sharedOwnership: String(enq.shared_ownership || "no"),
+                                        helpToBuy: String(enq.help_to_buy || "no"),
+                                        isCompany: String(enq.is_company || "no"),
+                                        buyToLet: String(enq.buy_to_let || "no"),
+                                        giftedDeposit: String(enq.gifted_deposit || "no"),
+                                        lifetimeIsa: String(enq.lifetime_isa || "no"),
+                                        rightToBuy: String(enq.right_to_buy || "no"),
+                                        saleMortgage: String(enq.sale_mortgage || "no"),
+                                        managementCompany: String(enq.management_company || "no"),
+                                        tenanted: String(enq.tenanted || "no"),
+                                        numberOfSellers: String(enq.number_of_sellers || "1"),
+                                        additionalBorrowing: String(enq.additional_borrowing || "no"),
+                                        remortgageTransfer: String(enq.remortgage_transfer || "no"),
+                                        transferMortgage: String(enq.transfer_mortgage || "no"),
+                                        ownersChanging: String(enq.owners_changing || "one"),
+                                        referrerNote: String(enq.referrer_note || ""),
+                                      }}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -13257,45 +13905,94 @@ function StandaloneSdltCalculator() {
 
 // ── Referrer Simple Form (with quote preview) ─────────────────────────────────
 
-function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: string; onSuccess: () => void }) {
+type ReferrerFormState = {
+  property_address: string;
+  type: string;
+  tenure: string;
+  price: string;
+  postcode: string;
+  negotiator_name: string;
+  name: string;
+  email: string;
+  phone: string;
+  mortgage: string;
+  lender: string;
+  ownershipType: string;
+  firstTimeBuyer: string;
+  additionalProperty: string;
+  ukResidentForSdlt: string;
+  newBuild: string;
+  sharedOwnership: string;
+  helpToBuy: string;
+  isCompany: string;
+  buyToLet: string;
+  giftedDeposit: string;
+  lifetimeIsa: string;
+  rightToBuy: string;
+  saleMortgage: string;
+  managementCompany: string;
+  tenanted: string;
+  numberOfSellers: string;
+  additionalBorrowing: string;
+  remortgageTransfer: string;
+  transferMortgage: string;
+  ownersChanging: string;
+  referrerNote: string;
+};
+
+const REFERRER_FORM_DEFAULTS: ReferrerFormState = {
+  property_address: "",
+  type: "purchase",
+  tenure: "freehold",
+  price: "",
+  postcode: "",
+  negotiator_name: "",
+  name: "", email: "", phone: "",
+  mortgage: "mortgage",
+  lender: "",
+  ownershipType: "individual",
+  firstTimeBuyer: "no",
+  additionalProperty: "no",
+  ukResidentForSdlt: "yes",
+  newBuild: "no",
+  sharedOwnership: "no",
+  helpToBuy: "no",
+  isCompany: "no",
+  buyToLet: "no",
+  giftedDeposit: "no",
+  lifetimeIsa: "no",
+  rightToBuy: "no",
+  saleMortgage: "no",
+  managementCompany: "no",
+  tenanted: "no",
+  numberOfSellers: "1",
+  additionalBorrowing: "no",
+  remortgageTransfer: "no",
+  transferMortgage: "no",
+  ownersChanging: "one",
+  referrerNote: "",
+};
+
+function ReferrerSimpleForm({
+  referrerToken,
+  onSuccess,
+  initialValues,
+  parentEnquiryId,
+  submitLabel,
+  onCancel,
+}: {
+  referrerToken: string;
+  onSuccess: () => void;
+  initialValues?: Partial<ReferrerFormState>;
+  parentEnquiryId?: number;
+  submitLabel?: string;
+  onCancel?: () => void;
+}) {
   type Step = "form" | "preview" | "done";
   const [step, setStep] = useState<Step>("form");
-  const [form, setForm] = useState({
-    // Property / matter
-    property_address: "",
-    type: "purchase",
-    tenure: "freehold",
-    price: "",
-    postcode: "",
-    negotiator_name: "",
-    // Client
-    name: "", email: "", phone: "",
-    // Purchase fields
-    mortgage: "mortgage",
-    lender: "",
-    ownershipType: "individual",
-    firstTimeBuyer: "no",
-    additionalProperty: "no",
-    ukResidentForSdlt: "yes",
-    newBuild: "no",
-    sharedOwnership: "no",
-    helpToBuy: "no",
-    isCompany: "no",
-    buyToLet: "no",
-    giftedDeposit: "no",
-    lifetimeIsa: "no",
-    rightToBuy: "no",
-    // Sale fields
-    saleMortgage: "no",
-    managementCompany: "no",
-    tenanted: "no",
-    numberOfSellers: "1",
-    // Remortgage fields
-    additionalBorrowing: "no",
-    remortgageTransfer: "no",
-    // Transfer fields
-    transferMortgage: "no",
-    ownersChanging: "one",
+  const [form, setForm] = useState<ReferrerFormState>({
+    ...REFERRER_FORM_DEFAULTS,
+    ...(initialValues || {}),
   });
   const [preview, setPreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
   const [sendToClient, setSendToClient] = useState(true);
@@ -13328,7 +14025,12 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       const res = await fetch("/api/referrer-submit-enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
-        body: JSON.stringify({ ...form, send_to_client: sendToClient }),
+        body: JSON.stringify({
+          ...form,
+          send_to_client: sendToClient,
+          referrerNote: form.referrerNote.trim(),
+          parent_enquiry_id: parentEnquiryId ?? undefined,
+        }),
       });
       const result = await res.json() as { success: boolean; reference?: string; error?: string; client_emailed?: boolean };
       if (result.success && result.reference) {
@@ -13433,9 +14135,15 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
         {error && <p style={{ color: "#dc2626", fontSize: "14px", marginBottom: "12px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: "12px" }}>
+          {onCancel && (
+            <button type="button" className="muted-button" disabled={submitting} onClick={onCancel}
+              style={{ minHeight: 48, padding: "0 24px", fontSize: "15px" }}>
+              Cancel
+            </button>
+          )}
           <button type="button" className="primary-button" disabled={submitting} onClick={() => void handleSubmit()}
             style={{ flex: 1, minHeight: 48, fontSize: "15px" }}>
-            {submitting ? "Submitting…" : sendToClient ? "Confirm & Send Quote to Client" : "Confirm & Save Referral"}
+            {submitting ? "Submitting…" : submitLabel ? submitLabel : sendToClient ? "Confirm & Send Quote to Client" : "Confirm & Save Referral"}
           </button>
         </div>
       </div>
@@ -13721,6 +14429,27 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
             <label style={labelStyle}>Your name / negotiator</label>
             <input style={inputStyle} type="text" value={form.negotiator_name}
               onChange={(e) => set("negotiator_name", e.target.value)} placeholder="Who referred this client?" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section: Optional note ── */}
+      <div style={sectionStyle}>
+        <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Note (optional)</h4>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            Add a short note for your client — included in the quote email and visible on this matter in My Referrals.
+          </label>
+          <textarea
+            value={form.referrerNote}
+            onChange={(e) => set("referrerNote", e.target.value.slice(0, 500))}
+            maxLength={500}
+            rows={3}
+            placeholder="e.g. We've already discussed your preference to complete before the school holidays."
+            style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+          />
+          <div style={{ fontSize: "12px", color: "var(--muted)", textAlign: "right" }}>
+            {form.referrerNote.length}/500
           </div>
         </div>
       </div>

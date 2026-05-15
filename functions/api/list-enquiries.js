@@ -51,11 +51,17 @@ export async function onRequestGet(context) {
         e.target_completion_date,
         e.fall_through_reason,
         e.decline_reason,
+        e.referrer_note,
+        e.parent_enquiry_id,
+        e.allocation_requested_at,
+        e.allocated_at,
         e.created_at,
         e.referred_at,
-        r.referrer_name
+        r.referrer_name,
+        successor.reference AS successor_reference
       FROM enquiries e
       LEFT JOIN referrers r ON r.id = e.referrer_id
+      LEFT JOIN enquiries successor ON successor.parent_enquiry_id = e.id
       WHERE 1 = 1
     `;
 
