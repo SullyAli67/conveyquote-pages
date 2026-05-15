@@ -308,6 +308,11 @@ type DashboardEnquiry = {
   referral_fee_payable?: number;
   referral_fee_amount?: number;
   created_at?: string;
+  allocation_requested_at?: string | null;
+  allocated_at?: string | null;
+  successor_reference?: string | null;
+  parent_enquiry_id?: number | null;
+  referrer_note?: string | null;
 };
 
 type PanelFirm = {
@@ -550,6 +555,15 @@ type LoadedEnquiry = {
   remortgage_transfer_ownership_type?: string;
 
   quote?: LoadedQuote | null;
+
+  // Pattern B referrer-allocation fields
+  referrer_id?: number | null;
+  referrer_name?: string | null;
+  referrer_note?: string | null;
+  allocation_requested_at?: string | null;
+  allocated_at?: string | null;
+  successor_reference?: string | null;
+  parent_enquiry_id?: number | null;
 };
 
 type AdminTab = "dashboard" | "enquiries" | "firms" | "lenders" | "quote" | "settings" | "referrers" | "invoices" | "pipeline" | "audit";
@@ -2404,6 +2418,43 @@ function App() {
       return;
     }
     setPanelAssignment((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ── Pattern B admin allocation handlers ────────────────────────────
+  const [allocationDeclineReason, setAllocationDeclineReason] = useState("");
+  const [allocationDeclineMessage, setAllocationDeclineMessage] = useState("");
+  const [isDecliningAllocation, setIsDecliningAllocation] = useState(false);
+
+  const handleDeclineAllocation = async () => {
+    if (!loadedEnquiry?.reference) return;
+    if (!window.confirm("Decline this allocation request? The referrer will be emailed and can re-request later.")) return;
+    setIsDecliningAllocation(true);
+    setAllocationDeclineMessage("");
+    try {
+      const response = await adminFetch("/api/referrer-decline-allocation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: loadedEnquiry.reference,
+          reason: allocationDeclineReason.trim(),
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setAllocationDeclineMessage("Allocation request declined. Referrer notified.");
+        setAllocationDeclineReason("");
+        if (loadedEnquiry?.reference) {
+          await handleOpenDashboardEnquiry(loadedEnquiry.reference);
+        }
+      } else {
+        setAllocationDeclineMessage(result.error || "Failed to decline.");
+      }
+    } catch (error) {
+      console.error("Decline allocation error:", error);
+      setAllocationDeclineMessage("Something went wrong.");
+    } finally {
+      setIsDecliningAllocation(false);
+    }
   };
 
   const handleAssignPanelFirm = async (e: FormEvent<HTMLFormElement>) => {
@@ -5622,6 +5673,16 @@ function App() {
         value: String(
           dashboardEnquiries.filter(
             (enquiry) => enquiry.transaction_type === "sale"
+          ).length
+        ),
+      },
+      {
+        label: "Allocation requests pending",
+        value: String(
+          dashboardEnquiries.filter(
+            (enquiry) =>
+              Boolean((enquiry as Record<string, unknown>).allocation_requested_at) &&
+              !((enquiry as Record<string, unknown>).allocated_at)
           ).length
         ),
       },
@@ -10128,6 +10189,11 @@ function App() {
                                 <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, background: statusBg, color: statusCol }}>
                                   {c.case_status ? c.case_status.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()) : "Assigned"}
                                 </span>
+                                {c.allocation_requested_at && !c.allocated_at && (
+                                  <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, background: "#fef3c7", color: "#92400e" }}>
+                                    Allocation requested
+                                  </span>
+                                )}
                                 {/* Target completion date — urgent if ≤5 days */}
                                 {targetDate && !isCompleted && (
                                   <span style={{ fontSize: "11px", fontWeight: completionUrgent ? 700 : 400, color: completionUrgent ? "#dc2626" : "#5b21b6", background: completionUrgent ? "#fee2e2" : "#ede9fe", padding: "2px 6px", borderRadius: "6px" }}>
@@ -11228,6 +11294,65 @@ function App() {
                         </p>
                       </div>
                     </SummaryCard>
+
+                    {/* Pattern B: Allocation request from referrer */}
+                    {loadedEnquiry.allocation_requested_at && !loadedEnquiry.allocated_at && (
+                      <SummaryCard title={`Allocation request from ${loadedEnquiry.referrer_name || "referrer"}`}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px 24px", marginBottom: "14px" }}>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Requested</div>
+                            <div style={{ fontSize: "13px", color: "#111827" }}>
+                              {new Date(String(loadedEnquiry.allocation_requested_at)).toLocaleString("en-GB")}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Referrer</div>
+                            <div style={{ fontSize: "13px", color: "#111827", fontWeight: 600 }}>
+                              {loadedEnquiry.referrer_name || "—"}
+                            </div>
+                          </div>
+                        </div>
+                        {loadedEnquiry.referrer_note && (
+                          <div style={{ marginBottom: "14px" }}>
+                            <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Referrer note</div>
+                            <div style={{ fontSize: "13px", color: "#334155", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px 12px", whiteSpace: "pre-wrap" }}>
+                              {loadedEnquiry.referrer_note}
+                            </div>
+                          </div>
+                        )}
+                        <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                          To approve, pick a panel firm in the section below and click <strong>Assign Firm</strong> — that will mark this matter as allocated and email the referrer. To decline, leave a reason and click below.
+                        </p>
+                        <div className="field field--full">
+                          <label htmlFor="declineReason" style={{ fontSize: "13px", fontWeight: 600 }}>Decline reason (optional)</label>
+                          <textarea
+                            id="declineReason"
+                            value={allocationDeclineReason}
+                            onChange={(e) => setAllocationDeclineReason(e.target.value.slice(0, 500))}
+                            maxLength={500}
+                            rows={2}
+                            placeholder="e.g. Need more details on the property before allocating."
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }}
+                          />
+                        </div>
+                        {allocationDeclineMessage && (
+                          <p className="form-note" style={{ marginTop: "10px", color: allocationDeclineMessage.toLowerCase().includes("declined") ? "#065f46" : "#dc2626" }}>
+                            {allocationDeclineMessage}
+                          </p>
+                        )}
+                        <div className="form-footer action-row" style={{ marginTop: "12px" }}>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ minHeight: 36, padding: "0 14px", fontSize: "13px", color: "#991b1b", borderColor: "#fca5a5" }}
+                            disabled={isDecliningAllocation}
+                            onClick={() => void handleDeclineAllocation()}
+                          >
+                            {isDecliningAllocation ? "Declining…" : "Decline allocation"}
+                          </button>
+                        </div>
+                      </SummaryCard>
+                    )}
 
                     <SummaryCard title="Assign to Panel Firm">
                       <form onSubmit={(e) => void handleAssignPanelFirm(e)}>

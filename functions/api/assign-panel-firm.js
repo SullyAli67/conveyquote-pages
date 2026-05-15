@@ -65,14 +65,19 @@ export async function onRequestPost(context) {
       );
     }
 
+    // Stamp allocated_at when the enquiry has a referrer — this is the
+    // Pattern B "approve allocation" step. Non-referrer enquiries
+    // continue to work unchanged (allocated_at stays NULL).
+    const allocatedAt = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE enquiries
        SET assigned_firm_id=?, assigned_firm_name=?, referral_fee_payable=?,
            referral_fee_amount=?, panel_status='panel_referred',
            referred_at=CURRENT_TIMESTAMP, admin_notes=COALESCE(?,admin_notes),
+           allocated_at=CASE WHEN referrer_id IS NOT NULL THEN ? ELSE allocated_at END,
            updated_at=datetime('now')
        WHERE reference=?`
-    ).bind(firm_id, firm_name, toFlag(referral_fee_payable), Number(referral_fee_amount||0), admin_notes||null, reference).run();
+    ).bind(firm_id, firm_name, toFlag(referral_fee_payable), Number(referral_fee_amount||0), admin_notes||null, allocatedAt, reference).run();
 
     // Audit log
     try {
@@ -89,8 +94,44 @@ export async function onRequestPost(context) {
 
     const [firmRow, enquiryRow] = await Promise.all([
       env.DB.prepare(`SELECT firm_name,contact_name,contact_email,portal_email,portal_active FROM panel_firms WHERE id=? LIMIT 1`).bind(firm_id).first(),
-      env.DB.prepare(`SELECT client_name,transaction_type,price,tenure,postcode FROM enquiries WHERE reference=? LIMIT 1`).bind(reference).first(),
+      env.DB.prepare(`SELECT client_name,client_email,property_address,transaction_type,price,tenure,postcode,referrer_id FROM enquiries WHERE reference=? LIMIT 1`).bind(reference).first(),
     ]);
+
+    // Pattern B: notify the referrer when their requested allocation is
+    // approved. Looks up the referrer's contact_email (preferred) or
+    // portal_email; silently skips if neither is set.
+    if (enquiryRow?.referrer_id && env.RESEND_API_KEY) {
+      const referrerRow = await env.DB.prepare(
+        `SELECT referrer_name, contact_email, portal_email FROM referrers WHERE id = ? LIMIT 1`
+      ).bind(enquiryRow.referrer_id).first();
+      const referrerEmail = referrerRow?.contact_email || referrerRow?.portal_email;
+      if (referrerEmail) {
+        const txLabel = getTransactionLabel(enquiryRow?.transaction_type);
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: [referrerEmail],
+            subject: `Allocated to ${firm_name} — ${reference}`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
+              <div style="background:#0f2747;padding:20px 24px;border-radius:8px 8px 0 0;">
+                <h2 style="color:#fff;margin:0;font-size:18px;">Allocation approved</h2>
+              </div>
+              <div style="padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+                <p style="margin:0 0 12px;font-size:14px;">Hi ${escapeHtml(referrerRow?.referrer_name || "")},</p>
+                <p style="margin:0 0 12px;font-size:14px;">Your referral for <strong>${escapeHtml(enquiryRow?.client_name || enquiryRow?.client_email || "")}</strong> has been allocated to <strong>${escapeHtml(firm_name)}</strong>.</p>
+                <table style="border-collapse:collapse;width:100%;">
+                  <tr><td style="padding:7px 0;color:#6b7280;width:40%;">Reference</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(reference)}</td></tr>
+                  <tr><td style="padding:7px 0;color:#6b7280;">Property</td><td style="padding:7px 0;">${escapeHtml(enquiryRow?.property_address || "—")}</td></tr>
+                  <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(txLabel)}</td></tr>
+                </table>
+              </div>
+            </div>`,
+          }),
+        }).catch((err) => console.error("Referrer allocation email error:", err));
+      }
+    }
 
     const firmEmail = firmRow?.portal_email || firmRow?.contact_email;
     if (firmEmail && env.RESEND_API_KEY) {
