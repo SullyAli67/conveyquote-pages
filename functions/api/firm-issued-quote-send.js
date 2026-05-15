@@ -265,6 +265,7 @@ export async function onRequestPost(context) {
       firm.contact_email ||
       firm.portal_email ||
       "";
+    const ccAddress = branding.email || firm.contact_email || "";
 
     let inputs = null;
     let output = null;
@@ -355,6 +356,7 @@ export async function onRequestPost(context) {
       ],
     };
     if (replyTo) resendPayload.reply_to = replyTo;
+    if (ccAddress) resendPayload.cc = [ccAddress];
 
     const sendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
