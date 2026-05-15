@@ -1,4 +1,5 @@
 import {
+  Component,
   createContext,
   useCallback,
   useContext,
@@ -7,6 +8,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ErrorInfo,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -1247,6 +1249,84 @@ function AdminPasswordForm({ adminFetch }: { adminFetch: (url: string, opts?: Re
   );
 }
 
+// ── App-wide ErrorBoundary ────────────────────────────────────────────────
+// Catches render-time errors anywhere in the App tree so an unhandled
+// exception (e.g. a Rules of Hooks violation) doesn't blank the page.
+// Raw error text is logged to the console but never shown to the user.
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("ErrorBoundary caught:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg)",
+          padding: "24px",
+          fontFamily: "Arial, sans-serif",
+        }}>
+          <div style={{
+            background: "#fff",
+            border: "1px solid var(--border)",
+            borderRadius: "18px",
+            padding: "32px 28px",
+            maxWidth: "440px",
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "var(--shadow)",
+            borderTop: "4px solid var(--teal)",
+          }}>
+            <h1 style={{ color: "var(--navy)", fontSize: "22px", margin: "0 0 12px" }}>
+              Something went wrong
+            </h1>
+            <p style={{ color: "var(--muted)", fontSize: "15px", lineHeight: 1.5, margin: "0 0 20px" }}>
+              We&rsquo;ve logged the error. Please refresh the page to try again. If the problem persists, contact{" "}
+              <a href="mailto:info@conveyquote.uk" style={{ color: "var(--teal)" }}>info@conveyquote.uk</a>.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                background: "var(--navy)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "18px",
+                padding: "12px 24px",
+                fontSize: "15px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "Arial, sans-serif",
+              }}
+            >
+              Refresh page
+            </button>
+            <div style={{ marginTop: "14px" }}>
+              <a href="/" style={{ color: "var(--muted)", fontSize: "13px", textDecoration: "underline" }}>
+                Go to homepage
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const { pushToast } = useToast();
   const [form, setForm] = useState<QuoteForm>(initialFormState);
@@ -1632,6 +1712,12 @@ function App() {
     localStorage.setItem("cq_referrer_tab", tab);
     setReferrerPortalTabRaw(tab);
   };
+
+  // My Referrals tab UI state — hoisted out of an inline IIFE to keep
+  // hook order stable across tab switches (Rules of Hooks).
+  const [openCase, setOpenCase] = useState<string | null>(null);
+  const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
+  const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
 
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
@@ -11799,9 +11885,6 @@ function App() {
             {/* ── MY REFERRALS ── */}
             {referrerPortalTab === "my_referrals" && (() => {
               const visibleEnquiries = enquiries.filter((e) => String(e.status || "") !== "archived");
-              const [openCase, setOpenCase] = React.useState<string | null>(null);
-              const [archiveMsg, setArchiveMsg] = React.useState<Record<string, string>>({});
-              const [requestMsg, setRequestMsg] = React.useState<Record<string, string>>({});
 
               const handleArchive = (ref: string) => {
                 if (!window.confirm("Archive this case? It will be hidden from your portal. Contact us if you need to restore it.")) return;
@@ -12274,7 +12357,9 @@ function App() {
 function AppWithProviders() {
   return (
     <ToastProvider>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </ToastProvider>
   );
 }
