@@ -1735,6 +1735,9 @@ function App() {
   // set, the matching matter card renders an inline ReferrerSimpleForm
   // pre-filled with the parent's inputs.
   const [requoteOpen, setRequoteOpen] = useState<string | null>(null);
+  // Allocation request — inline status messages keyed by reference.
+  const [allocationMsg, setAllocationMsg] = useState<Record<string, string>>({});
+  const [allocationBusy, setAllocationBusy] = useState<string | null>(null);
 
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
@@ -12310,6 +12313,26 @@ function App() {
                 }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })));
               };
 
+              const handleRequestAllocation = (enquiryId: number, ref: string) => {
+                if (!window.confirm("Request that this matter is allocated to a panel firm? You can't undo this.")) return;
+                setAllocationBusy(ref);
+                setAllocationMsg((p) => { const n = { ...p }; delete n[ref]; return n; });
+                fetch("/api/referrer-request-allocation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
+                  body: JSON.stringify({ enquiry_id: enquiryId }),
+                }).then((r) => r.json()).then((res: unknown) => {
+                  const r = res as { success: boolean; error?: string };
+                  if (r.success) {
+                    setAllocationMsg((p) => ({ ...p, [ref]: "\u2713 Allocation requested \u2014 admin notified." }));
+                    refreshPortal();
+                  } else {
+                    setAllocationMsg((p) => ({ ...p, [ref]: r.error || "Failed." }));
+                  }
+                }).catch(() => setAllocationMsg((p) => ({ ...p, [ref]: "Something went wrong." })))
+                  .finally(() => setAllocationBusy(null));
+              };
+
               return (
                 <div>
                   {!referrerPortalData && <p className="form-note">Loading\u2026</p>}
@@ -12407,6 +12430,21 @@ function App() {
                                       {requoteOpen === ref ? "Cancel re-quote" : "Re-quote"}
                                     </button>
                                   )}
+                                  {!enq.allocated_at && !enq.successor_reference && !enq.allocation_requested_at && (
+                                    <button type="button" className="primary-button" style={{ minHeight: 30, padding: "0 12px", fontSize: "12px" }}
+                                      disabled={allocationBusy === ref}
+                                      onClick={() => handleRequestAllocation(Number(enq.id), ref)}>
+                                      {allocationBusy === ref ? "Requesting…" : "Request allocation"}
+                                    </button>
+                                  )}
+                                  {Boolean(enq.allocation_requested_at) && !enq.allocated_at && (
+                                    <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: "#fef3c7", color: "#92400e", fontWeight: 600 }}>
+                                      Allocation requested
+                                    </span>
+                                  )}
+                                  {allocationMsg[ref] && (
+                                    <span style={{ fontSize: "12px", color: allocationMsg[ref].startsWith("✓") ? "#065f46" : "#dc2626" }}>{allocationMsg[ref]}</span>
+                                  )}
                                   {Boolean(enq.successor_reference) && (
                                     <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: "#ede9fe", color: "#5b21b6", fontWeight: 600 }}>
                                       Re-quoted &rarr; {String(enq.successor_reference)}
@@ -12489,6 +12527,22 @@ function App() {
                                       <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Submitted</div>
                                       <div style={{ fontSize: "13px", color: "#111827" }}>{enq.created_at ? new Date(String(enq.created_at)).toLocaleDateString("en-GB") : "\u2014"}</div>
                                     </div>
+                                    {Boolean(enq.allocation_requested_at) && !enq.allocated_at && (
+                                      <div>
+                                        <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Allocation</div>
+                                        <div style={{ fontSize: "13px", color: "#92400e", fontWeight: 600 }}>
+                                          Requested on {new Date(String(enq.allocation_requested_at)).toLocaleDateString("en-GB")}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {Boolean(enq.allocated_at) && (
+                                      <div>
+                                        <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Allocated</div>
+                                        <div style={{ fontSize: "13px", color: "#065f46", fontWeight: 600 }}>
+                                          {new Date(String(enq.allocated_at)).toLocaleDateString("en-GB")}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 {/* Your note */}
