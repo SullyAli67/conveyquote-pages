@@ -6895,12 +6895,12 @@ function App() {
                 : tab === "fees" ? "Fee Settings"
                 : "Profile";
               return (
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px", borderBottom: "2px solid var(--border)", paddingBottom: "0" }}>
                   {allTabs.map((tab) => (
                     <button
                       key={tab}
                       type="button"
-                      className={firmPortalTab === tab ? "primary-button" : "muted-button"}
+                      style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: firmPortalTab === tab ? "var(--teal)" : "var(--muted)", borderBottom: firmPortalTab === tab ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
                       onClick={() => {
                         setFirmPortalTab(tab);
 
@@ -7288,9 +7288,9 @@ function App() {
                         )}
                         <div className="field">
                           <label>Tenure</label>
-                          <div style={{ display: "flex", gap: "16px" }}>
+                          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                             {(["freehold", "leasehold"] as const).map((t) => (
-                              <label key={t} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                              <label key={t} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                 <input
                                   type="radio"
                                   name="iq-tenure"
@@ -7341,9 +7341,9 @@ function App() {
                       <div className="form-grid">
                         <div className="field field--full">
                           <label>Mortgage or cash</label>
-                          <div style={{ display: "flex", gap: "16px" }}>
+                          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                             {(["mortgage", "cash"] as const).map((m) => (
-                              <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                              <label key={m} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                 <input
                                   type="radio"
                                   name="iq-mortgageOrCash"
@@ -7426,9 +7426,9 @@ function App() {
                           ] as const).map(([key, label]) => (
                             <div key={key} className="field field--full">
                               <label>{label}</label>
-                              <div style={{ display: "flex", gap: "16px" }}>
+                              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                                 {([true, false] as const).map((v) => (
-                                  <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                                  <label key={String(v)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", padding: "10px 8px" }}>
                                     <input
                                       type="radio"
                                       name={`iq-sdlt-${key}`}
@@ -7852,7 +7852,7 @@ function App() {
                           void loadFeeConfig(e.target.value);
                           setFeeConfigMessage("");
                         }}
-                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}>
+                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
                         <option value="purchase">Purchase</option>
                         <option value="sale">Sale</option>
                         <option value="remortgage">Remortgage</option>
@@ -7869,7 +7869,7 @@ function App() {
                             <div className="detail-row__label" style={{ flex: 2 }}>
                               <input type="text" value={item.label} placeholder="Fee label"
                                 onChange={(e) => updateFeeItem(idx, "label", e.target.value)}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                               <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
                                 <input type="checkbox" checked={item.includes_vat}
                                   onChange={(e) => updateFeeItem(idx, "includes_vat", e.target.checked)} />
@@ -7881,7 +7881,7 @@ function App() {
                                 <span style={{ fontSize: "13px" }}>£</span>
                                 <input type="number" step="0.01" value={item.amount}
                                   onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))}
-                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                                 <button type="button" className="muted-button" style={{ fontSize: "12px" }}
                                   onClick={() => removeFeeItem(idx)}>Remove</button>
                               </div>
@@ -7902,14 +7902,14 @@ function App() {
                             <div className="detail-row__label" style={{ flex: 2 }}>
                               <input type="text" value={item.label} placeholder="Disbursement label"
                                 onChange={(e) => updateFeeItem(idx, "label", e.target.value)}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                             </div>
                             <div className="detail-row__value">
                               <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                                 <span style={{ fontSize: "13px" }}>£</span>
                                 <input type="number" step="0.01" value={item.amount}
                                   onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))}
-                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "13px" }} />
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
                                 <button type="button" className="muted-button" style={{ fontSize: "12px" }}
                                   onClick={() => removeFeeItem(idx)}>Remove</button>
                               </div>
@@ -7996,7 +7996,7 @@ function App() {
                               accept="image/png,image/jpeg"
                               onChange={(e) => void handleFirmLogoUpload(e)}
                               disabled={isUploadingFirmLogo}
-                              style={{ fontSize: "13px" }}
+                              style={{ fontSize: "16px" }}
                             />
                             {isUploadingFirmLogo && (
                               <span style={{ marginLeft: "10px", fontSize: "13px", color: "#6b7280" }}>
@@ -8017,7 +8017,7 @@ function App() {
                             maxLength={100}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, displayName: e.target.value }))}
                             placeholder="e.g. Cambridge Solicitors LLP"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -8032,7 +8032,7 @@ function App() {
                             rows={3}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, address: e.target.value }))}
                             placeholder="One line per address row"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px", fontFamily: "inherit", resize: "vertical" }}
                           />
                         </div>
 
@@ -8047,7 +8047,7 @@ function App() {
                             maxLength={30}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, phone: e.target.value }))}
                             placeholder="e.g. 01223 555 000"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -8062,7 +8062,7 @@ function App() {
                             maxLength={100}
                             onChange={(e) => setFirmBranding((p) => ({ ...p, email: e.target.value }))}
                             placeholder="e.g. enquiries@cambridgesolicitors.co.uk"
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "14px" }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
                           />
                         </div>
 
@@ -8439,94 +8439,31 @@ function App() {
               );
             })()}
 
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginBottom: "20px",
-              }}
-            >
-              <button
-                type="button"
-                className={adminTab === "dashboard" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("dashboard")}
-              >
-                Overview
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "enquiries" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("enquiries")}
-              >
-                Enquiries
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "firms" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("firms")}
-              >
-                Firms
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "lenders" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("lenders")}
-              >
-                Lenders
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "quote" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("quote")}
-              >
-                Quote Review
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "pipeline" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("pipeline")}
-              >
-                Pipeline
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "referrers" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("referrers")}
-              >
-                Referrers
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "invoices" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("invoices")}
-              >
-                Invoices
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "audit" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("audit")}
-              >
-                Audit Log
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "settings" ? "primary-button" : "muted-button"}
-                onClick={() => void handleAdminTabChange("settings")}
-              >
-                Settings
-              </button>
-            </div>
+            {(() => {
+              const adminTabs: { id: AdminTab; label: string }[] = [
+                { id: "dashboard", label: "Overview" },
+                { id: "enquiries", label: "Enquiries" },
+                { id: "firms", label: "Firms" },
+                { id: "lenders", label: "Lenders" },
+                { id: "quote", label: "Quote Review" },
+                { id: "pipeline", label: "Pipeline" },
+                { id: "referrers", label: "Referrers" },
+                { id: "invoices", label: "Invoices" },
+                { id: "audit", label: "Audit Log" },
+                { id: "settings", label: "Settings" },
+              ];
+              return (
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px", borderBottom: "2px solid var(--border)", paddingBottom: "0" }}>
+                  {adminTabs.map((tab) => (
+                    <button key={tab.id} type="button"
+                      style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: adminTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: adminTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
+                      onClick={() => void handleAdminTabChange(tab.id)}>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {adminTab === "quote" && (
             <div style={{ marginBottom: "20px" }}>
@@ -8918,12 +8855,8 @@ function App() {
 
             {adminTab === "firms" && !loadedEnquiry && !isLoadingDashboard && (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(300px, 1fr) minmax(380px, 1.4fr)",
-                  gap: "20px",
-                  alignItems: "start",
-                }}
+                className="admin-two-col admin-two-col--wide-right"
+                style={{ alignItems: "start" }}
               >
                 <div className="admin-stack">
                   <SummaryCard title="Panel Firms">
@@ -9477,13 +9410,8 @@ function App() {
 
             {adminTab === "lenders" && !loadedEnquiry && !isLoadingDashboard && (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(300px, 1fr) minmax(360px, 1.2fr)",
-                  gap: "20px",
-                  alignItems: "start",
-                  marginTop: "20px",
-                }}
+                className="admin-two-col admin-two-col--wide-right"
+                style={{ alignItems: "start", marginTop: "20px" }}
               >
                 <div className="admin-stack">
                   <SummaryCard title="Panel Lenders">
@@ -9708,7 +9636,7 @@ function App() {
 
             {/* ── Referrers tab ── */}
             {adminTab === "referrers" && (
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(300px,1fr) minmax(380px,1.4fr)", gap: "20px", alignItems: "start", marginTop: "20px" }}>
+              <div className="admin-two-col admin-two-col--wide-right" style={{ alignItems: "start", marginTop: "20px" }}>
 
                 {/* Left: referrer list */}
                 <div className="admin-stack">
@@ -12241,7 +12169,7 @@ function FirmReferredMatterCard({
     borderBottom: "1px solid #f0f2f5", padding: "6px 0",
   };
   const inputStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "4px 8px", border: "1px solid #d1d5db",
+    fontSize: "16px", padding: "4px 8px", border: "1px solid #d1d5db",
     borderRadius: "5px", background: "#fff",
   };
 
@@ -12336,7 +12264,7 @@ function FirmReferredMatterCard({
                   <div style={{ width: "100%", background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: "8px", padding: "10px 12px" }}>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: "#991b1b", marginBottom: "6px" }}>Reason for falling through</div>
                     <select value={fallThroughReason} onChange={(e) => setFallThroughReason(e.target.value)}
-                      style={{ fontSize: "13px", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: "5px", width: "100%", marginBottom: "6px" }}>
+                      style={{ fontSize: "16px", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: "5px", width: "100%", marginBottom: "6px" }}>
                       <option value="">Select reason…</option>
                       <option value="buyer withdrew">Buyer withdrew</option>
                       <option value="survey issue">Survey issue</option>
@@ -12355,7 +12283,7 @@ function FirmReferredMatterCard({
                 )}
                 {!pendingStatus && (
                   <select
-                    style={{ fontSize: "13px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #d1d5db", width: "100%" }}
+                    style={{ fontSize: "16px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #d1d5db", width: "100%" }}
                     value=""
                     onChange={(e) => { if (e.target.value) { handleStatusSelect(e.target.value); e.currentTarget.value = ""; } }}
                   >
@@ -13117,7 +13045,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
   // ── Form screen ──────────────────────────────────────────────────────────
   const fieldStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "4px" };
   const labelStyle: React.CSSProperties = { fontSize: "13px", fontWeight: 600, color: "#374151" };
-  const inputStyle: React.CSSProperties = { padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "14px", width: "100%", boxSizing: "border-box" };
+  const inputStyle: React.CSSProperties = { padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", width: "100%", boxSizing: "border-box" };
   const sectionStyle: React.CSSProperties = { marginBottom: "24px", paddingBottom: "20px", borderBottom: "1px solid var(--border)" };
   const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" };
 
