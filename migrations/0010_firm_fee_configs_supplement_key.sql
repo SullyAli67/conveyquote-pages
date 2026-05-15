@@ -1,0 +1,28 @@
+-- Firm Fee Settings parity overhaul — supplements as first-class rows.
+--
+-- Adds a single column to firm_fee_configs so the firm quote engine can
+-- match supplement rows by an explicit key instead of substring-matching
+-- the free-text label (the Phase 1 simplification flagged in PR #12).
+--
+-- Semantics of supplement_key
+-- ---------------------------
+--   NULL       → unconditional base fee (always included in the quote
+--                for the row's transaction_type). This matches existing
+--                row semantics, so every legacy row stays correct after
+--                the migration with no backfill.
+--   non-NULL   → conditional supplement. The engine includes the row
+--                only when the corresponding request flag is set on
+--                Issue Quote. Canonical keys are listed in
+--                functions/lib/calculate-firm-quote-core.js
+--                (SUPPLEMENT_KEYS).
+--
+-- SQLite idempotency caveat
+-- -------------------------
+-- ALTER TABLE … ADD COLUMN is NOT idempotent in SQLite — there is no
+-- "IF NOT EXISTS" form for ADD COLUMN. If this migration is run twice,
+-- the second run will error with "duplicate column name". That's fine
+-- in our deployment flow (Sully applies migrations once via the D1
+-- console after merge), but anyone re-running locally should drop the
+-- column first or skip this file.
+
+ALTER TABLE firm_fee_configs ADD COLUMN supplement_key TEXT;

@@ -1352,7 +1352,7 @@ function App() {
   // Firm fee config state — shared by the Fee Settings tab and the
   // Issue Quote rail. The legacy "My Quotes" rail (firm_quotes table)
   // was retired along with its handlers, types, and endpoints.
-  type FirmFeeItem = { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean };
+  type FirmFeeItem = { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean; supplement_key?: string | null };
 
   type FirmPortalTab = "referrals" | "issue_quote" | "history" | "fees" | "profile";
   const FIRM_PORTAL_TABS = [
@@ -1540,13 +1540,36 @@ function App() {
   const [quoteSdltAmount, setQuoteSdltAmount] = useState("");
   const [isSavingFees, setIsSavingFees] = useState(false);
   const [feeConfigMessage, setFeeConfigMessage] = useState("");
+  const [supplementPickerOpen, setSupplementPickerOpen] = useState(false);
+
+  // Canonical supplement keys. Must stay aligned with SUPPLEMENT_KEYS in
+  // functions/lib/calculate-firm-quote-core.js and the validator in
+  // functions/api/firm-fee-config.js. The 11 entries below cover every
+  // supplement the Issue Quote form can trigger.
+  const SUPPLEMENT_OPTIONS: { key: string; label: string }[] = [
+    { key: "leasehold", label: "Leasehold supplement" },
+    { key: "mortgagePresent", label: "Acting for lender supplement" },
+    { key: "newBuild", label: "New build supplement" },
+    { key: "sharedOwnership", label: "Shared ownership supplement" },
+    { key: "helpToBuy", label: "Help to Buy supplement" },
+    { key: "buyToLet", label: "Buy to let supplement" },
+    { key: "companyBuyer", label: "Buying via company supplement" },
+    { key: "giftedDeposit", label: "Gifted deposit supplement" },
+    { key: "lifetimeIsa", label: "Lifetime ISA supplement" },
+    { key: "rightToBuy", label: "Right to Buy supplement" },
+    { key: "additionalProperty", label: "Additional property supplement" },
+  ];
 
   const legalFeeItems = useMemo(
-    () => feeConfigItems.filter((f) => !f.is_disbursement),
+    () => feeConfigItems.filter((f) => !f.is_disbursement && !f.supplement_key),
     [feeConfigItems]
   );
   const disbursementItems = useMemo(
     () => feeConfigItems.filter((f) => f.is_disbursement),
+    [feeConfigItems]
+  );
+  const supplementItems = useMemo(
+    () => feeConfigItems.filter((f) => !!f.supplement_key),
     [feeConfigItems]
   );
 
@@ -3085,6 +3108,7 @@ function App() {
                 amount: Number(f.amount || 0),
                 includes_vat: Number(f.includes_vat) === 1,
                 is_disbursement: Number(f.is_disbursement) === 1,
+                supplement_key: f.supplement_key ? String(f.supplement_key) : null,
               }))
             : getDefaultFeeItems(type)
         );
@@ -3116,11 +3140,32 @@ function App() {
         { label: "Office copy entries", amount: 12, includes_vat: false, is_disbursement: true },
         { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
       ],
+      sale_purchase: [
+        { label: "Legal fee", amount: 1500, includes_vat: true, is_disbursement: false },
+        { label: "Search pack", amount: 350, includes_vat: false, is_disbursement: true },
+        { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
+      ],
+      remortgage_transfer: [
+        { label: "Legal fee", amount: 895, includes_vat: true, is_disbursement: false },
+        { label: "Office copy entries", amount: 20, includes_vat: false, is_disbursement: true },
+        { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
+      ],
     };
     return defaults[type] || [{ label: "Legal fee", amount: 0, includes_vat: true, is_disbursement: false }];
   };
 
   const handleSaveFeeConfig = async () => {
+    const seenKeys = new Set<string>();
+    for (const item of feeConfigItems) {
+      if (!item.supplement_key) continue;
+      if (seenKeys.has(item.supplement_key)) {
+        setFeeConfigMessage(
+          `Duplicate supplement: "${item.label}" is configured more than once. Remove the duplicate before saving.`
+        );
+        return;
+      }
+      seenKeys.add(item.supplement_key);
+    }
     setIsSavingFees(true);
     setFeeConfigMessage("");
     try {
@@ -3285,8 +3330,27 @@ function App() {
   const addFeeItem = (isDisbursement: boolean) => {
     setFeeConfigItems((prev) => [
       ...prev,
-      { label: "", amount: 0, includes_vat: !isDisbursement, is_disbursement: isDisbursement },
+      { label: "", amount: 0, includes_vat: !isDisbursement, is_disbursement: isDisbursement, supplement_key: null },
     ]);
+  };
+
+  const addSupplementItem = (key: string) => {
+    const option = SUPPLEMENT_OPTIONS.find((o) => o.key === key);
+    if (!option) return;
+    setFeeConfigItems((prev) => {
+      if (prev.some((item) => item.supplement_key === key)) return prev;
+      return [
+        ...prev,
+        {
+          label: option.label,
+          amount: 0,
+          includes_vat: true,
+          is_disbursement: false,
+          supplement_key: key,
+        },
+      ];
+    });
+    setSupplementPickerOpen(false);
   };
 
   const updateFeeItem = (index: number, field: string, value: string | number | boolean) => {
@@ -7857,8 +7921,41 @@ function App() {
                         <option value="sale">Sale</option>
                         <option value="remortgage">Remortgage</option>
                         <option value="transfer">Transfer of Equity</option>
+                        <option value="sale_purchase">Sale and purchase</option>
+                        <option value="remortgage_transfer">Remortgage and transfer of equity</option>
                       </select>
                     </div>
+
+                    {(feeConfigType === "sale_purchase" || feeConfigType === "remortgage_transfer") &&
+                      feeConfigItems.length === 0 && (
+                        <div
+                          style={{
+                            background: "#fef3c7",
+                            border: "1px solid #fde68a",
+                            color: "#92400e",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            marginBottom: "16px",
+                            display: "flex",
+                            gap: "12px",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: "200px" }}>
+                            You haven&rsquo;t set up fees for combined matters yet. Use &ldquo;+ Add legal fee&rdquo; to add your base fee, and &ldquo;+ Add supplement&rdquo; for any supplements you charge.
+                          </div>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "13px" }}
+                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}
+                          >
+                            Reset to Defaults
+                          </button>
+                        </div>
+                      )}
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
@@ -7920,6 +8017,99 @@ function App() {
                     </div>
                     <button type="button" className="muted-button" style={{ fontSize: "13px", marginBottom: "20px" }}
                       onClick={() => addFeeItem(true)}>+ Add disbursement</button>
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "4px" }}>Supplements</h4>
+                    <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                      Configure how much you charge when clients tick property characteristics on the quote form. Leave blank if you don&rsquo;t charge for that scenario.
+                    </p>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {supplementItems.map((item, localIdx) => {
+                        const idx = feeConfigItems.indexOf(item);
+                        return (
+                          <div key={localIdx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <div style={{ fontSize: "14px", fontWeight: 600 }}>{item.label}</div>
+                              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
+                                <input type="checkbox" checked={item.includes_vat}
+                                  onChange={(e) => updateFeeItem(idx, "includes_vat", e.target.checked)} />
+                                VAT applicable (adds 20%)
+                              </label>
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateFeeItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeFeeItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const configuredKeys = new Set(
+                        feeConfigItems
+                          .map((f) => f.supplement_key)
+                          .filter((k): k is string => !!k)
+                      );
+                      const availableSupplements = SUPPLEMENT_OPTIONS.filter(
+                        (o) => !configuredKeys.has(o.key)
+                      );
+                      if (availableSupplements.length === 0) {
+                        return (
+                          <p className="form-note" style={{ marginBottom: "20px", fontSize: "13px" }}>
+                            All supplements are configured for this transaction type.
+                          </p>
+                        );
+                      }
+                      if (!supplementPickerOpen) {
+                        return (
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "13px", marginBottom: "20px" }}
+                            onClick={() => setSupplementPickerOpen(true)}
+                          >
+                            + Add supplement
+                          </button>
+                        );
+                      }
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            alignItems: "center",
+                            marginBottom: "20px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <select
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) addSupplementItem(e.target.value);
+                            }}
+                            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
+                          >
+                            <option value="" disabled>Choose a supplement…</option>
+                            {availableSupplements.map((o) => (
+                              <option key={o.key} value={o.key}>{o.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "12px" }}
+                            onClick={() => setSupplementPickerOpen(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {feeConfigMessage && (
                       <p className="form-note" style={{ color: feeConfigMessage.includes("saved") ? "#065f46" : "#dc2626" }}>
