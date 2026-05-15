@@ -1414,6 +1414,8 @@ function App() {
     buyerCount: string;
     mortgageOrCash: "mortgage" | "cash";
     lender: string;
+    sharePercent: string;
+    continuingMortgage: string;
     supplements: {
       newBuild: boolean;
       sharedOwnership: boolean;
@@ -1445,6 +1447,8 @@ function App() {
     buyerCount: "1",
     mortgageOrCash: "mortgage",
     lender: "",
+    sharePercent: "",
+    continuingMortgage: "",
     supplements: {
       newBuild: false,
       sharedOwnership: false,
@@ -3418,6 +3422,17 @@ function App() {
     buyerCount: Math.max(1, Math.min(4, Math.floor(Number(form.buyerCount) || 1))),
     mortgageOrCash: form.mortgageOrCash,
     lender: form.mortgageOrCash === "mortgage" ? form.lender : "",
+    // Optional transfer-of-equity refinements. Sent as empty strings
+    // when blank so the engine's optionalNumber treats them as "not
+    // provided" and falls back to the conservative LR over-estimate.
+    sharePercent:
+      form.transactionType === "transfer" || form.transactionType === "remortgage_transfer"
+        ? form.sharePercent
+        : "",
+    continuingMortgage:
+      form.transactionType === "transfer" || form.transactionType === "remortgage_transfer"
+        ? form.continuingMortgage
+        : "",
     supplements: form.supplements,
     sdltFlags: TRANSACTION_TYPES_WITH_SDLT.includes(form.transactionType)
       ? form.sdltFlags
@@ -7439,6 +7454,51 @@ function App() {
                               required
                             />
                           </div>
+                        )}
+                        {(issueQuoteForm.transactionType === "transfer" ||
+                          issueQuoteForm.transactionType === "remortgage_transfer") && (
+                          <>
+                            <div className="field field--full">
+                              <p className="form-note" style={{ marginTop: 0, marginBottom: 0, fontSize: "16px" }}>
+                                Optional: provide these details for a more accurate Land Registry fee. Without them, we use a conservative estimate that may be slightly higher than the statutory amount.
+                              </p>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-sharePercent">Share being transferred (%)</label>
+                              <input
+                                id="iq-sharePercent"
+                                type="number"
+                                inputMode="numeric"
+                                min="1"
+                                max="99"
+                                value={issueQuoteForm.sharePercent}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, sharePercent: e.target.value }))
+                                }
+                                placeholder="50"
+                              />
+                              <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                                Optional. The percentage of the property being transferred to a new or different owner. Leave blank if unsure.
+                              </p>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-continuingMortgage">Continuing mortgage on the property (£)</label>
+                              <input
+                                id="iq-continuingMortgage"
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                value={issueQuoteForm.continuingMortgage}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, continuingMortgage: e.target.value }))
+                                }
+                                placeholder="150000"
+                              />
+                              <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                                Optional. Any existing mortgage that will remain on the property after the transfer. Leave blank if unsure or none.
+                              </p>
+                            </div>
+                          </>
                         )}
                         <div className="field">
                           <label>Tenure</label>
