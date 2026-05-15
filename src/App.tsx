@@ -13289,7 +13289,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
     return (
       <div>
         <button type="button" onClick={() => setStep("form")}
-          style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: 0, marginBottom: "20px" }}>
+          style={{ background: "none", border: "none", color: "var(--teal)", cursor: "pointer", fontSize: "14px", fontWeight: 600, padding: "10px 0", minHeight: 44, marginBottom: "12px" }}>
           ← Edit details
         </button>
 
@@ -13362,7 +13362,6 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
   const labelStyle: React.CSSProperties = { fontSize: "13px", fontWeight: 600, color: "#374151" };
   const inputStyle: React.CSSProperties = { padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", width: "100%", boxSizing: "border-box" };
   const sectionStyle: React.CSSProperties = { marginBottom: "24px", paddingBottom: "20px", borderBottom: "1px solid var(--border)" };
-  const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" };
 
   return (
     <form onSubmit={(e) => void handlePreview(e)}>
@@ -13377,7 +13376,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
               onChange={(e) => set("property_address", e.target.value)}
               placeholder="e.g. 14 Maple Street, Sheffield, S1 2AB" required />
           </div>
-          <div style={grid2}>
+          <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Transaction type</label>
               <select style={inputStyle} value={form.type} onChange={(e) => set("type", e.target.value)}>
@@ -13414,7 +13413,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       {isPurchase && (
         <div style={sectionStyle}>
           <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Purchase Details</h4>
-          <div style={grid2}>
+          <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage or cash?</label>
               <select style={inputStyle} value={form.mortgage} onChange={(e) => set("mortgage", e.target.value)}>
@@ -13521,7 +13520,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       {isSale && (
         <div style={sectionStyle}>
           <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Sale Details</h4>
-          <div style={grid2}>
+          <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage to redeem on sale?</label>
               <select style={inputStyle} value={form.saleMortgage} onChange={(e) => set("saleMortgage", e.target.value)}>
@@ -13559,7 +13558,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       {isRemortgage && (
         <div style={sectionStyle}>
           <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Remortgage Details</h4>
-          <div style={grid2}>
+          <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Ownership type</label>
               <select style={inputStyle} value={form.ownershipType} onChange={(e) => set("ownershipType", e.target.value)}>
@@ -13594,7 +13593,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       {isTransfer && (
         <div style={sectionStyle}>
           <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Transfer of Equity Details</h4>
-          <div style={grid2}>
+          <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage on the property?</label>
               <select style={inputStyle} value={form.transferMortgage} onChange={(e) => set("transferMortgage", e.target.value)}>
@@ -13617,7 +13616,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       {/* ── Section: Client ── */}
       <div style={sectionStyle}>
         <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Client Details</h4>
-        <div style={grid2}>
+        <div className="form-grid">
           <div style={fieldStyle}>
             <label style={labelStyle}>Full name</label>
             <input style={inputStyle} type="text" value={form.name}
