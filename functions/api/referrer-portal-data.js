@@ -23,28 +23,31 @@ export async function onRequestGet(context) {
     if (!referrer) return unauthorised();
 
     // Phase 1: include property_address, target_completion_date, fall_through_reason, negotiator_name
+    // Workflow fields (referrer_note, parent_enquiry_id, allocated_at)
+    // live in the referrer_workflow side-table — see migration 0013.
     const enquiriesResult = await env.DB.prepare(
       `SELECT
-         id, reference, client_name, client_email, client_phone,
-         transaction_type, tenure, price, postcode,
-         property_address, negotiator_name,
-         status, panel_status, case_status, eta_date,
-         target_completion_date, fall_through_reason,
-         assigned_firm_name, firm_response,
-         referred_at, created_at, referral_fee_payable, referral_fee_amount,
-         referrer_note,
-         mortgage, lender, ownership_type, first_time_buyer, new_build,
-         shared_ownership, help_to_buy, is_company, buy_to_let,
-         gifted_deposit, additional_property, uk_resident_for_sdlt,
-         lifetime_isa, right_to_buy,
-         sale_mortgage, management_company, tenanted, number_of_sellers,
-         additional_borrowing, remortgage_transfer, transfer_mortgage,
-         owners_changing,
-         parent_enquiry_id, allocated_at,
-         quote_json, approved_quote_json, approved_quote_amount
-       FROM enquiries
-       WHERE referrer_id = ?
-       ORDER BY created_at DESC`
+         e.id, e.reference, e.client_name, e.client_email, e.client_phone,
+         e.transaction_type, e.tenure, e.price, e.postcode,
+         e.property_address, e.negotiator_name,
+         e.status, e.panel_status, e.case_status, e.eta_date,
+         e.target_completion_date, e.fall_through_reason,
+         e.assigned_firm_name, e.firm_response,
+         e.referred_at, e.created_at, e.referral_fee_payable, e.referral_fee_amount,
+         w.referrer_note,
+         e.mortgage, e.lender, e.ownership_type, e.first_time_buyer, e.new_build,
+         e.shared_ownership, e.help_to_buy, e.is_company, e.buy_to_let,
+         e.gifted_deposit, e.additional_property, e.uk_resident_for_sdlt,
+         e.lifetime_isa, e.right_to_buy,
+         e.sale_mortgage, e.management_company, e.tenanted, e.number_of_sellers,
+         e.additional_borrowing, e.remortgage_transfer, e.transfer_mortgage,
+         e.owners_changing,
+         w.parent_enquiry_id, w.allocated_at,
+         e.quote_json, e.approved_quote_json, e.approved_quote_amount
+       FROM enquiries e
+       LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+       WHERE e.referrer_id = ?
+       ORDER BY e.created_at DESC`
     ).bind(referrerId).all();
 
     // Build a set of enquiry ids that have at least one child (i.e.

@@ -58,10 +58,10 @@ export async function onRequestGet(context) {
               e.remortgage_transfer_owners_changing,
               e.remortgage_transfer_ownership_type,
               e.referrer_id,
-              e.referrer_note,
-              e.allocation_requested_at,
-              e.allocated_at,
-              e.parent_enquiry_id,
+              w.referrer_note,
+              w.allocation_requested_at,
+              w.allocated_at,
+              w.parent_enquiry_id,
               r.referrer_name      AS referrer_name,
               successor.reference  AS successor_reference,
               fs.quote_sent_at      AS fs_quote_sent_at,
@@ -71,7 +71,9 @@ export async function onRequestGet(context) {
          FROM enquiries e
          LEFT JOIN followup_state fs ON fs.enquiry_reference = e.reference
          LEFT JOIN referrers r ON r.id = e.referrer_id
-         LEFT JOIN enquiries successor ON successor.parent_enquiry_id = e.id
+         LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+         LEFT JOIN referrer_workflow w2 ON w2.parent_enquiry_id = e.id
+         LEFT JOIN enquiries successor ON successor.id = w2.enquiry_id
         WHERE e.reference = ?
         LIMIT 1`
     )

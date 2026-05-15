@@ -1,15 +1,25 @@
--- Pattern B referrer workflow — per-referrer pricing and allocation flow.
+-- Pattern B referrer workflow — per-referrer pricing.
 --
--- Adds a referrer_fee_configs table (mirrors firm_fee_configs from the
--- PR #39 / 0010 migration) so the Pattern B engine can price per
--- referrer instead of falling back to the global customer price book.
--- Also adds four columns to enquiries to capture the new lifecycle:
+-- Originally this migration also attempted to add four columns to the
+-- enquiries table to capture the new lifecycle:
 --   • allocation_requested_at — referrer asks admin to allocate
 --   • allocated_at            — admin approves and a panel firm is set
 --   • referrer_note           — optional 500-char note travelling with
 --                                the quote and visible in My Referrals
 --   • parent_enquiry_id       — points back to the original referral
 --                                when a referrer re-quotes
+--
+-- All four ALTER TABLE statements failed in the D1 console with the
+-- error "too many columns on sqlite_altertab_enquiries: SQLITE_ERROR"
+-- — the enquiries table has hit the SQLite/D1 100-column cap
+-- (confirmed via SELECT COUNT(*) FROM pragma_table_info('enquiries')).
+-- The ALTER TABLE lines have been removed because they cannot be
+-- applied. The CREATE TABLE for referrer_fee_configs below DID succeed
+-- and is kept for idempotent re-runs.
+--
+-- The four workflow fields now live in a side-table — see migration
+-- 0013_referrer_workflow.sql for the replacement schema and the
+-- backend changes that route reads/writes through it.
 --
 -- Per-referrer pricing semantics
 -- ------------------------------
@@ -20,15 +30,6 @@
 -- A row with supplement_key = NULL is an unconditional base fee. A row
 -- with a non-NULL supplement_key is included only when the matching
 -- request flag is set on the form. Same warnings, same validation.
---
--- SQLite idempotency caveat
--- -------------------------
--- ALTER TABLE … ADD COLUMN is NOT idempotent in SQLite — there is no
--- "IF NOT EXISTS" form. If this migration is re-run on a D1 environment
--- where the columns already exist, each ADD COLUMN errors with
--- "duplicate column name". That is expected and safe — Sully applies
--- migrations once via the D1 console after merge. The CREATE TABLE
--- below uses IF NOT EXISTS so re-runs are a no-op for the table.
 
 CREATE TABLE IF NOT EXISTS referrer_fee_configs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,8 +42,3 @@ CREATE TABLE IF NOT EXISTS referrer_fee_configs (
   supplement_key TEXT,
   sort_order INTEGER DEFAULT 0
 );
-
-ALTER TABLE enquiries ADD COLUMN allocation_requested_at TEXT;
-ALTER TABLE enquiries ADD COLUMN allocated_at TEXT;
-ALTER TABLE enquiries ADD COLUMN referrer_note TEXT;
-ALTER TABLE enquiries ADD COLUMN parent_enquiry_id INTEGER;

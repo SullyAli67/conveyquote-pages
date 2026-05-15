@@ -212,7 +212,11 @@ export async function onRequestPost(context) {
         );
       }
       const parentRow = await env.DB.prepare(
-        `SELECT id, referrer_id, allocated_at FROM enquiries WHERE id = ? LIMIT 1`
+        `SELECT e.id, e.referrer_id, w.allocated_at
+           FROM enquiries e
+           LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+          WHERE e.id = ?
+          LIMIT 1`
       ).bind(parsedParentId).first();
       if (!parentRow || Number(parentRow.referrer_id) !== Number(referrerId)) {
         return jsonResponse(
@@ -343,9 +347,25 @@ export async function onRequestPost(context) {
       referrer_id: referrerId,
       referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
       referral_fee_amount: Number(referrer.referral_fee) || 0,
-      referrer_note: trimmedNote || null,
-      parent_enquiry_id: validatedParentId,
     });
+
+    // Persist workflow fields (referrer_note, parent_enquiry_id) in the
+    // referrer_workflow side-table — they used to live on enquiries but
+    // that table hit the D1 100-column cap. See migration 0013.
+    if (trimmedNote || validatedParentId != null) {
+      const inserted = await env.DB.prepare(
+        `SELECT id FROM enquiries WHERE reference = ? LIMIT 1`
+      ).bind(reference).first();
+      if (inserted?.id) {
+        await env.DB.prepare(
+          `INSERT INTO referrer_workflow (enquiry_id, referrer_note, parent_enquiry_id)
+           VALUES (?, ?, ?)
+           ON CONFLICT (enquiry_id) DO UPDATE SET
+             referrer_note = excluded.referrer_note,
+             parent_enquiry_id = excluded.parent_enquiry_id`
+        ).bind(inserted.id, trimmedNote || null, validatedParentId).run();
+      }
+    }
 
     const transactionLabel = getTransactionLabel(type);
     const adminUrl = `https://conveyquote.uk/admin/?ref=${encodeURIComponent(reference)}`;

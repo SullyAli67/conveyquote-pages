@@ -46,12 +46,14 @@ export async function onRequestPost(context) {
 
     // Pattern B: a referrer can re-quote on an unallocated matter,
     // creating a successor row pointing to this one via
-    // parent_enquiry_id. The original is then "superseded" and must not
-    // be allocated — admin should allocate the latest active row.
+    // referrer_workflow.parent_enquiry_id. The original is then
+    // "superseded" and must not be allocated — admin should allocate
+    // the latest active row.
     const supersededRow = await env.DB.prepare(
       `SELECT successor.reference AS successor_reference
          FROM enquiries e
-         JOIN enquiries successor ON successor.parent_enquiry_id = e.id
+         JOIN referrer_workflow w ON w.parent_enquiry_id = e.id
+         JOIN enquiries successor ON successor.id = w.enquiry_id
         WHERE e.reference = ?
         LIMIT 1`
     ).bind(reference).first();
@@ -65,19 +67,30 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Stamp allocated_at when the enquiry has a referrer — this is the
-    // Pattern B "approve allocation" step. Non-referrer enquiries
-    // continue to work unchanged (allocated_at stays NULL).
     const allocatedAt = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE enquiries
        SET assigned_firm_id=?, assigned_firm_name=?, referral_fee_payable=?,
            referral_fee_amount=?, panel_status='panel_referred',
            referred_at=CURRENT_TIMESTAMP, admin_notes=COALESCE(?,admin_notes),
-           allocated_at=CASE WHEN referrer_id IS NOT NULL THEN ? ELSE allocated_at END,
            updated_at=datetime('now')
        WHERE reference=?`
-    ).bind(firm_id, firm_name, toFlag(referral_fee_payable), Number(referral_fee_amount||0), admin_notes||null, allocatedAt, reference).run();
+    ).bind(firm_id, firm_name, toFlag(referral_fee_payable), Number(referral_fee_amount||0), admin_notes||null, reference).run();
+
+    // Stamp allocated_at into referrer_workflow when the enquiry has a
+    // referrer — this is the Pattern B "approve allocation" step.
+    // Non-referrer enquiries get no workflow row (allocated_at stays
+    // effectively NULL via LEFT JOIN).
+    const enquiryForWorkflow = await env.DB.prepare(
+      `SELECT id, referrer_id FROM enquiries WHERE reference = ? LIMIT 1`
+    ).bind(reference).first();
+    if (enquiryForWorkflow?.referrer_id) {
+      await env.DB.prepare(
+        `INSERT INTO referrer_workflow (enquiry_id, allocated_at)
+         VALUES (?, ?)
+         ON CONFLICT (enquiry_id) DO UPDATE SET allocated_at = ?`
+      ).bind(enquiryForWorkflow.id, allocatedAt, allocatedAt).run();
+    }
 
     // Audit log
     try {
