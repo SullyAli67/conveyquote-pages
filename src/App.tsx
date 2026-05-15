@@ -1317,7 +1317,7 @@ function App() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Referrer management state
-  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; marketing_fee: number; portal_email: string; portal_active: number; notes: string; created_at: string };
+  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
   const [allReferrers, setAllReferrers] = useState<ReferrerRow[]>([]);
   const [isLoadingReferrers, setIsLoadingReferrers] = useState(false);
   const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>({
@@ -1625,8 +1625,6 @@ function App() {
   const [referrerToken, setReferrerToken] = useState("");
   const [referrerSession, setReferrerSession] = useState<{ referrer_id: number; referrer_name: string } | null>(null);
   const [referrerPortalData, setReferrerPortalData] = useState<{ referrer: ReferrerInfo; enquiries: ReferrerEnquiry[] } | null>(null);
-  const [isLoadingReferrerPortal, setIsLoadingReferrerPortal] = useState(false);
-  const [referrerPortalError, setReferrerPortalError] = useState("");
   const [referrerPortalTab, setReferrerPortalTabRaw] = useState<"dashboard" | "my_referrals" | "new_referral" | "payments">(
     () => (localStorage.getItem("cq_referrer_tab") as "dashboard" | "my_referrals" | "new_referral" | "payments") || "dashboard"
   );
@@ -1634,30 +1632,7 @@ function App() {
     localStorage.setItem("cq_referrer_tab", tab);
     setReferrerPortalTabRaw(tab);
   };
-  const [referrerUpdateMessage, setReferrerUpdateMessage] = useState("");
-  const [referrerSubmitMessage, setReferrerSubmitMessage] = useState("");
-  const [isSubmittingReferrerEnquiry, setIsSubmittingReferrerEnquiry] = useState(false);
-  const [clientEmailed, setClientEmailed] = useState(false);
-  const [referrerQuotePreview, setReferrerQuotePreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
-  const [referrerSimpleForm, setReferrerSimpleForm] = useState({
-    property_address: "", name: "", email: "", phone: "",
-    type: "purchase", price: "", tenure: "freehold", negotiator_name: "",
-    mortgage: "mortgage", firstTimeBuyer: "no", additionalProperty: "no",
-    ukResidentForSdlt: "yes", newBuild: "no",
-    saleMortgage: "no", managementCompany: "no",
-  });
-  const [referrerEnquiryForm, setReferrerEnquiryForm] = useState({
-    name: "", email: "", phone: "",
-    type: "purchase", tenure: "freehold", price: "", postcode: "",
-    mortgage: "mortgage", firstTimeBuyer: "no", additionalProperty: "no",
-    ukResidentForSdlt: "yes", newBuild: "no", sharedOwnership: "no",
-    helpToBuy: "no", isCompany: "no", buyToLet: "no", giftedDeposit: "no",
-    saleMortgage: "no", managementCompany: "no", tenanted: "no", numberOfSellers: "1",
-  });
 
-  // ── Admin referrers state ──────────────────────────────────────────────
-  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; referral_fee: number; portal_email: string; portal_active: number };
-  const [referrers, setReferrers] = useState<ReferrerRow[]>([]);
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
     null
