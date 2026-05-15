@@ -1407,6 +1407,19 @@ function App() {
   const [referrerSaveMessage, setReferrerSaveMessage] = useState("");
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
 
+  // Per-referrer pricing config (Pattern B). Mirrors the firm Fee
+  // Settings state shape (FirmFeeItem) so the Pricing UI on the
+  // Referrers tab can reuse the same line-item editing pattern. The
+  // active config is keyed by (referrerEditor.id, referrerPricingType).
+  const [referrerPricingType, setReferrerPricingType] = useState("purchase");
+  const [referrerPricingItems, setReferrerPricingItems] = useState<
+    { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean; supplement_key?: string | null }[]
+  >([]);
+  const [isLoadingReferrerPricing, setIsLoadingReferrerPricing] = useState(false);
+  const [isSavingReferrerPricing, setIsSavingReferrerPricing] = useState(false);
+  const [referrerPricingMessage, setReferrerPricingMessage] = useState("");
+  const [referrerPricingPickerOpen, setReferrerPricingPickerOpen] = useState(false);
+
   // Invoices state
   type InvoiceRow = { reference: string; invoice_ref: string; invoice_json: string; invoice_status: string; voided_invoice_ref: string; voided_invoice_json: string; client_name: string; assigned_firm_name: string; case_status: string; created_at: string };
   const [allInvoices, setAllInvoices] = useState<InvoiceRow[]>([]);
@@ -3235,6 +3248,111 @@ function App() {
       ],
     };
     return defaults[type] || [{ label: "Legal fee", amount: 0, includes_vat: true, is_disbursement: false }];
+  };
+
+  // ── Per-referrer pricing handlers (admin Pricing section on the
+  // Referrers tab — Pattern B) ─────────────────────────────────────────
+  const loadReferrerPricing = async (referrerId: number, type: string) => {
+    setIsLoadingReferrerPricing(true);
+    try {
+      const res = await adminFetch(
+        `/api/referrer-fee-config?referrer_id=${referrerId}&type=${encodeURIComponent(type)}`
+      );
+      const result = await res.json();
+      if (result.success) {
+        setReferrerPricingItems(
+          (result.fees || []).map((f: Record<string, unknown>) => ({
+            label: String(f.label || ""),
+            amount: Number(f.amount || 0),
+            includes_vat: Number(f.includes_vat) === 1,
+            is_disbursement: Number(f.is_disbursement) === 1,
+            supplement_key: f.supplement_key ? String(f.supplement_key) : null,
+          }))
+        );
+      } else {
+        setReferrerPricingItems([]);
+      }
+    } catch {
+      setReferrerPricingItems([]);
+    } finally {
+      setIsLoadingReferrerPricing(false);
+    }
+  };
+
+  const handleSaveReferrerPricing = async () => {
+    if (!referrerEditor.id) {
+      setReferrerPricingMessage("Save the referrer first, then configure pricing.");
+      return;
+    }
+    const seenKeys = new Set<string>();
+    for (const item of referrerPricingItems) {
+      if (!item.supplement_key) continue;
+      if (seenKeys.has(item.supplement_key)) {
+        setReferrerPricingMessage(
+          `Duplicate supplement: "${item.label}" is configured more than once. Remove the duplicate before saving.`
+        );
+        return;
+      }
+      seenKeys.add(item.supplement_key);
+    }
+    setIsSavingReferrerPricing(true);
+    setReferrerPricingMessage("");
+    try {
+      const res = await adminFetch("/api/referrer-fee-config", {
+        method: "POST",
+        body: JSON.stringify({
+          referrer_id: referrerEditor.id,
+          transaction_type: referrerPricingType,
+          fees: referrerPricingItems,
+        }),
+      });
+      const result = await res.json();
+      setReferrerPricingMessage(result.success ? "Pricing saved." : result.error || "Failed to save.");
+    } catch {
+      setReferrerPricingMessage("Something went wrong.");
+    } finally {
+      setIsSavingReferrerPricing(false);
+    }
+  };
+
+  const addReferrerPricingItem = (isDisbursement: boolean) => {
+    setReferrerPricingItems((prev) => [
+      ...prev,
+      { label: "", amount: 0, includes_vat: !isDisbursement, is_disbursement: isDisbursement, supplement_key: null },
+    ]);
+  };
+
+  const addReferrerPricingSupplement = (key: string) => {
+    const option = SUPPLEMENT_OPTIONS.find((o) => o.key === key);
+    if (!option) return;
+    setReferrerPricingItems((prev) => {
+      if (prev.some((item) => item.supplement_key === key)) return prev;
+      return [
+        ...prev,
+        {
+          label: option.label,
+          amount: 0,
+          includes_vat: true,
+          is_disbursement: false,
+          supplement_key: key,
+        },
+      ];
+    });
+    setReferrerPricingPickerOpen(false);
+  };
+
+  const updateReferrerPricingItem = (
+    index: number,
+    field: string,
+    value: string | number | boolean
+  ) => {
+    setReferrerPricingItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const removeReferrerPricingItem = (index: number) => {
+    setReferrerPricingItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveFeeConfig = async () => {
@@ -10057,6 +10175,9 @@ function App() {
                         onClick={() => {
                           setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
                           setReferrerSaveMessage("");
+                          setReferrerPricingItems([]);
+                          setReferrerPricingMessage("");
+                          setReferrerPricingType("purchase");
                         }}>
                         + Add Referrer
                       </button>
@@ -10095,6 +10216,10 @@ function App() {
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
                                   });
                                   setReferrerSaveMessage("");
+                                  setReferrerPricingType("purchase");
+                                  setReferrerPricingMessage("");
+                                  setReferrerPricingPickerOpen(false);
+                                  void loadReferrerPricing(r.id, "purchase");
                                 }}>Edit</button>
                             </div>
                           </div>
@@ -10175,7 +10300,13 @@ function App() {
                       )}
                       <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                         <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
-                          onClick={() => { setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" }); setReferrerSaveMessage(""); }}>
+                          onClick={() => {
+                            setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                            setReferrerSaveMessage("");
+                            setReferrerPricingItems([]);
+                            setReferrerPricingMessage("");
+                            setReferrerPricingType("purchase");
+                          }}>
                           Clear
                         </button>
                         <button type="submit" className="primary-button" style={{ minHeight: 40, padding: "0 20px" }} disabled={isSavingReferrer}>
@@ -10183,6 +10314,257 @@ function App() {
                         </button>
                       </div>
                     </form>
+                  </SummaryCard>
+
+                  {/* Pricing — per-referrer fee config (Pattern B) */}
+                  <SummaryCard title="Pricing">
+                    <p className="form-note" style={{ marginTop: 0, marginBottom: "16px" }}>
+                      Set the legal fees, disbursements, and supplements applied when this referrer issues a quote. These replace the global price book for matters submitted via the referrer portal.
+                    </p>
+
+                    {!referrerEditor.id && (
+                      <div
+                        style={{
+                          background: "#fef3c7",
+                          border: "1px solid #fde68a",
+                          color: "#92400e",
+                          borderRadius: "18px",
+                          padding: "12px 16px",
+                          fontSize: "13px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        Save the referrer first, then return here to configure their pricing.
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <label htmlFor="referrerPricingType" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
+                        Transaction type
+                      </label>
+                      <select id="referrerPricingType" value={referrerPricingType}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setReferrerPricingType(next);
+                          setReferrerPricingMessage("");
+                          setReferrerPricingPickerOpen(false);
+                          if (referrerEditor.id) void loadReferrerPricing(referrerEditor.id, next);
+                          else setReferrerPricingItems([]);
+                        }}
+                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
+                        <option value="purchase">Purchase</option>
+                        <option value="sale">Sale</option>
+                        <option value="remortgage">Remortgage</option>
+                        <option value="transfer">Transfer of Equity</option>
+                        <option value="sale_purchase">Sale and purchase</option>
+                        <option value="remortgage_transfer">Remortgage and transfer of equity</option>
+                      </select>
+                    </div>
+
+                    {isLoadingReferrerPricing && (
+                      <p className="form-note">Loading pricing…</p>
+                    )}
+
+                    {!isLoadingReferrerPricing && referrerPricingItems.length === 0 && (
+                      <div
+                        style={{
+                          background: "#f1f5f9",
+                          border: "1px solid #cbd5e1",
+                          color: "var(--navy)",
+                          borderRadius: "18px",
+                          padding: "14px 18px",
+                          fontSize: "13px",
+                          marginBottom: "16px",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: "200px" }}>
+                          No pricing configured for {referrerPricingType.replace(/_/g, " ")} yet. Click <strong>Reset to Defaults</strong> to seed from the firm-portal defaults, then adjust each line and click Save Pricing.
+                        </div>
+                        <button
+                          type="button"
+                          className="primary-button"
+                          style={{ fontSize: "13px", minHeight: 36, padding: "0 14px" }}
+                          onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}
+                        >
+                          Reset to Defaults
+                        </button>
+                      </div>
+                    )}
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => !item.is_disbursement && !item.supplement_key)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <input type="text" value={item.label} placeholder="Fee label"
+                                onChange={(e) => updateReferrerPricingItem(idx, "label", e.target.value)}
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
+                                <input type="checkbox" checked={item.includes_vat}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "includes_vat", e.target.checked)} />
+                                VAT applicable (adds 20%)
+                              </label>
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    <button type="button" className="muted-button" style={{ fontSize: "13px", marginBottom: "20px" }}
+                      onClick={() => addReferrerPricingItem(false)}>+ Add legal fee</button>
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Disbursements</h4>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => item.is_disbursement)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <input type="text" value={item.label} placeholder="Disbursement label"
+                                onChange={(e) => updateReferrerPricingItem(idx, "label", e.target.value)}
+                                style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    <button type="button" className="muted-button" style={{ fontSize: "13px", marginBottom: "20px" }}
+                      onClick={() => addReferrerPricingItem(true)}>+ Add disbursement</button>
+
+                    <h4 style={{ color: "#0f2747", marginBottom: "4px" }}>Supplements</h4>
+                    <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                      Charges added when the referrer ticks property characteristics on the form. Same canonical 11 keys as firm Fee Settings.
+                    </p>
+                    <div className="detail-table" style={{ marginBottom: "12px" }}>
+                      {referrerPricingItems
+                        .map((item, idx) => ({ item, idx }))
+                        .filter(({ item }) => !!item.supplement_key)
+                        .map(({ item, idx }) => (
+                          <div key={idx} className="detail-row">
+                            <div className="detail-row__label" style={{ flex: 2 }}>
+                              <div style={{ fontSize: "14px", fontWeight: 600 }}>{item.label}</div>
+                              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginTop: "6px", color: "#6b7280" }}>
+                                <input type="checkbox" checked={item.includes_vat}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "includes_vat", e.target.checked)} />
+                                VAT applicable (adds 20%)
+                              </label>
+                            </div>
+                            <div className="detail-row__value">
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "13px" }}>£</span>
+                                <input type="number" step="0.01" value={item.amount}
+                                  onChange={(e) => updateReferrerPricingItem(idx, "amount", Number(e.target.value))}
+                                  style={{ width: "90px", padding: "6px 8px", borderRadius: "4px", border: "1px solid #d1d5db", fontSize: "16px" }} />
+                                <button type="button" className="muted-button" style={{ fontSize: "12px" }}
+                                  onClick={() => removeReferrerPricingItem(idx)}>Remove</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    {(() => {
+                      const configuredKeys = new Set(
+                        referrerPricingItems
+                          .map((f) => f.supplement_key)
+                          .filter((k): k is string => !!k)
+                      );
+                      const availableSupplements = SUPPLEMENT_OPTIONS.filter(
+                        (o) => !configuredKeys.has(o.key)
+                      );
+                      if (availableSupplements.length === 0) {
+                        return (
+                          <p className="form-note" style={{ marginBottom: "20px", fontSize: "13px" }}>
+                            All supplements are configured for this transaction type.
+                          </p>
+                        );
+                      }
+                      if (!referrerPricingPickerOpen) {
+                        return (
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "13px", marginBottom: "20px" }}
+                            onClick={() => setReferrerPricingPickerOpen(true)}
+                          >
+                            + Add supplement
+                          </button>
+                        );
+                      }
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            alignItems: "center",
+                            marginBottom: "20px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <select
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) addReferrerPricingSupplement(e.target.value);
+                            }}
+                            style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}
+                          >
+                            <option value="" disabled>Choose a supplement…</option>
+                            {availableSupplements.map((o) => (
+                              <option key={o.key} value={o.key}>{o.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "12px" }}
+                            onClick={() => setReferrerPricingPickerOpen(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {referrerPricingMessage && (
+                      <p className="form-note" style={{ color: referrerPricingMessage.includes("saved") ? "#065f46" : "#dc2626" }}>
+                        {referrerPricingMessage}
+                      </p>
+                    )}
+
+                    <div className="form-footer action-row" style={{ marginTop: "14px" }}>
+                      <button type="button" className="muted-button"
+                        onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}>
+                        Reset to Defaults
+                      </button>
+                      <button type="button" className="primary-button" disabled={isSavingReferrerPricing || !referrerEditor.id}
+                        onClick={() => void handleSaveReferrerPricing()}>
+                        {isSavingReferrerPricing ? "Saving…" : "Save Pricing"}
+                      </button>
+                    </div>
                   </SummaryCard>
                 </div>
               </div>
