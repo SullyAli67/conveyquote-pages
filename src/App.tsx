@@ -1445,7 +1445,7 @@ function App() {
   const [showFirmHistory, setShowFirmHistory] = useState(false);
 
   // Pipeline state
-  type PipelineRow = { reference: string; client_name: string; transaction_type: string; assigned_firm_name: string; case_status: string; eta_date: string; firm_response: string; invoice_ref: string; referrer_id: number; created_at: string; property_address: string; target_completion_date: string; fall_through_reason: string; negotiator_name: string; referrer_name: string; };
+  type PipelineRow = { reference: string; client_name: string; transaction_type: string; assigned_firm_name: string; case_status: string; eta_date: string; firm_response: string; invoice_ref: string; referrer_id: number; created_at: string; property_address: string; target_completion_date: string; fall_through_reason: string; negotiator_name: string; referrer_name: string; successor_reference?: string | null; allocated_at?: string | null; allocation_requested_at?: string | null; parent_enquiry_id?: number | null; };
   const [pipeline, setPipeline] = useState<PipelineRow[]>([]);
   const [isLoadingPipeline, setIsLoadingPipeline] = useState(false);
   const [pipelineFilter, setPipelineFilter] = useState("all");
@@ -1731,6 +1731,10 @@ function App() {
   const [openCase, setOpenCase] = useState<string | null>(null);
   const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
   const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
+  // Re-quote (Pattern B) — keyed by the parent matter's reference. When
+  // set, the matching matter card renders an inline ReferrerSimpleForm
+  // pre-filled with the parent's inputs.
+  const [requoteOpen, setRequoteOpen] = useState<string | null>(null);
 
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
@@ -10109,6 +10113,9 @@ function App() {
                               {c.referrer_name && (
                                 <div style={{ fontSize: "11px", color: "#7c3aed" }}>Via: {c.referrer_name}{c.negotiator_name ? ` · ${c.negotiator_name}` : ""}</div>
                               )}
+                              {c.successor_reference && (
+                                <div style={{ fontSize: "11px", color: "#5b21b6", marginTop: "2px" }}>Superseded by: <span style={{ fontFamily: "monospace" }}>{c.successor_reference}</span></div>
+                              )}
                             </div>
                             <div className="detail-row__value">
                               <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--navy)", marginBottom: "4px" }}>
@@ -12394,6 +12401,17 @@ function App() {
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
                                       onClick={() => handleRequestUpdate(ref)}>Request update</button>
                                   )}
+                                  {!enq.allocated_at && !enq.successor_reference && (
+                                    <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
+                                      onClick={() => { setOpenCase(ref); setRequoteOpen(requoteOpen === ref ? null : ref); }}>
+                                      {requoteOpen === ref ? "Cancel re-quote" : "Re-quote"}
+                                    </button>
+                                  )}
+                                  {Boolean(enq.successor_reference) && (
+                                    <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: "#ede9fe", color: "#5b21b6", fontWeight: 600 }}>
+                                      Re-quoted &rarr; {String(enq.successor_reference)}
+                                    </span>
+                                  )}
                                   {isDraft && (
                                     <button type="button"
                                       style={{ minHeight: 30, padding: "0 10px", fontSize: "12px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fff1f2", color: "#991b1b", cursor: "pointer" }}
@@ -12484,7 +12502,7 @@ function App() {
                                 )}
                                 {/* Payments */}
                                 {Number(enq.referral_fee_payable) === 1 && (
-                                  <div style={{ padding: "14px 20px" }}>
+                                  <div style={{ padding: "14px 20px", borderBottom: requoteOpen === ref ? "1px solid #e5e7eb" : undefined }}>
                                     <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Payments</div>
                                     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-end" }}>
                                       <div>
@@ -12498,6 +12516,56 @@ function App() {
                                         </span>
                                       </div>
                                     </div>
+                                  </div>
+                                )}
+                                {/* Re-quote inline form (Pattern B) */}
+                                {requoteOpen === ref && (
+                                  <div style={{ padding: "20px", background: "#fff" }}>
+                                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Re-quote</div>
+                                    <p className="form-note" style={{ marginTop: 0, marginBottom: "12px", fontSize: "13px" }}>
+                                      Adjust the inputs below and send a fresh quote to {String(enq.client_name || enq.client_email || "the client")}. The original quote is kept for audit; the new one becomes the active referral.
+                                    </p>
+                                    <ReferrerSimpleForm
+                                      referrerToken={referrerToken ?? ""}
+                                      parentEnquiryId={Number(enq.id)}
+                                      submitLabel="Send new quote"
+                                      onCancel={() => setRequoteOpen(null)}
+                                      onSuccess={() => { setRequoteOpen(null); refreshPortal(); }}
+                                      initialValues={{
+                                        property_address: String(enq.property_address || ""),
+                                        type: String(enq.transaction_type || "purchase"),
+                                        tenure: String(enq.tenure || "freehold"),
+                                        price: enq.price != null ? String(enq.price) : "",
+                                        postcode: String(enq.postcode || ""),
+                                        negotiator_name: String(enq.negotiator_name || ""),
+                                        name: String(enq.client_name || ""),
+                                        email: String(enq.client_email || ""),
+                                        phone: String(enq.client_phone || ""),
+                                        mortgage: String(enq.mortgage || "mortgage"),
+                                        lender: String(enq.lender || ""),
+                                        ownershipType: String(enq.ownership_type || "individual"),
+                                        firstTimeBuyer: String(enq.first_time_buyer || "no"),
+                                        additionalProperty: String(enq.additional_property || "no"),
+                                        ukResidentForSdlt: String(enq.uk_resident_for_sdlt || "yes"),
+                                        newBuild: String(enq.new_build || "no"),
+                                        sharedOwnership: String(enq.shared_ownership || "no"),
+                                        helpToBuy: String(enq.help_to_buy || "no"),
+                                        isCompany: String(enq.is_company || "no"),
+                                        buyToLet: String(enq.buy_to_let || "no"),
+                                        giftedDeposit: String(enq.gifted_deposit || "no"),
+                                        lifetimeIsa: String(enq.lifetime_isa || "no"),
+                                        rightToBuy: String(enq.right_to_buy || "no"),
+                                        saleMortgage: String(enq.sale_mortgage || "no"),
+                                        managementCompany: String(enq.management_company || "no"),
+                                        tenanted: String(enq.tenanted || "no"),
+                                        numberOfSellers: String(enq.number_of_sellers || "1"),
+                                        additionalBorrowing: String(enq.additional_borrowing || "no"),
+                                        remortgageTransfer: String(enq.remortgage_transfer || "no"),
+                                        transferMortgage: String(enq.transfer_mortgage || "no"),
+                                        ownersChanging: String(enq.owners_changing || "one"),
+                                        referrerNote: String(enq.referrer_note || ""),
+                                      }}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -13658,48 +13726,94 @@ function StandaloneSdltCalculator() {
 
 // ── Referrer Simple Form (with quote preview) ─────────────────────────────────
 
-function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: string; onSuccess: () => void }) {
+type ReferrerFormState = {
+  property_address: string;
+  type: string;
+  tenure: string;
+  price: string;
+  postcode: string;
+  negotiator_name: string;
+  name: string;
+  email: string;
+  phone: string;
+  mortgage: string;
+  lender: string;
+  ownershipType: string;
+  firstTimeBuyer: string;
+  additionalProperty: string;
+  ukResidentForSdlt: string;
+  newBuild: string;
+  sharedOwnership: string;
+  helpToBuy: string;
+  isCompany: string;
+  buyToLet: string;
+  giftedDeposit: string;
+  lifetimeIsa: string;
+  rightToBuy: string;
+  saleMortgage: string;
+  managementCompany: string;
+  tenanted: string;
+  numberOfSellers: string;
+  additionalBorrowing: string;
+  remortgageTransfer: string;
+  transferMortgage: string;
+  ownersChanging: string;
+  referrerNote: string;
+};
+
+const REFERRER_FORM_DEFAULTS: ReferrerFormState = {
+  property_address: "",
+  type: "purchase",
+  tenure: "freehold",
+  price: "",
+  postcode: "",
+  negotiator_name: "",
+  name: "", email: "", phone: "",
+  mortgage: "mortgage",
+  lender: "",
+  ownershipType: "individual",
+  firstTimeBuyer: "no",
+  additionalProperty: "no",
+  ukResidentForSdlt: "yes",
+  newBuild: "no",
+  sharedOwnership: "no",
+  helpToBuy: "no",
+  isCompany: "no",
+  buyToLet: "no",
+  giftedDeposit: "no",
+  lifetimeIsa: "no",
+  rightToBuy: "no",
+  saleMortgage: "no",
+  managementCompany: "no",
+  tenanted: "no",
+  numberOfSellers: "1",
+  additionalBorrowing: "no",
+  remortgageTransfer: "no",
+  transferMortgage: "no",
+  ownersChanging: "one",
+  referrerNote: "",
+};
+
+function ReferrerSimpleForm({
+  referrerToken,
+  onSuccess,
+  initialValues,
+  parentEnquiryId,
+  submitLabel,
+  onCancel,
+}: {
+  referrerToken: string;
+  onSuccess: () => void;
+  initialValues?: Partial<ReferrerFormState>;
+  parentEnquiryId?: number;
+  submitLabel?: string;
+  onCancel?: () => void;
+}) {
   type Step = "form" | "preview" | "done";
   const [step, setStep] = useState<Step>("form");
-  const [form, setForm] = useState({
-    // Property / matter
-    property_address: "",
-    type: "purchase",
-    tenure: "freehold",
-    price: "",
-    postcode: "",
-    negotiator_name: "",
-    // Client
-    name: "", email: "", phone: "",
-    // Purchase fields
-    mortgage: "mortgage",
-    lender: "",
-    ownershipType: "individual",
-    firstTimeBuyer: "no",
-    additionalProperty: "no",
-    ukResidentForSdlt: "yes",
-    newBuild: "no",
-    sharedOwnership: "no",
-    helpToBuy: "no",
-    isCompany: "no",
-    buyToLet: "no",
-    giftedDeposit: "no",
-    lifetimeIsa: "no",
-    rightToBuy: "no",
-    // Sale fields
-    saleMortgage: "no",
-    managementCompany: "no",
-    tenanted: "no",
-    numberOfSellers: "1",
-    // Remortgage fields
-    additionalBorrowing: "no",
-    remortgageTransfer: "no",
-    // Transfer fields
-    transferMortgage: "no",
-    ownersChanging: "one",
-    // Optional referrer note (≤500 chars) — travels with the quote
-    // email to the client and shows on the matter card in My Referrals.
-    referrerNote: "",
+  const [form, setForm] = useState<ReferrerFormState>({
+    ...REFERRER_FORM_DEFAULTS,
+    ...(initialValues || {}),
   });
   const [preview, setPreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
   const [sendToClient, setSendToClient] = useState(true);
@@ -13732,7 +13846,12 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       const res = await fetch("/api/referrer-submit-enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
-        body: JSON.stringify({ ...form, send_to_client: sendToClient, referrerNote: form.referrerNote.trim() }),
+        body: JSON.stringify({
+          ...form,
+          send_to_client: sendToClient,
+          referrerNote: form.referrerNote.trim(),
+          parent_enquiry_id: parentEnquiryId ?? undefined,
+        }),
       });
       const result = await res.json() as { success: boolean; reference?: string; error?: string; client_emailed?: boolean };
       if (result.success && result.reference) {
@@ -13837,9 +13956,15 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
         {error && <p style={{ color: "#dc2626", fontSize: "14px", marginBottom: "12px" }}>{error}</p>}
 
         <div style={{ display: "flex", gap: "12px" }}>
+          {onCancel && (
+            <button type="button" className="muted-button" disabled={submitting} onClick={onCancel}
+              style={{ minHeight: 48, padding: "0 24px", fontSize: "15px" }}>
+              Cancel
+            </button>
+          )}
           <button type="button" className="primary-button" disabled={submitting} onClick={() => void handleSubmit()}
             style={{ flex: 1, minHeight: 48, fontSize: "15px" }}>
-            {submitting ? "Submitting…" : sendToClient ? "Confirm & Send Quote to Client" : "Confirm & Save Referral"}
+            {submitting ? "Submitting…" : submitLabel ? submitLabel : sendToClient ? "Confirm & Send Quote to Client" : "Confirm & Save Referral"}
           </button>
         </div>
       </div>

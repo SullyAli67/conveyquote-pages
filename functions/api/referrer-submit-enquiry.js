@@ -9,6 +9,16 @@
 // the firm signature in the client quote email, and shown read-only on
 // the referrer's My Referrals expanded matter card.
 //
+// Re-quote (Pattern B)
+// --------------------
+// When parent_enquiry_id is present in the request body, this endpoint
+// also acts as a "re-quote": it inserts a fresh enquiries row carrying
+// parent_enquiry_id pointing to the immediate predecessor (chain, not
+// star — each re-quote points to the row it was issued from). The
+// active row in a chain is the leaf — the row no other row references
+// as a parent. We validate the parent belongs to this referrer and is
+// not already allocated; either failure rejects the request.
+//
 // Pricing path (Pattern B)
 // ------------------------
 // If the referrer has any rows in referrer_fee_configs for the
@@ -172,6 +182,7 @@ export async function onRequestPost(context) {
       additionalBorrowing, remortgageTransfer, transferMortgage, ownersChanging,
       send_to_client,
       referrerNote,
+      parent_enquiry_id,
     } = body;
 
     if (!email || !type) {
@@ -187,6 +198,38 @@ export async function onRequestPost(context) {
         },
         400
       );
+    }
+
+    // Re-quote validation: the parent must exist, belong to this
+    // referrer, and not already be allocated to a panel firm.
+    let validatedParentId = null;
+    if (parent_enquiry_id != null && parent_enquiry_id !== "") {
+      const parsedParentId = Number(parent_enquiry_id);
+      if (!Number.isFinite(parsedParentId) || parsedParentId <= 0) {
+        return jsonResponse(
+          { success: false, error: "Invalid parent_enquiry_id." },
+          400
+        );
+      }
+      const parentRow = await env.DB.prepare(
+        `SELECT id, referrer_id, allocated_at FROM enquiries WHERE id = ? LIMIT 1`
+      ).bind(parsedParentId).first();
+      if (!parentRow || Number(parentRow.referrer_id) !== Number(referrerId)) {
+        return jsonResponse(
+          { success: false, error: "Original referral not found." },
+          404
+        );
+      }
+      if (parentRow.allocated_at) {
+        return jsonResponse(
+          {
+            success: false,
+            error: "This referral has already been allocated to a panel firm and can no longer be re-quoted.",
+          },
+          409
+        );
+      }
+      validatedParentId = parsedParentId;
     }
 
     // Load referrer details — include fee_markup for referrer pricing
@@ -301,6 +344,7 @@ export async function onRequestPost(context) {
       referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
       referral_fee_amount: Number(referrer.referral_fee) || 0,
       referrer_note: trimmedNote || null,
+      parent_enquiry_id: validatedParentId,
     });
 
     const transactionLabel = getTransactionLabel(type);

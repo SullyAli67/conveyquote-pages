@@ -44,6 +44,27 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Reference, firm id and firm name are required." }, 400);
     }
 
+    // Pattern B: a referrer can re-quote on an unallocated matter,
+    // creating a successor row pointing to this one via
+    // parent_enquiry_id. The original is then "superseded" and must not
+    // be allocated — admin should allocate the latest active row.
+    const supersededRow = await env.DB.prepare(
+      `SELECT successor.reference AS successor_reference
+         FROM enquiries e
+         JOIN enquiries successor ON successor.parent_enquiry_id = e.id
+        WHERE e.reference = ?
+        LIMIT 1`
+    ).bind(reference).first();
+    if (supersededRow && supersededRow.successor_reference) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `This referral was re-quoted and is superseded by ${supersededRow.successor_reference}. Allocate the newer row instead.`,
+        },
+        409
+      );
+    }
+
     await env.DB.prepare(
       `UPDATE enquiries
        SET assigned_firm_id=?, assigned_firm_name=?, referral_fee_payable=?,
