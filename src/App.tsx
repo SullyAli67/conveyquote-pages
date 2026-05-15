@@ -3140,6 +3140,16 @@ function App() {
         { label: "Office copy entries", amount: 12, includes_vat: false, is_disbursement: true },
         { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
       ],
+      sale_purchase: [
+        { label: "Legal fee", amount: 1500, includes_vat: true, is_disbursement: false },
+        { label: "Search pack", amount: 350, includes_vat: false, is_disbursement: true },
+        { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
+      ],
+      remortgage_transfer: [
+        { label: "Legal fee", amount: 895, includes_vat: true, is_disbursement: false },
+        { label: "Office copy entries", amount: 20, includes_vat: false, is_disbursement: true },
+        { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
+      ],
     };
     return defaults[type] || [{ label: "Legal fee", amount: 0, includes_vat: true, is_disbursement: false }];
   };
@@ -7911,8 +7921,41 @@ function App() {
                         <option value="sale">Sale</option>
                         <option value="remortgage">Remortgage</option>
                         <option value="transfer">Transfer of Equity</option>
+                        <option value="sale_purchase">Sale and purchase</option>
+                        <option value="remortgage_transfer">Remortgage and transfer of equity</option>
                       </select>
                     </div>
+
+                    {(feeConfigType === "sale_purchase" || feeConfigType === "remortgage_transfer") &&
+                      feeConfigItems.length === 0 && (
+                        <div
+                          style={{
+                            background: "#fef3c7",
+                            border: "1px solid #fde68a",
+                            color: "#92400e",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            marginBottom: "16px",
+                            display: "flex",
+                            gap: "12px",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: "200px" }}>
+                            You haven&rsquo;t set up fees for combined matters yet. Use &ldquo;+ Add legal fee&rdquo; to add your base fee, and &ldquo;+ Add supplement&rdquo; for any supplements you charge.
+                          </div>
+                          <button
+                            type="button"
+                            className="muted-button"
+                            style={{ fontSize: "13px" }}
+                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}
+                          >
+                            Reset to Defaults
+                          </button>
+                        </div>
+                      )}
 
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
