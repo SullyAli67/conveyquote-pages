@@ -1633,6 +1633,12 @@ function App() {
     setReferrerPortalTabRaw(tab);
   };
 
+  // My Referrals tab UI state — hoisted out of an inline IIFE to keep
+  // hook order stable across tab switches (Rules of Hooks).
+  const [openCase, setOpenCase] = useState<string | null>(null);
+  const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
+  const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
+
   const [loadedEnquiryMessage, setLoadedEnquiryMessage] = useState("");
   const [loadedEnquiry, setLoadedEnquiry] = useState<LoadedEnquiry | null>(
     null
@@ -11799,9 +11805,6 @@ function App() {
             {/* ── MY REFERRALS ── */}
             {referrerPortalTab === "my_referrals" && (() => {
               const visibleEnquiries = enquiries.filter((e) => String(e.status || "") !== "archived");
-              const [openCase, setOpenCase] = React.useState<string | null>(null);
-              const [archiveMsg, setArchiveMsg] = React.useState<Record<string, string>>({});
-              const [requestMsg, setRequestMsg] = React.useState<Record<string, string>>({});
 
               const handleArchive = (ref: string) => {
                 if (!window.confirm("Archive this case? It will be hidden from your portal. Contact us if you need to restore it.")) return;
