@@ -3183,13 +3183,23 @@ function App() {
                 is_disbursement: Number(f.is_disbursement) === 1,
                 supplement_key: f.supplement_key ? String(f.supplement_key) : null,
               }))
-            : getDefaultFeeItems(type)
+            : getDefaultFeeItems(type, "firm")
         );
       }
     } catch {}
   };
 
-  const getDefaultFeeItems = (type: string): { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[] => {
+  // Default fee structures used when seeding a new Fee Settings config.
+  // The `audience` argument exists so the same source-of-truth feeds the
+  // firm Fee Settings tab and the admin-managed referrer Pricing section
+  // (Pattern B): both rails currently share the same seed values, with
+  // admin tweaking from there. If referrer defaults ever diverge, branch
+  // on `audience` here rather than duplicating defaults at the call site.
+  const getDefaultFeeItems = (
+    type: string,
+    audience: "firm" | "referrer"
+  ): { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[] => {
+    void audience;
     const defaults: Record<string, { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean }[]> = {
       purchase: [
         { label: "Legal fee", amount: 1025, includes_vat: true, is_disbursement: false },
@@ -8161,7 +8171,7 @@ function App() {
                             type="button"
                             className="muted-button"
                             style={{ fontSize: "13px" }}
-                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}
+                            onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType, "firm"))}
                           >
                             Reset to Defaults
                           </button>
@@ -8330,7 +8340,7 @@ function App() {
 
                     <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                       <button type="button" className="muted-button"
-                        onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType))}>
+                        onClick={() => setFeeConfigItems(getDefaultFeeItems(feeConfigType, "firm"))}>
                         Reset to Defaults
                       </button>
                       <button type="button" className="primary-button" disabled={isSavingFees}
