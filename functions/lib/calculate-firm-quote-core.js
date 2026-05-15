@@ -122,6 +122,16 @@ function round2(n) {
   return Number((Number(n) || 0).toFixed(2));
 }
 
+// Coerce request input to a number, preserving null for blank/missing
+// so the LR helper can distinguish blank from £0.
+function optionalNumber(value) {
+  if (value === null || value === undefined) return null;
+  const str = String(value).replace(/,/g, "").trim();
+  if (str === "") return null;
+  const parsed = Number(str);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function perPersonLabel(base, n) {
   return n > 1 ? `${base} (${n} buyers)` : base;
 }
@@ -179,6 +189,11 @@ export async function calculateFirmQuote({ db, firmId, body }) {
     body.mortgageOrCash === "mortgage" ? "mortgage" : "cash";
   const supplements = body.supplements || {};
   const sdltFlags = body.sdltFlags || {};
+  // Optional transfer-of-equity refinements. Null when blank/missing so
+  // the LR helper falls back to the conservative full-property estimate
+  // rather than treating blank as zero.
+  const sharePercent = optionalNumber(body.sharePercent);
+  const continuingMortgage = optionalNumber(body.continuingMortgage);
 
   const reqCtx = { tenure, mortgageOrCash, supplements };
 
@@ -276,6 +291,8 @@ export async function calculateFirmQuote({ db, firmId, body }) {
     purchasePrice: price,
     mortgageAmount,
     propertyValue: price,
+    sharePercent,
+    continuingMortgage,
   });
   if (landRegistryFee > 0) {
     disbursements.push({
