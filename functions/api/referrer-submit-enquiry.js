@@ -1,14 +1,96 @@
 // functions/api/referrer-submit-enquiry.js
 // Referrer (e.g. estate agent) submits an enquiry on behalf of a client
-// Uses same logic as send-quote.js but ties to referrer_id
+// Uses same logic as send-quote.js but ties to referrer_id.
+//
+// Pricing path (Pattern B)
+// ------------------------
+// If the referrer has any rows in referrer_fee_configs for the
+// requested transaction type, the per-referrer engine
+// (calculateReferrerQuote) prices the quote. Otherwise we fall back to
+// the legacy global price book + fee_markup so referrers that haven't
+// been configured yet keep working unchanged. The fee_markup column on
+// referrers is ignored when the per-referrer engine is in play — admin
+// expresses pricing directly via the line items.
 
 import { buildQuoteData } from "../lib/calculate-quote.js";
+import { calculateReferrerQuote } from "../lib/calculate-referrer-quote-core.js";
 import {
   getTokenFromRequest,
   validateSession,
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+
+// Map the referrer-submit form payload to the shape the per-referrer
+// engine expects (mirrors firm Issue Quote's body shape — camelCase
+// transactionType, supplements bag, sdltFlags bag, etc.). Returns null
+// if the form's transaction type isn't supported.
+const buildReferrerEngineBody = (form) => {
+  const type = String(form.type || "").trim();
+  if (!type) return null;
+  const tenure = form.tenure === "leasehold" ? "leasehold" : "freehold";
+  const mortgageOrCash = form.mortgage === "mortgage" ? "mortgage" : "cash";
+  const buyerCount = form.ownershipType === "joint" ? 2 : 1;
+  const supplements = {
+    newBuild: form.newBuild === "yes",
+    sharedOwnership: form.sharedOwnership === "yes",
+    helpToBuy: form.helpToBuy === "yes",
+    buyToLet: form.buyToLet === "yes",
+    companyBuyer: form.isCompany === "yes",
+    giftedDeposit: form.giftedDeposit === "yes",
+    lifetimeIsa: form.lifetimeIsa === "yes",
+    rightToBuy: form.rightToBuy === "yes",
+    additionalProperty: form.additionalProperty === "yes",
+  };
+  const sdltFlags = {
+    firstTimeBuyer: form.firstTimeBuyer === "yes",
+    additionalProperty: form.additionalProperty === "yes",
+    ukResident: form.ukResidentForSdlt !== "no",
+  };
+  return {
+    transactionType: type,
+    price: form.price,
+    tenure,
+    mortgageOrCash,
+    buyerCount,
+    supplements,
+    sdltFlags,
+  };
+};
+
+// Translate the per-referrer engine output into the buildQuoteData
+// shape so the email rendering and quote_json columns stay identical
+// between the two pricing paths.
+const adaptReferrerQuoteToBuildShape = (engineQuote) => {
+  const legalFees = (engineQuote.legalFees || []).map((row) => ({
+    label: row.label,
+    amount: row.amount,
+  }));
+  const disbursements = engineQuote.disbursements || [];
+  const sdltAmount =
+    typeof engineQuote.sdlt === "number" ? engineQuote.sdlt : undefined;
+  const grandTotalNoSdlt = Number(
+    (
+      Number(engineQuote.legalFeesGross || 0) +
+      Number(engineQuote.disbursementsTotal || 0)
+    ).toFixed(2)
+  );
+  return {
+    legalFees,
+    legalFeesExVat: Number(engineQuote.legalFeesNet || 0),
+    vat: Number(engineQuote.vat || 0),
+    legalTotalInclVat: Number(engineQuote.legalFeesGross || 0),
+    disbursements,
+    disbursementTotal: Number(engineQuote.disbursementsTotal || 0),
+    sdltAmount,
+    grandTotal: grandTotalNoSdlt,
+    totalIncludingSdlt:
+      typeof sdltAmount === "number"
+        ? Number((grandTotalNoSdlt + sdltAmount).toFixed(2))
+        : undefined,
+    warnings: engineQuote.warnings || [],
+  };
+};
 
 function generateReference() {
   const now = new Date();
@@ -95,45 +177,69 @@ export async function onRequestPost(context) {
 
     const reference = generateReference();
 
-    // Build base quote using shared pricing logic
-    const baseQuote = buildQuoteData({
-      type, price: String(price || ""), tenure: tenure || "",
-      mortgage: mortgage || "", lender: lender || "",
-      ownershipType: ownershipType || "", firstTimeBuyer: firstTimeBuyer || "",
-      additionalProperty: additionalProperty || "", ukResidentForSdlt: ukResidentForSdlt || "",
-      giftedDeposit: giftedDeposit || "", newBuild: newBuild || "",
-      sharedOwnership: sharedOwnership || "", helpToBuy: helpToBuy || "",
-      isCompany: isCompany || "", buyToLet: buyToLet || "", lifetimeIsa: lifetimeIsa || "",
-      saleMortgage: saleMortgage || "", managementCompany: managementCompany || "",
-      tenanted: tenanted || "", numberOfSellers: numberOfSellers || "",
-      additionalBorrowing: additionalBorrowing || "", remortgageTransfer: remortgageTransfer || "",
-      transferMortgage: transferMortgage || "", ownersChanging: ownersChanging || "",
+    // Pricing path: prefer the per-referrer engine when admin has set
+    // up referrer_fee_configs for this transaction type; otherwise fall
+    // back to the legacy global engine + fee_markup so referrers that
+    // haven't been migrated to Pattern B keep working unchanged.
+    let quote;
+    let usedReferrerEngine = false;
+    const engineBody = buildReferrerEngineBody({
+      type, price, tenure, mortgage, ownershipType, firstTimeBuyer,
+      additionalProperty, ukResidentForSdlt, newBuild, sharedOwnership,
+      helpToBuy, buyToLet, isCompany, giftedDeposit, lifetimeIsa, rightToBuy,
     });
+    const referrerEngineResult = engineBody
+      ? await calculateReferrerQuote({
+          db: env.DB,
+          referrerId,
+          body: engineBody,
+        })
+      : null;
 
-    // Apply referrer fee_markup if set — adds a line item to legal fees.
-    // This adjusts the client-facing total; referral_fee remains a separate internal value.
-    const markup = Number(referrer.fee_markup) || 0;
-    let quote = baseQuote;
-    if (markup > 0) {
-      const markupFees = [...(baseQuote.legalFees || []), { label: "Referrer service arrangement fee", amount: markup }];
-      const legalFeesExVat = Number(markupFees.reduce((s, f) => s + Number(f.amount || 0), 0).toFixed(2));
-      const vat = Number((legalFeesExVat * 0.2).toFixed(2));
-      const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
-      const disbursementTotal = baseQuote.disbursementTotal;
-      const grandTotal = Number((legalTotalInclVat + disbursementTotal).toFixed(2));
-      const totalIncludingSdlt = typeof baseQuote.sdltAmount === "number"
-        ? Number((grandTotal + baseQuote.sdltAmount).toFixed(2))
-        : undefined;
-      quote = {
-        ...baseQuote,
-        legalFees: markupFees,
-        legalFeesExVat,
-        vat,
-        legalTotalInclVat,
-        grandTotal,
-        totalIncludingSdlt,
-      };
+    if (referrerEngineResult && referrerEngineResult.ok) {
+      quote = adaptReferrerQuoteToBuildShape(referrerEngineResult.payload);
+      usedReferrerEngine = true;
+    } else {
+      // Legacy fallback: build via the global price book, then apply
+      // the referrer's fee_markup as a single arrangement-fee line item.
+      const baseQuote = buildQuoteData({
+        type, price: String(price || ""), tenure: tenure || "",
+        mortgage: mortgage || "", lender: lender || "",
+        ownershipType: ownershipType || "", firstTimeBuyer: firstTimeBuyer || "",
+        additionalProperty: additionalProperty || "", ukResidentForSdlt: ukResidentForSdlt || "",
+        giftedDeposit: giftedDeposit || "", newBuild: newBuild || "",
+        sharedOwnership: sharedOwnership || "", helpToBuy: helpToBuy || "",
+        isCompany: isCompany || "", buyToLet: buyToLet || "", lifetimeIsa: lifetimeIsa || "",
+        saleMortgage: saleMortgage || "", managementCompany: managementCompany || "",
+        tenanted: tenanted || "", numberOfSellers: numberOfSellers || "",
+        additionalBorrowing: additionalBorrowing || "", remortgageTransfer: remortgageTransfer || "",
+        transferMortgage: transferMortgage || "", ownersChanging: ownersChanging || "",
+      });
+
+      const markup = Number(referrer.fee_markup) || 0;
+      quote = baseQuote;
+      if (markup > 0) {
+        const markupFees = [...(baseQuote.legalFees || []), { label: "Referrer service arrangement fee", amount: markup }];
+        const legalFeesExVat = Number(markupFees.reduce((s, f) => s + Number(f.amount || 0), 0).toFixed(2));
+        const vat = Number((legalFeesExVat * 0.2).toFixed(2));
+        const legalTotalInclVat = Number((legalFeesExVat + vat).toFixed(2));
+        const disbursementTotal = baseQuote.disbursementTotal;
+        const grandTotal = Number((legalTotalInclVat + disbursementTotal).toFixed(2));
+        const totalIncludingSdlt = typeof baseQuote.sdltAmount === "number"
+          ? Number((grandTotal + baseQuote.sdltAmount).toFixed(2))
+          : undefined;
+        quote = {
+          ...baseQuote,
+          legalFees: markupFees,
+          legalFeesExVat,
+          vat,
+          legalTotalInclVat,
+          grandTotal,
+          totalIncludingSdlt,
+        };
+      }
     }
+    void usedReferrerEngine;
 
     await insertEnquiryRow(env.DB, {
       reference,
