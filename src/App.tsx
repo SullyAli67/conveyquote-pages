@@ -395,6 +395,8 @@ type QuoteForm = {
 
   transferMortgage: string;
   ownersChanging: string;
+  sharePercent: string;
+  continuingMortgage: string;
 
   saleTenure: string;
   salePrice: string;
@@ -431,6 +433,8 @@ type QuoteForm = {
   remortgageTransferOwnersChanging: string;
   remortgageTransferOwnershipType: string;
   remortgageTransferMortgageAmount: string;
+  remortgageTransferSharePercent: string;
+  remortgageTransferContinuingMortgage: string;
 };
 
 type ApprovedQuoteData = {
@@ -648,6 +652,8 @@ const initialFormState: QuoteForm = {
 
   transferMortgage: "",
   ownersChanging: "",
+  sharePercent: "",
+  continuingMortgage: "",
 
   saleTenure: "",
   salePrice: "",
@@ -684,6 +690,8 @@ const initialFormState: QuoteForm = {
   remortgageTransferOwnersChanging: "",
   remortgageTransferOwnershipType: "",
   remortgageTransferMortgageAmount: "",
+  remortgageTransferSharePercent: "",
+  remortgageTransferContinuingMortgage: "",
 };
 
 const defaultApprovedNextSteps =
@@ -6544,6 +6552,47 @@ function App() {
                         </select>
                       </div>
                     </div>
+
+                    <p className="form-note" style={{ marginTop: "12px", fontSize: "16px" }}>
+                      Optional: provide these details for a more accurate Land Registry fee. Without them, we use a conservative estimate that may be slightly higher than the statutory amount.
+                    </p>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="sharePercent">Share being transferred (%)</label>
+                        <input
+                          id="sharePercent"
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          max="99"
+                          name="sharePercent"
+                          placeholder="50"
+                          value={form.sharePercent}
+                          onChange={handleChange}
+                        />
+                        <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                          Optional. The percentage of the property being transferred to a new or different owner. Leave blank if unsure.
+                        </p>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="continuingMortgage">Continuing mortgage on the property (£)</label>
+                        <input
+                          id="continuingMortgage"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          name="continuingMortgage"
+                          placeholder="150000"
+                          value={form.continuingMortgage}
+                          onChange={handleChange}
+                        />
+                        <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                          Optional. Any existing mortgage that will remain on the property after the transfer. Leave blank if unsure or none.
+                        </p>
+                      </div>
+                    </div>
                   </>
                 )}
 
@@ -6735,6 +6784,47 @@ function App() {
                           <option value="two">Two owners</option>
                           <option value="more">More than two</option>
                         </select>
+                      </div>
+                    </div>
+
+                    <p className="form-note" style={{ marginTop: "12px", fontSize: "16px" }}>
+                      Optional: provide these details for a more accurate Land Registry fee. Without them, we use a conservative estimate that may be slightly higher than the statutory amount.
+                    </p>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="remortgageTransferSharePercent">Share being transferred (%)</label>
+                        <input
+                          id="remortgageTransferSharePercent"
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          max="99"
+                          name="remortgageTransferSharePercent"
+                          placeholder="50"
+                          value={form.remortgageTransferSharePercent}
+                          onChange={handleChange}
+                        />
+                        <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                          Optional. The percentage of the property being transferred to a new or different owner. Leave blank if unsure.
+                        </p>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="remortgageTransferContinuingMortgage">Continuing mortgage on the property (£)</label>
+                        <input
+                          id="remortgageTransferContinuingMortgage"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          name="remortgageTransferContinuingMortgage"
+                          placeholder="150000"
+                          value={form.remortgageTransferContinuingMortgage}
+                          onChange={handleChange}
+                        />
+                        <p className="form-note" style={{ marginTop: "4px", fontSize: "16px" }}>
+                          Optional. Any existing mortgage that will remain on the property after the transfer. Leave blank if unsure or none.
+                        </p>
                       </div>
                     </div>
                   </>
