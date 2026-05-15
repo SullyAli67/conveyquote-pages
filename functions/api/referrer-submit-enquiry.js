@@ -2,6 +2,13 @@
 // Referrer (e.g. estate agent) submits an enquiry on behalf of a client
 // Uses same logic as send-quote.js but ties to referrer_id.
 //
+// Optional referrer note
+// ----------------------
+// Referrers can attach a free-text note (≤ 500 chars) when submitting.
+// Persisted to enquiries.referrer_note, included as a muted block above
+// the firm signature in the client quote email, and shown read-only on
+// the referrer's My Referrals expanded matter card.
+//
 // Pricing path (Pattern B)
 // ------------------------
 // If the referrer has any rows in referrer_fee_configs for the
@@ -20,6 +27,8 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+
+const NOTE_MAX_LENGTH = 500;
 
 // Map the referrer-submit form payload to the shape the per-referrer
 // engine expects (mirrors firm Issue Quote's body shape — camelCase
@@ -162,10 +171,22 @@ export async function onRequestPost(context) {
       saleMortgage, managementCompany, tenanted, numberOfSellers,
       additionalBorrowing, remortgageTransfer, transferMortgage, ownersChanging,
       send_to_client,
+      referrerNote,
     } = body;
 
     if (!email || !type) {
       return jsonResponse({ success: false, error: "Client email and transaction type are required." }, 400);
+    }
+
+    const trimmedNote = String(referrerNote || "").trim();
+    if (trimmedNote.length > NOTE_MAX_LENGTH) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Note must be ${NOTE_MAX_LENGTH} characters or fewer (received ${trimmedNote.length}).`,
+        },
+        400
+      );
     }
 
     // Load referrer details — include fee_markup for referrer pricing
@@ -279,6 +300,7 @@ export async function onRequestPost(context) {
       referrer_id: referrerId,
       referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
       referral_fee_amount: Number(referrer.referral_fee) || 0,
+      referrer_note: trimmedNote || null,
     });
 
     const transactionLabel = getTransactionLabel(type);
@@ -525,6 +547,20 @@ export async function onRequestPost(context) {
                     </table>
                   </td>
                 </tr>
+
+                <!-- Optional note from the referrer -->
+                ${trimmedNote ? `<tr>
+                  <td style="padding:16px 32px 0 32px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                      style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;">
+                      <tr>
+                        <td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#334155;">
+                          <strong>Note from ${escapeHtml(referrer.referrer_name)}:</strong> ${escapeHtml(trimmedNote)}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>` : ""}
 
                 <!-- Important note -->
                 <tr>

@@ -12446,7 +12446,7 @@ function App() {
                                   </div>
                                 </div>
                                 {/* Status */}
-                                <div style={{ padding: "14px 20px", borderBottom: Number(enq.referral_fee_payable) === 1 ? "1px solid #e5e7eb" : undefined }}>
+                                <div style={{ padding: "14px 20px", borderBottom: (Number(enq.referral_fee_payable) === 1 || enq.referrer_note) ? "1px solid #e5e7eb" : undefined }}>
                                   <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Status</div>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px 20px" }}>
                                     <div>
@@ -12473,6 +12473,15 @@ function App() {
                                     </div>
                                   </div>
                                 </div>
+                                {/* Your note */}
+                                {Boolean(enq.referrer_note) && (
+                                  <div style={{ padding: "14px 20px", borderBottom: Number(enq.referral_fee_payable) === 1 ? "1px solid #e5e7eb" : undefined }}>
+                                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Your note</div>
+                                    <div style={{ fontSize: "13px", color: "#334155", whiteSpace: "pre-wrap", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px 12px" }}>
+                                      {String(enq.referrer_note)}
+                                    </div>
+                                  </div>
+                                )}
                                 {/* Payments */}
                                 {Number(enq.referral_fee_payable) === 1 && (
                                   <div style={{ padding: "14px 20px" }}>
@@ -13688,6 +13697,9 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
     // Transfer fields
     transferMortgage: "no",
     ownersChanging: "one",
+    // Optional referrer note (≤500 chars) — travels with the quote
+    // email to the client and shows on the matter card in My Referrals.
+    referrerNote: "",
   });
   const [preview, setPreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
   const [sendToClient, setSendToClient] = useState(true);
@@ -13720,7 +13732,7 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
       const res = await fetch("/api/referrer-submit-enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
-        body: JSON.stringify({ ...form, send_to_client: sendToClient }),
+        body: JSON.stringify({ ...form, send_to_client: sendToClient, referrerNote: form.referrerNote.trim() }),
       });
       const result = await res.json() as { success: boolean; reference?: string; error?: string; client_emailed?: boolean };
       if (result.success && result.reference) {
@@ -14113,6 +14125,27 @@ function ReferrerSimpleForm({ referrerToken, onSuccess }: { referrerToken: strin
             <label style={labelStyle}>Your name / negotiator</label>
             <input style={inputStyle} type="text" value={form.negotiator_name}
               onChange={(e) => set("negotiator_name", e.target.value)} placeholder="Who referred this client?" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section: Optional note ── */}
+      <div style={sectionStyle}>
+        <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Note (optional)</h4>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            Add a short note for your client — included in the quote email and visible on this matter in My Referrals.
+          </label>
+          <textarea
+            value={form.referrerNote}
+            onChange={(e) => set("referrerNote", e.target.value.slice(0, 500))}
+            maxLength={500}
+            rows={3}
+            placeholder="e.g. We've already discussed your preference to complete before the school holidays."
+            style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+          />
+          <div style={{ fontSize: "12px", color: "var(--muted)", textAlign: "right" }}>
+            {form.referrerNote.length}/500
           </div>
         </div>
       </div>

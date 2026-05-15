@@ -32,6 +32,7 @@ export async function onRequestGet(context) {
          target_completion_date, fall_through_reason,
          assigned_firm_name, firm_response,
          referred_at, created_at, referral_fee_payable, referral_fee_amount,
+         referrer_note,
          quote_json, approved_quote_json, approved_quote_amount
        FROM enquiries
        WHERE referrer_id = ?
