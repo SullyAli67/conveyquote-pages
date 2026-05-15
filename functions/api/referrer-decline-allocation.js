@@ -51,11 +51,12 @@ export async function onRequestPost(context) {
     }
 
     const enquiry = await env.DB.prepare(
-      `SELECT id, reference, referrer_id, client_name, client_email,
-              property_address, transaction_type, allocation_requested_at,
-              allocated_at
-         FROM enquiries
-        WHERE reference = ?
+      `SELECT e.id, e.reference, e.referrer_id, e.client_name, e.client_email,
+              e.property_address, e.transaction_type,
+              w.allocation_requested_at, w.allocated_at
+         FROM enquiries e
+         LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+        WHERE e.reference = ?
         LIMIT 1`
     ).bind(reference).first();
 
@@ -78,7 +79,10 @@ export async function onRequestPost(context) {
     }
 
     await env.DB.prepare(
-      `UPDATE enquiries SET allocation_requested_at = NULL, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE referrer_workflow SET allocation_requested_at = NULL WHERE enquiry_id = ?`
+    ).bind(enquiry.id).run();
+    await env.DB.prepare(
+      `UPDATE enquiries SET updated_at = datetime('now') WHERE id = ?`
     ).bind(enquiry.id).run();
 
     try {

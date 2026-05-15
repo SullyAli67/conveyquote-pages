@@ -45,11 +45,12 @@ export async function onRequestPost(context) {
     }
 
     const enquiry = await env.DB.prepare(
-      `SELECT id, reference, referrer_id, client_name, client_email,
-              property_address, transaction_type, allocation_requested_at,
-              allocated_at, referrer_note
-         FROM enquiries
-        WHERE id = ?
+      `SELECT e.id, e.reference, e.referrer_id, e.client_name, e.client_email,
+              e.property_address, e.transaction_type,
+              w.allocation_requested_at, w.allocated_at, w.referrer_note
+         FROM enquiries e
+         LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+        WHERE e.id = ?
         LIMIT 1`
     ).bind(enquiryId).first();
 
@@ -74,7 +75,11 @@ export async function onRequestPost(context) {
     // Check the row hasn't been re-quoted (i.e. superseded) — admin
     // should be working from the latest active row.
     const successor = await env.DB.prepare(
-      `SELECT reference FROM enquiries WHERE parent_enquiry_id = ? LIMIT 1`
+      `SELECT e.reference
+         FROM referrer_workflow w
+         JOIN enquiries e ON e.id = w.enquiry_id
+        WHERE w.parent_enquiry_id = ?
+        LIMIT 1`
     ).bind(enquiryId).first();
     if (successor && successor.reference) {
       return jsonResponse(
@@ -88,8 +93,13 @@ export async function onRequestPost(context) {
 
     const requestedAt = new Date().toISOString();
     await env.DB.prepare(
-      `UPDATE enquiries SET allocation_requested_at = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(requestedAt, enquiryId).run();
+      `INSERT INTO referrer_workflow (enquiry_id, allocation_requested_at)
+       VALUES (?, ?)
+       ON CONFLICT (enquiry_id) DO UPDATE SET allocation_requested_at = ?`
+    ).bind(enquiryId, requestedAt, requestedAt).run();
+    await env.DB.prepare(
+      `UPDATE enquiries SET updated_at = datetime('now') WHERE id = ?`
+    ).bind(enquiryId).run();
 
     const referrer = await env.DB.prepare(
       `SELECT referrer_name FROM referrers WHERE id = ? LIMIT 1`
