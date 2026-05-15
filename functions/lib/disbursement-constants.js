@@ -71,23 +71,29 @@ export function getLandRegistryScale2Fee(amount) {
 //   sale                → no fee returned (HMLR fee is paid by the buyer's
 //                         solicitor on the matching purchase, not the seller)
 //
-// Notes:
-// • transfer of equity uses propertyValue as a conservative
-//   over-estimate. The statutory basis is share-value minus any
-//   continuing charge, but the quote form doesn't currently capture
-//   share percentage or continuing mortgage amount. Using full
-//   property value over-states the fee by ~50% in typical cases; the
-//   firm reconciles at completion. Future batch: capture share % and
-//   continuing-charge amount, swap to a share-aware calculation.
-// • remortgage_transfer combines a Scale 2 charge (new mortgage) and
-//   a Scale 2 transfer (share). HMLR charges ONE fee on combined
-//   applications, the higher of the two scenarios. We compute both
-//   and take the max so the customer is never under-quoted.
+// Share-aware path for transfer of equity
+// ---------------------------------------
+// The statutory Scale 2 basis for a transfer of equity is
+// (propertyValue × sharePercent / 100) − continuingMortgage. When both
+// optional inputs are provided AND the resulting chargeable amount is
+// > 0 we use that figure. When either input is missing or the formula
+// produces ≤ 0 (over-mortgaged / 0% share / blank inputs) we fall back
+// to the conservative over-estimate on full property value — we never
+// under-quote the customer.
+//
+// remortgage_transfer continues to take the max of:
+//   • Scale 2 on the new mortgage advance, and
+//   • Scale 2 on the transfer side (share-aware when available, else
+//     conservative full propertyValue).
+// HMLR charges ONE fee on combined applications, the higher of the
+// two scenarios.
 export function getLandRegistryFee({
   transactionType,
   purchasePrice = 0,
   mortgageAmount = 0,
   propertyValue = 0,
+  sharePercent = null,
+  continuingMortgage = null,
 }) {
   switch (transactionType) {
     case "sale":
@@ -98,15 +104,35 @@ export function getLandRegistryFee({
     case "remortgage":
       return getLandRegistryScale2Fee(mortgageAmount);
     case "transfer":
-      return getLandRegistryScale2Fee(propertyValue);
+      return getLandRegistryScale2Fee(
+        getTransferChargeableAmount(propertyValue, sharePercent, continuingMortgage)
+      );
     case "remortgage_transfer":
       return Math.max(
         getLandRegistryScale2Fee(mortgageAmount),
-        getLandRegistryScale2Fee(propertyValue)
+        getLandRegistryScale2Fee(
+          getTransferChargeableAmount(propertyValue, sharePercent, continuingMortgage)
+        )
       );
     default:
       throw new Error(
         `getLandRegistryFee: unsupported transactionType '${transactionType}'`
       );
   }
+}
+
+// Returns the chargeable consideration to feed into Scale 2 for a
+// transfer of equity. Uses (propertyValue × share% − continuingMortgage)
+// when both share and continuing mortgage are valid and the result is
+// positive; otherwise returns full propertyValue (conservative
+// over-estimate, never under-quoted).
+function getTransferChargeableAmount(propertyValue, sharePercent, continuingMortgage) {
+  const value = Number(propertyValue) || 0;
+  const share = Number(sharePercent);
+  const continuing = Number(continuingMortgage);
+  const shareValid = Number.isFinite(share) && share >= 1 && share <= 99;
+  const continuingValid = Number.isFinite(continuing) && continuing >= 0;
+  if (!shareValid || !continuingValid) return value;
+  const chargeable = (value * share) / 100 - continuing;
+  return chargeable > 0 ? chargeable : value;
 }

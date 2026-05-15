@@ -193,6 +193,22 @@ export const buildFilename = (id, clientName, issuedAt) => {
     : `ConveyQuote-${idPart}-${datePart}.pdf`;
 };
 
+// Appends share % and continuing mortgage rows to the transaction
+// details when those optional inputs were populated. Quietly skipped
+// for the conservative-estimate case (both blank), keeping the PDF
+// clean. Continuing mortgage is only rendered when > 0 — a literal
+// "£0" row is omitted as noise.
+const addTransferRefinementRows = (details, inputs) => {
+  const share = Number(inputs.sharePercent);
+  if (Number.isFinite(share) && share > 0) {
+    details.push(["Share being transferred", `${share}%`]);
+  }
+  const continuing = Number(inputs.continuingMortgage);
+  if (Number.isFinite(continuing) && continuing > 0) {
+    details.push(["Continuing mortgage", formatPriceLarge(continuing)]);
+  }
+};
+
 const curateTransactionDetails = (transactionType, inputs) => {
   const details = [];
   const i = inputs || {};
@@ -226,12 +242,14 @@ const curateTransactionDetails = (transactionType, inputs) => {
     case "transfer":
       if (i.price) details.push(["Property value", formatPriceLarge(i.price)]);
       if (tenureLabel) details.push(["Tenure", tenureLabel]);
+      addTransferRefinementRows(details, i);
       break;
     case "remortgage_transfer":
       if (i.price) details.push(["Property value", formatPriceLarge(i.price)]);
       if (i.mortgageAmount)
         details.push(["Mortgage amount", formatPriceLarge(i.mortgageAmount)]);
       if (tenureLabel) details.push(["Tenure", tenureLabel]);
+      addTransferRefinementRows(details, i);
       break;
     default:
       if (i.price) details.push(["Amount", formatPriceLarge(i.price)]);

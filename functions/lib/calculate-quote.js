@@ -28,6 +28,18 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Like toNumber but returns null for blank/missing/invalid input. Used
+// for optional fields (e.g. sharePercent, continuingMortgage) where
+// "blank" must remain distinguishable from "0" so the engine can fall
+// back to a conservative path rather than treating blank as a zero.
+function toOptionalNumber(value) {
+  if (value === null || value === undefined) return null;
+  const str = String(value).replace(/,/g, "").trim();
+  if (str === "") return null;
+  const parsed = Number(str);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function getSellerCount(value) {
   if (value === "2") return 2;
   if (value === "3") return 3;
@@ -494,6 +506,8 @@ function buildTransferQuote(input, options = {}) {
   const disbursements = [];
   const propertyValue = toNumber(input.price);
   const partyCount = getOwnersChangingCount(input.ownersChanging);
+  const sharePercent = toOptionalNumber(input.sharePercent);
+  const continuingMortgage = toOptionalNumber(input.continuingMortgage);
 
   addItem(legalFees, "Transfer legal fee", getTransferBaseFee(propertyValue));
 
@@ -524,9 +538,11 @@ function buildTransferQuote(input, options = {}) {
       getOfficeCopyEntriesAmount(input.tenure)
     );
   }
-  // HMLR Scale 2 — conservative over-estimate, see helper note. In a
-  // combined remortgage_transfer matter the LR fee is added once at
-  // the parent level (max-of-two scenarios), so this leg omits its
+  // HMLR Scale 2 — uses the share-aware formula when sharePercent and
+  // continuingMortgage are both provided and produce a positive amount;
+  // otherwise falls back to the conservative over-estimate (see helper).
+  // In a combined remortgage_transfer matter the LR fee is added once
+  // at the parent level (max-of-two scenarios), so this leg omits its
   // own line in that case.
   if (!options.omitLandRegistryFee) {
     addItem(
@@ -535,6 +551,8 @@ function buildTransferQuote(input, options = {}) {
       getLandRegistryFee({
         transactionType: "transfer",
         propertyValue,
+        sharePercent,
+        continuingMortgage,
       })
     );
   }
@@ -594,11 +612,16 @@ function buildRemortgageTransferQuote(input) {
   );
 
   // HMLR: combined applications attract ONE fee — the higher of
-  // Scale 2 on the new mortgage and Scale 2 on the property value.
+  // Scale 2 on the new mortgage and Scale 2 on the transfer side.
+  // Transfer side uses the share-aware formula when both inputs are
+  // provided; otherwise falls back to the conservative over-estimate
+  // on full property value.
   const combinedLandRegistryFee = getLandRegistryFee({
     transactionType: "remortgage_transfer",
     mortgageAmount,
     propertyValue,
+    sharePercent: toOptionalNumber(input.remortgageTransferSharePercent),
+    continuingMortgage: toOptionalNumber(input.remortgageTransferContinuingMortgage),
   });
   if (combinedLandRegistryFee > 0) {
     remortgage.disbursements.push({

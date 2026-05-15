@@ -171,6 +171,61 @@ const SCENARIOS = [
   { name: "Transfer £200k property (Scale 2 → £30)", input: { ...transferDefaults, price: "200000" } },
   { name: "Transfer £450k property (Scale 2 → £45)", input: { ...transferDefaults, price: "450000" } },
 
+  // ── Share-aware transfer of equity (Scale 2 on chargeable amount) ─
+  // chargeable = (propertyValue × share / 100) − continuingMortgage,
+  // with fallback to full propertyValue when inputs missing or result ≤ 0.
+  {
+    name: "Transfer 50% share, £150k cont. mortgage, £400k value (chargeable £50k → £20)",
+    input: {
+      ...transferDefaults,
+      price: "400000",
+      sharePercent: "50",
+      continuingMortgage: "150000",
+    },
+  },
+  {
+    name: "Transfer 50% share, £0 cont. mortgage, £400k value (chargeable £200k → £30)",
+    input: {
+      ...transferDefaults,
+      price: "400000",
+      sharePercent: "50",
+      continuingMortgage: "0",
+    },
+  },
+  {
+    name: "Transfer no share data, £400k value (over-estimate → £45)",
+    input: { ...transferDefaults, price: "400000" },
+  },
+  {
+    name: "Transfer 100% share, £500k cont. mortgage, £400k value (negative → over-estimate £45)",
+    input: {
+      ...transferDefaults,
+      price: "400000",
+      sharePercent: "100",
+      continuingMortgage: "500000",
+    },
+  },
+  {
+    name: "Remortgage+Transfer 50% share, £150k cont. mortgage, £400k value, £80k mortgage (transfer side wins £20 vs mortgage side £20 — tie still £20)",
+    input: {
+      ...remortgageTransferDefaults,
+      remortgageTransferPrice: "400000",
+      remortgageTransferMortgageAmount: "80000",
+      remortgageTransferSharePercent: "50",
+      remortgageTransferContinuingMortgage: "150000",
+    },
+  },
+  {
+    name: "Remortgage+Transfer 50% share, £0 cont. mortgage, £400k value, £80k mortgage (transfer side £30 wins)",
+    input: {
+      ...remortgageTransferDefaults,
+      remortgageTransferPrice: "400000",
+      remortgageTransferMortgageAmount: "80000",
+      remortgageTransferSharePercent: "50",
+      remortgageTransferContinuingMortgage: "0",
+    },
+  },
+
   // ── HMLR remortgage_transfer: max(Scale 2 mortgage, Scale 2 value) ─
   {
     name: "Remortgage+Transfer £400k value / £80k mortgage (value wins → £45)",

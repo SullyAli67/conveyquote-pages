@@ -48,6 +48,8 @@ type QuoteFormLike = {
 
   transferMortgage?: string;
   ownersChanging?: string;
+  sharePercent?: string;
+  continuingMortgage?: string;
 
   saleTenure?: string;
   salePrice?: string;
@@ -83,6 +85,8 @@ type QuoteFormLike = {
   remortgageTransferOwnersChanging?: string;
   remortgageTransferOwnershipType?: string;
   remortgageTransferMortgageAmount?: string;
+  remortgageTransferSharePercent?: string;
+  remortgageTransferContinuingMortgage?: string;
 };
 
 export type QuoteItem = {
@@ -126,6 +130,18 @@ const sumItems = (items: QuoteItem[]) =>
 const toNumber = (value?: string) => {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+// Optional-field counterpart: returns null for blank/missing/invalid so
+// the LR helper can distinguish blank from £0 and fall back to the
+// conservative over-estimate. Used for share % and continuing mortgage
+// on transfer of equity.
+const toOptionalNumber = (value?: string | null): number | null => {
+  if (value === null || value === undefined) return null;
+  const str = String(value).replace(/,/g, "").trim();
+  if (str === "") return null;
+  const parsed = Number(str);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const getSellerCount = (value?: string) => {
@@ -726,6 +742,8 @@ function buildTransferQuote(
     tenure?: string;
     transferMortgage?: string;
     ownersChanging?: string;
+    sharePercent?: string;
+    continuingMortgage?: string;
   },
   options: { omitOfficeCopies?: boolean; omitLandRegistryFee?: boolean } = {}
 ): BuiltQuoteData {
@@ -735,6 +753,8 @@ function buildTransferQuote(
 
   const partyCount = getOwnersChangingCount(input.ownersChanging);
   const propertyValue = toNumber(input.price);
+  const sharePercent = toOptionalNumber(input.sharePercent);
+  const continuingMortgage = toOptionalNumber(input.continuingMortgage);
 
   addItem(legalFees, "Transfer legal fee", getTransferBaseFee(propertyValue));
 
@@ -787,6 +807,8 @@ function buildTransferQuote(
       getLandRegistryFee({
         transactionType: "transfer",
         propertyValue,
+        sharePercent,
+        continuingMortgage,
       })
     );
   }
@@ -922,6 +944,8 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       tenure: form.tenure,
       transferMortgage: form.transferMortgage,
       ownersChanging: form.ownersChanging,
+      sharePercent: form.sharePercent,
+      continuingMortgage: form.continuingMortgage,
     });
   }
 
@@ -1014,6 +1038,10 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       transactionType: "remortgage_transfer",
       mortgageAmount: toNumber(form.remortgageTransferMortgageAmount),
       propertyValue: toNumber(form.remortgageTransferPrice),
+      sharePercent: toOptionalNumber(form.remortgageTransferSharePercent),
+      continuingMortgage: toOptionalNumber(
+        form.remortgageTransferContinuingMortgage
+      ),
     });
     if (combinedLandRegistryFee > 0) {
       remortgage.disbursements.push({
