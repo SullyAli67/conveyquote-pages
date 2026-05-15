@@ -39,40 +39,84 @@ const SUPPORTED_TRANSACTION_TYPES = new Set([
   "remortgage_transfer",
 ]);
 
-// Each entry maps a request condition to a case-insensitive label
-// substring. When a firm_fee_configs row matches a pattern here, the
-// row is included only if the corresponding condition is true. Rows
-// that do not match any pattern are treated as unconditional base fees
-// and are always included.
-//
-// `supplementKey` is set for entries that come from the request's
-// `supplements` object — those are the ones that produce a warning when
-// the flag is true but no matching row exists in firm_fee_configs.
-const CONDITIONAL_PATTERNS = [
-  { test: (req) => req.tenure === "leasehold", pattern: "leasehold", supplementKey: null },
-  { test: (req) => req.mortgageOrCash === "mortgage", pattern: "acting for lender", supplementKey: null },
-  { test: (req) => Boolean(req.supplements?.newBuild), pattern: "new build", supplementKey: "newBuild" },
-  { test: (req) => Boolean(req.supplements?.sharedOwnership), pattern: "shared ownership", supplementKey: "sharedOwnership" },
-  { test: (req) => Boolean(req.supplements?.helpToBuy), pattern: "help to buy", supplementKey: "helpToBuy" },
-  { test: (req) => Boolean(req.supplements?.buyToLet), pattern: "buy to let", supplementKey: "buyToLet" },
-  { test: (req) => Boolean(req.supplements?.companyBuyer), pattern: "company", supplementKey: "companyBuyer" },
-  { test: (req) => Boolean(req.supplements?.giftedDeposit), pattern: "gifted", supplementKey: "giftedDeposit" },
-  { test: (req) => Boolean(req.supplements?.lifetimeIsa), pattern: "lifetime isa", supplementKey: "lifetimeIsa" },
-  { test: (req) => Boolean(req.supplements?.rightToBuy), pattern: "right to buy", supplementKey: "rightToBuy" },
-  { test: (req) => Boolean(req.supplements?.additionalProperty), pattern: "additional property", supplementKey: "additionalProperty" },
+// Canonical supplement keys. Each entry pairs the persisted
+// firm_fee_configs.supplement_key value with the request flag that
+// activates it and the human-readable label used in warnings. A row in
+// firm_fee_configs with supplement_key = NULL is an unconditional base
+// fee. A row with supplement_key matching one of these keys is included
+// only when the request flag is true.
+const SUPPLEMENT_KEYS = [
+  {
+    key: "leasehold",
+    requestFlag: (req) => req.tenure === "leasehold",
+    label: "Leasehold supplement",
+    triggeredBy: "Leasehold tenure",
+  },
+  {
+    key: "mortgagePresent",
+    requestFlag: (req) => req.mortgageOrCash === "mortgage",
+    label: "Acting for lender supplement",
+    triggeredBy: "Mortgage",
+  },
+  {
+    key: "newBuild",
+    requestFlag: (req) => Boolean(req.supplements?.newBuild),
+    label: "New build supplement",
+    triggeredBy: "New build",
+  },
+  {
+    key: "sharedOwnership",
+    requestFlag: (req) => Boolean(req.supplements?.sharedOwnership),
+    label: "Shared ownership supplement",
+    triggeredBy: "Shared ownership",
+  },
+  {
+    key: "helpToBuy",
+    requestFlag: (req) => Boolean(req.supplements?.helpToBuy),
+    label: "Help to Buy supplement",
+    triggeredBy: "Help to Buy",
+  },
+  {
+    key: "buyToLet",
+    requestFlag: (req) => Boolean(req.supplements?.buyToLet),
+    label: "Buy to let supplement",
+    triggeredBy: "Buy to let",
+  },
+  {
+    key: "companyBuyer",
+    requestFlag: (req) => Boolean(req.supplements?.companyBuyer),
+    label: "Buying via company supplement",
+    triggeredBy: "Buying via company",
+  },
+  {
+    key: "giftedDeposit",
+    requestFlag: (req) => Boolean(req.supplements?.giftedDeposit),
+    label: "Gifted deposit supplement",
+    triggeredBy: "Gifted deposit",
+  },
+  {
+    key: "lifetimeIsa",
+    requestFlag: (req) => Boolean(req.supplements?.lifetimeIsa),
+    label: "Lifetime ISA supplement",
+    triggeredBy: "Lifetime ISA",
+  },
+  {
+    key: "rightToBuy",
+    requestFlag: (req) => Boolean(req.supplements?.rightToBuy),
+    label: "Right to Buy supplement",
+    triggeredBy: "Right to Buy",
+  },
+  {
+    key: "additionalProperty",
+    requestFlag: (req) => Boolean(req.supplements?.additionalProperty),
+    label: "Additional property supplement",
+    triggeredBy: "Additional property",
+  },
 ];
 
-const SUPPLEMENT_LABELS = {
-  newBuild: "New build supplement",
-  sharedOwnership: "Shared ownership supplement",
-  helpToBuy: "Help to Buy supplement",
-  buyToLet: "Buy to let supplement",
-  companyBuyer: "Company buyer supplement",
-  giftedDeposit: "Gifted deposit supplement",
-  lifetimeIsa: "Lifetime ISA supplement",
-  rightToBuy: "Right to Buy supplement",
-  additionalProperty: "Additional property supplement",
-};
+// Exported so the firm-fee-config endpoint can validate supplement_key
+// values sent by the frontend without re-declaring the list.
+export const VALID_SUPPLEMENT_KEYS = SUPPLEMENT_KEYS.map((e) => e.key);
 
 function round2(n) {
   return Number((Number(n) || 0).toFixed(2));
@@ -80,14 +124,6 @@ function round2(n) {
 
 function perPersonLabel(base, n) {
   return n > 1 ? `${base} (${n} buyers)` : base;
-}
-
-function classifyRow(row) {
-  const label = String(row.label || "").toLowerCase();
-  for (const entry of CONDITIONAL_PATTERNS) {
-    if (label.includes(entry.pattern)) return entry;
-  }
-  return null;
 }
 
 // Public entry point. Returns a tagged result so the caller can pick the
@@ -149,7 +185,7 @@ export async function calculateFirmQuote({ db, firmId, body }) {
   // ── Load firm legal fees ───────────────────────────────────────────
   const feeConfigResult = await db
     .prepare(
-      `SELECT id, label, amount, includes_vat, is_disbursement, sort_order
+      `SELECT id, label, amount, includes_vat, is_disbursement, sort_order, supplement_key
          FROM firm_fee_configs
         WHERE firm_id = ?
           AND transaction_type = ?
@@ -171,21 +207,33 @@ export async function calculateFirmQuote({ db, firmId, body }) {
   }
 
   // ── Build legal fees ───────────────────────────────────────────────
+  // Rows with supplement_key = NULL are unconditional base fees and are
+  // always included. Rows with a non-NULL supplement_key are included
+  // only when the corresponding request flag is true. After the loop we
+  // warn for every supplement the firm requested but didn't configure.
   const legalFees = [];
   const matchedSupplementKeys = new Set();
   const warnings = [];
+  const supplementByKey = new Map(SUPPLEMENT_KEYS.map((e) => [e.key, e]));
 
   for (const row of rows) {
-    const classification = classifyRow(row);
-    if (classification) {
-      const conditionMet = classification.test(reqCtx);
-      if (!conditionMet) {
-        // Conditional row whose condition is false — skip silently.
+    const supplementKey = row.supplement_key || null;
+    if (supplementKey) {
+      const entry = supplementByKey.get(supplementKey);
+      if (!entry) {
+        // Unknown key persisted in the DB — skip the row and warn so the
+        // firm notices. Shouldn't happen in normal use because the
+        // endpoint validates keys against VALID_SUPPLEMENT_KEYS.
+        warnings.push(
+          `Fee row "${String(row.label || "")}" has an unknown supplement_key '${supplementKey}' and was skipped.`
+        );
         continue;
       }
-      if (classification.supplementKey) {
-        matchedSupplementKeys.add(classification.supplementKey);
+      if (!entry.requestFlag(reqCtx)) {
+        // Conditional row whose flag is false — skip silently.
+        continue;
       }
+      matchedSupplementKeys.add(supplementKey);
     }
     legalFees.push({
       label: String(row.label || ""),
@@ -194,14 +242,12 @@ export async function calculateFirmQuote({ db, firmId, body }) {
     });
   }
 
-  for (const entry of CONDITIONAL_PATTERNS) {
-    if (!entry.supplementKey) continue;
-    if (entry.test(reqCtx) && !matchedSupplementKeys.has(entry.supplementKey)) {
-      const label = SUPPLEMENT_LABELS[entry.supplementKey];
-      warnings.push(
-        `${label} requested but no matching '${entry.pattern}' line configured in your fees.`
-      );
-    }
+  for (const entry of SUPPLEMENT_KEYS) {
+    if (!entry.requestFlag(reqCtx)) continue;
+    if (matchedSupplementKeys.has(entry.key)) continue;
+    warnings.push(
+      `${entry.triggeredBy} was requested but no ${entry.label} is configured. The quote may be under-priced. Add a ${entry.label} in Fee Settings.`
+    );
   }
 
   const legalFeesNet = round2(
