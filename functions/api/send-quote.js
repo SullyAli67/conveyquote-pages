@@ -165,22 +165,9 @@ export async function onRequestPost(context) {
       tenantedCombined,
       numberOfSellersCombined,
 
-      purchaseTenure,
       purchasePrice,
-      purchasePostcode,
       purchaseMortgage,
       purchaseLender,
-      purchaseOwnershipType,
-      purchaseFirstTimeBuyer,
-      purchaseNewBuild,
-      purchaseSharedOwnership,
-      purchaseHelpToBuy,
-      purchaseIsCompany,
-      purchaseBuyToLet,
-      purchaseGiftedDeposit,
-      purchaseAdditionalProperty,
-      purchaseUkResidentForSdlt,
-      purchaseLifetimeIsa,
 
       remortgageTransferTenure,
       remortgageTransferPrice,
@@ -188,7 +175,6 @@ export async function onRequestPost(context) {
       remortgageTransferCurrentLender,
       remortgageTransferNewLender,
       remortgageTransferAdditionalBorrowing,
-      remortgageTransferHasMortgage,
       remortgageTransferOwnersChanging,
       remortgageTransferOwnershipType,
     } = body;
@@ -255,23 +241,6 @@ export async function onRequestPost(context) {
       tenanted_combined: tenantedCombined || "",
       number_of_sellers_combined: numberOfSellersCombined || "",
 
-      purchase_tenure: purchaseTenure || "",
-      purchase_price: purchasePrice || "",
-      purchase_postcode: purchasePostcode || "",
-      purchase_mortgage: purchaseMortgage || "",
-      purchase_lender: purchaseLender || "",
-      purchase_ownership_type: purchaseOwnershipType || "",
-      purchase_first_time_buyer: purchaseFirstTimeBuyer || "",
-      purchase_new_build: purchaseNewBuild || "",
-      purchase_shared_ownership: purchaseSharedOwnership || "",
-      purchase_help_to_buy: purchaseHelpToBuy || "",
-      purchase_is_company: purchaseIsCompany || "",
-      purchase_buy_to_let: purchaseBuyToLet || "",
-      purchase_gifted_deposit: purchaseGiftedDeposit || "",
-      purchase_additional_property: purchaseAdditionalProperty || "",
-      purchase_uk_resident_for_sdlt: purchaseUkResidentForSdlt || "",
-      purchase_lifetime_isa: purchaseLifetimeIsa || "",
-
       remortgage_transfer_tenure: remortgageTransferTenure || "",
       remortgage_transfer_price: remortgageTransferPrice || "",
       remortgage_transfer_postcode: remortgageTransferPostcode || "",
@@ -280,8 +249,6 @@ export async function onRequestPost(context) {
       remortgage_transfer_new_lender: remortgageTransferNewLender || "",
       remortgage_transfer_additional_borrowing:
         remortgageTransferAdditionalBorrowing || "",
-      remortgage_transfer_has_mortgage:
-        remortgageTransferHasMortgage || "",
       remortgage_transfer_owners_changing:
         remortgageTransferOwnersChanging || "",
       remortgage_transfer_ownership_type:
