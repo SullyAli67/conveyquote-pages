@@ -1,0 +1,57 @@
+-- Drops three dead columns from the enquiries table.
+--
+-- Background
+-- ----------
+-- The enquiries table is at SQLite/D1's 100-column cap (confirmed via
+-- SELECT COUNT(*) FROM pragma_table_info('enquiries')). Migration 0012
+-- attempted to ADD four workflow columns and all four failed with
+-- "too many columns on sqlite_altertab_enquiries: SQLITE_ERROR"; the
+-- workaround in 0013 routed them through a side-table. To reclaim
+-- headroom on the parent table itself, the enquiries audit walked
+-- every column for reads and writes across functions/, src/, and
+-- scripts/. Three columns came back with zero live references:
+--
+--   • accepted_at        — the only `accepted_at` writes in the repo
+--                          are on the firm_quotes table
+--                          (firm-quote-accept.js:157). The customer
+--                          accept flow (accept-quote.js:87) sets
+--                          status='accepted' only. enquiries.accepted_at
+--                          itself is never written and never read.
+--
+--   • quote_sent_at      — the canonical timestamp lives in the
+--                          followup_state side-table (migration 0002).
+--                          get-enquiry.js documents this column as
+--                          "vestigial" (see comment at line 28) and
+--                          LEFT JOINs followup_state for the real
+--                          value. No SELECT or UPDATE in the codebase
+--                          references enquiries.quote_sent_at directly.
+--
+--   • quote_approved_at  — a single write at send-approved-quote.js,
+--                          zero reads anywhere. The companion code
+--                          change in this PR removes that dead write
+--                          so this DROP COLUMN does not regress the
+--                          endpoint.
+--
+-- Reclaim: 3 columns. Enquiries goes from 100 → 97. Larger phases of
+-- the audit plan (variant-column consolidation, invoice extraction,
+-- workflow side-tables) will follow in subsequent PRs.
+--
+-- Compatibility
+-- -------------
+-- ALTER TABLE ... DROP COLUMN requires SQLite 3.35+. Cloudflare D1
+-- ships a recent SQLite and supports DROP COLUMN.
+--
+-- Applying
+-- --------
+-- The D1 console has historically been unreliable with multi-statement
+-- pastes in this project. Apply each DROP COLUMN ONE AT A TIME and
+-- verify the column count after each:
+--
+--   SELECT COUNT(*) FROM pragma_table_info('enquiries');
+--
+-- Expected counts: 100 before, 99 after the first DROP, 98 after the
+-- second, 97 after the third.
+
+ALTER TABLE enquiries DROP COLUMN accepted_at;
+ALTER TABLE enquiries DROP COLUMN quote_sent_at;
+ALTER TABLE enquiries DROP COLUMN quote_approved_at;

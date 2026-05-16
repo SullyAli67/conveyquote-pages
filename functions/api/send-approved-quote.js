@@ -673,20 +673,16 @@ export async function onRequestPost(context) {
       manualAdjustment: adjustment || undefined,
     };
 
-    const nowIso = new Date().toISOString();
-
     await env.DB.prepare(
       `UPDATE enquiries
        SET approved_quote_json = ?,
            approved_quote_amount = ?,
-           quote_approved_at = ?,
            status = 'quote_sent'
        WHERE reference = ?`
     )
       .bind(
         JSON.stringify(approvedQuoteRecord),
         finalQuoteAmountValue,
-        nowIso,
         quoteReference
       )
       .run();

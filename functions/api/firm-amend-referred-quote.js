@@ -5,8 +5,19 @@
 // for complexity once they have reviewed the full details.
 //
 // The amended quote is saved back to enquiries.quote_json.
-// The original referrer-generated quote is preserved in quote_json_original
-// (added on first amendment only, so there is always an audit trail).
+//
+// The original (pre-amendment) quote is preserved inside the SAME quote_json
+// column under a top-level `_original` key, captured on first amendment and
+// left untouched by subsequent amendments so the audit trail is stable. This
+// replaces an earlier attempt that used a `quote_json_original` column — that
+// column was never created on production (enquiries hit the SQLite/D1
+// 100-column cap before it could be added) and every call to this endpoint
+// 500'd on "no such column: quote_json_original".
+//
+// All existing readers of quote_json (get-enquiry.js, firm-portal-data.js,
+// check-pending-enquiries.js, src/App.tsx) access only well-known top-level
+// keys (legalFees, disbursements, grandTotal, totalIncludingSdlt, …) so the
+// extra `_original` key is invisible to them.
 
 import {
   getTokenFromRequest,
@@ -65,7 +76,7 @@ export async function onRequestPost(context) {
 
     // Validate that this enquiry actually belongs to this firm
     const enquiry = await env.DB.prepare(
-      `SELECT id, assigned_firm_id, quote_json, quote_json_original
+      `SELECT id, assigned_firm_id, quote_json
        FROM enquiries WHERE reference = ? LIMIT 1`
     ).bind(reference).first();
 
@@ -104,19 +115,35 @@ export async function onRequestPost(context) {
       sdltNote || ""
     );
 
-    // On first amendment: preserve the original quote for audit purposes
-    const originalJson = enquiry.quote_json_original ?? enquiry.quote_json;
+    // Preserve the pre-amendment quote inside quote_json under `_original`.
+    // First amendment: snapshot the current quote_json as `_original`.
+    // Subsequent amendments: keep the existing `_original` untouched so the
+    // first-amendment snapshot remains the authoritative audit baseline.
+    let priorQuote = null;
+    if (enquiry.quote_json) {
+      try {
+        priorQuote = JSON.parse(enquiry.quote_json);
+      } catch {
+        priorQuote = null;
+      }
+    }
+    const preservedOriginal =
+      priorQuote && typeof priorQuote === "object" && priorQuote._original
+        ? priorQuote._original
+        : priorQuote;
+
+    const nextQuoteJson = preservedOriginal
+      ? { ...updatedQuote, _original: preservedOriginal }
+      : updatedQuote;
 
     await env.DB.prepare(
       `UPDATE enquiries
-       SET quote_json          = ?,
-           quote_json_original = ?,
-           updated_at          = datetime('now')
+       SET quote_json = ?,
+           updated_at = datetime('now')
        WHERE reference = ?`
     )
       .bind(
-        JSON.stringify(updatedQuote),
-        originalJson,
+        JSON.stringify(nextQuoteJson),
         reference
       )
       .run();
