@@ -42,19 +42,11 @@ export async function onRequestGet(context) {
               e.sale_tenure, e.sale_price, e.sale_postcode,
               e.sale_mortgage_combined, e.management_company_combined,
               e.tenanted_combined, e.number_of_sellers_combined,
-              e.purchase_tenure, e.purchase_price, e.purchase_postcode,
-              e.purchase_mortgage, e.purchase_lender, e.purchase_ownership_type,
-              e.purchase_first_time_buyer, e.purchase_new_build,
-              e.purchase_shared_ownership, e.purchase_help_to_buy,
-              e.purchase_is_company, e.purchase_buy_to_let,
-              e.purchase_gifted_deposit, e.purchase_additional_property,
-              e.purchase_uk_resident_for_sdlt, e.purchase_lifetime_isa,
               e.remortgage_transfer_tenure, e.remortgage_transfer_price,
               e.remortgage_transfer_postcode,
               e.remortgage_transfer_current_lender,
               e.remortgage_transfer_new_lender,
               e.remortgage_transfer_additional_borrowing,
-              e.remortgage_transfer_has_mortgage,
               e.remortgage_transfer_owners_changing,
               e.remortgage_transfer_ownership_type,
               e.referrer_id,
@@ -113,6 +105,37 @@ export async function onRequestGet(context) {
     // adminQuote prefers the saved approved version; falls back to base quote if not yet approved
     const authoritative = parsedApprovedQuote || parsedQuote;
 
+    // The 17 snake_case shadow columns below were dropped from the SELECT
+    // because Phase B PR1 stopped send-quote.js writing them — new rows
+    // have NULL there. The same values live in quote_json (camelCase) on
+    // every row, so we derive the snake_case fields from parsedQuote and
+    // expose them on the response, preserving the shape that the admin
+    // LoadedEnquiry in src/App.tsx consumes.
+    const quoteSource =
+      parsedQuote && typeof parsedQuote === "object" ? parsedQuote : {};
+    const shadowVariantFields = {
+      purchase_tenure: quoteSource.purchaseTenure || "",
+      purchase_price: quoteSource.purchasePrice || "",
+      purchase_postcode: quoteSource.purchasePostcode || "",
+      purchase_mortgage: quoteSource.purchaseMortgage || "",
+      purchase_lender: quoteSource.purchaseLender || "",
+      purchase_ownership_type: quoteSource.purchaseOwnershipType || "",
+      purchase_first_time_buyer: quoteSource.purchaseFirstTimeBuyer || "",
+      purchase_new_build: quoteSource.purchaseNewBuild || "",
+      purchase_shared_ownership: quoteSource.purchaseSharedOwnership || "",
+      purchase_help_to_buy: quoteSource.purchaseHelpToBuy || "",
+      purchase_is_company: quoteSource.purchaseIsCompany || "",
+      purchase_buy_to_let: quoteSource.purchaseBuyToLet || "",
+      purchase_gifted_deposit: quoteSource.purchaseGiftedDeposit || "",
+      purchase_additional_property:
+        quoteSource.purchaseAdditionalProperty || "",
+      purchase_uk_resident_for_sdlt:
+        quoteSource.purchaseUkResidentForSdlt || "",
+      purchase_lifetime_isa: quoteSource.purchaseLifetimeIsa || "",
+      remortgage_transfer_has_mortgage:
+        quoteSource.remortgageTransferHasMortgage || "",
+    };
+
     const {
       quote_json,
       approved_quote_json,
@@ -124,8 +147,9 @@ export async function onRequestGet(context) {
     } = enquiry;
 
     const mergedEnquiry = {
-      ...(parsedQuote && typeof parsedQuote === "object" ? parsedQuote : {}),
+      ...quoteSource,
       ...enquiryWithoutRawQuote,
+      ...shadowVariantFields,
       // Follow-up tracking lives in the followup_state table; override the
       // vestigial enquiries.quote_sent_at with the canonical value.
       quote_sent_at: fs_quote_sent_at ?? null,
