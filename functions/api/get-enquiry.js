@@ -4,6 +4,33 @@ const jsonResponse = (body, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
+// Phase B PR1: send-quote.js no longer writes these 17 variant
+// columns. For new rows they are NULL on the enquiries table; the
+// equivalent values are present inside quote_json under the
+// original camelCase form keys. Hydrate the snake_case fields
+// from quote_json so the admin UI (which reads these by snake
+// name) keeps working for both old rows (column populated) and
+// new rows (column NULL, value comes from quote_json).
+const VARIANT_FROM_QUOTE_JSON = {
+  purchase_tenure: "purchaseTenure",
+  purchase_price: "purchasePrice",
+  purchase_postcode: "purchasePostcode",
+  purchase_mortgage: "purchaseMortgage",
+  purchase_lender: "purchaseLender",
+  purchase_ownership_type: "purchaseOwnershipType",
+  purchase_first_time_buyer: "purchaseFirstTimeBuyer",
+  purchase_new_build: "purchaseNewBuild",
+  purchase_shared_ownership: "purchaseSharedOwnership",
+  purchase_help_to_buy: "purchaseHelpToBuy",
+  purchase_is_company: "purchaseIsCompany",
+  purchase_buy_to_let: "purchaseBuyToLet",
+  purchase_gifted_deposit: "purchaseGiftedDeposit",
+  purchase_additional_property: "purchaseAdditionalProperty",
+  purchase_uk_resident_for_sdlt: "purchaseUkResidentForSdlt",
+  purchase_lifetime_isa: "purchaseLifetimeIsa",
+  remortgage_transfer_has_mortgage: "remortgageTransferHasMortgage",
+};
+
 export async function onRequestGet(context) {
   try {
     const { request, env } = context;
@@ -136,6 +163,19 @@ export async function onRequestGet(context) {
       // Expose whether an approved quote exists so frontend can show correct state
       has_approved_quote: Boolean(parsedApprovedQuote),
     };
+
+    if (parsedQuote && typeof parsedQuote === "object") {
+      for (const [snake, camel] of Object.entries(VARIANT_FROM_QUOTE_JSON)) {
+        const current = mergedEnquiry[snake];
+        if (
+          (current === null || current === undefined || current === "") &&
+          parsedQuote[camel] !== undefined &&
+          parsedQuote[camel] !== null
+        ) {
+          mergedEnquiry[snake] = parsedQuote[camel];
+        }
+      }
+    }
 
     return jsonResponse({
       success: true,

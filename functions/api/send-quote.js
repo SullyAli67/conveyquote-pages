@@ -255,22 +255,12 @@ export async function onRequestPost(context) {
       tenanted_combined: tenantedCombined || "",
       number_of_sellers_combined: numberOfSellersCombined || "",
 
-      purchase_tenure: purchaseTenure || "",
-      purchase_price: purchasePrice || "",
-      purchase_postcode: purchasePostcode || "",
-      purchase_mortgage: purchaseMortgage || "",
-      purchase_lender: purchaseLender || "",
-      purchase_ownership_type: purchaseOwnershipType || "",
-      purchase_first_time_buyer: purchaseFirstTimeBuyer || "",
-      purchase_new_build: purchaseNewBuild || "",
-      purchase_shared_ownership: purchaseSharedOwnership || "",
-      purchase_help_to_buy: purchaseHelpToBuy || "",
-      purchase_is_company: purchaseIsCompany || "",
-      purchase_buy_to_let: purchaseBuyToLet || "",
-      purchase_gifted_deposit: purchaseGiftedDeposit || "",
-      purchase_additional_property: purchaseAdditionalProperty || "",
-      purchase_uk_resident_for_sdlt: purchaseUkResidentForSdlt || "",
-      purchase_lifetime_isa: purchaseLifetimeIsa || "",
+      // Phase B PR1: the 16 purchase_* variant columns are no
+      // longer written. They were a byte-for-byte shadow of the
+      // camelCase form fields already captured inside quote_json,
+      // and get-enquiry.js now hydrates them from quote_json for
+      // new rows. The columns still exist on the table; a future
+      // cleanup PR will drop them after a release cycle.
 
       remortgage_transfer_tenure: remortgageTransferTenure || "",
       remortgage_transfer_price: remortgageTransferPrice || "",
@@ -280,8 +270,8 @@ export async function onRequestPost(context) {
       remortgage_transfer_new_lender: remortgageTransferNewLender || "",
       remortgage_transfer_additional_borrowing:
         remortgageTransferAdditionalBorrowing || "",
-      remortgage_transfer_has_mortgage:
-        remortgageTransferHasMortgage || "",
+      // remortgage_transfer_has_mortgage: dropped in Phase B PR1;
+      // value is recoverable from quote_json.remortgageTransferHasMortgage.
       remortgage_transfer_owners_changing:
         remortgageTransferOwnersChanging || "",
       remortgage_transfer_ownership_type:
