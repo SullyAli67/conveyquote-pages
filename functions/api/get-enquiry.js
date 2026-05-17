@@ -105,12 +105,19 @@ export async function onRequestGet(context) {
     // adminQuote prefers the saved approved version; falls back to base quote if not yet approved
     const authoritative = parsedApprovedQuote || parsedQuote;
 
-    // The 17 snake_case shadow columns below were dropped from the SELECT
-    // because Phase B PR1 stopped send-quote.js writing them — new rows
-    // have NULL there. The same values live in quote_json (camelCase) on
-    // every row, so we derive the snake_case fields from parsedQuote and
-    // expose them on the response, preserving the shape that the admin
-    // LoadedEnquiry in src/App.tsx consumes.
+    // The snake_case shadow columns below are pure shadows of quote_json
+    // (camelCase) fields. Phase B PR1 stopped send-quote.js writing 17 of
+    // them and Phase B PR2 stopped it writing another 16 — new rows have
+    // NULL in the DB columns. We derive the snake_case fields from
+    // parsedQuote and expose them on the response, preserving the shape
+    // that the admin LoadedEnquiry in src/App.tsx consumes.
+    //
+    // PR2's 16 columns use a quote_json -> DB-column fallback because
+    // sale_mortgage is also written by referrer-submit-enquiry.js, whose
+    // quote_json doesn't include the form body. For referrer-submitted
+    // rows the DB column is the only source; for public-form rows
+    // quote_json wins and the DB column is NULL. PR1's 17 columns don't
+    // need the fallback (send-quote.js is the sole writer).
     const quoteSource =
       parsedQuote && typeof parsedQuote === "object" ? parsedQuote : {};
     const shadowVariantFields = {
@@ -134,6 +141,57 @@ export async function onRequestGet(context) {
       purchase_lifetime_isa: quoteSource.purchaseLifetimeIsa || "",
       remortgage_transfer_has_mortgage:
         quoteSource.remortgageTransferHasMortgage || "",
+
+      sale_tenure: quoteSource.saleTenure || enquiry.sale_tenure || "",
+      sale_price: quoteSource.salePrice || enquiry.sale_price || "",
+      sale_postcode: quoteSource.salePostcode || enquiry.sale_postcode || "",
+      sale_mortgage: quoteSource.saleMortgage || enquiry.sale_mortgage || "",
+      sale_mortgage_combined:
+        quoteSource.saleMortgageCombined ||
+        enquiry.sale_mortgage_combined ||
+        "",
+      management_company_combined:
+        quoteSource.managementCompanyCombined ||
+        enquiry.management_company_combined ||
+        "",
+      tenanted_combined:
+        quoteSource.tenantedCombined || enquiry.tenanted_combined || "",
+      number_of_sellers_combined:
+        quoteSource.numberOfSellersCombined ||
+        enquiry.number_of_sellers_combined ||
+        "",
+      remortgage_transfer_tenure:
+        quoteSource.remortgageTransferTenure ||
+        enquiry.remortgage_transfer_tenure ||
+        "",
+      remortgage_transfer_price:
+        quoteSource.remortgageTransferPrice ||
+        enquiry.remortgage_transfer_price ||
+        "",
+      remortgage_transfer_postcode:
+        quoteSource.remortgageTransferPostcode ||
+        enquiry.remortgage_transfer_postcode ||
+        "",
+      remortgage_transfer_current_lender:
+        quoteSource.remortgageTransferCurrentLender ||
+        enquiry.remortgage_transfer_current_lender ||
+        "",
+      remortgage_transfer_new_lender:
+        quoteSource.remortgageTransferNewLender ||
+        enquiry.remortgage_transfer_new_lender ||
+        "",
+      remortgage_transfer_additional_borrowing:
+        quoteSource.remortgageTransferAdditionalBorrowing ||
+        enquiry.remortgage_transfer_additional_borrowing ||
+        "",
+      remortgage_transfer_owners_changing:
+        quoteSource.remortgageTransferOwnersChanging ||
+        enquiry.remortgage_transfer_owners_changing ||
+        "",
+      remortgage_transfer_ownership_type:
+        quoteSource.remortgageTransferOwnershipType ||
+        enquiry.remortgage_transfer_ownership_type ||
+        "",
     };
 
     const {
