@@ -144,7 +144,6 @@ export async function onRequestPost(context) {
       lifetimeIsa,
       rightToBuy,
 
-      saleMortgage,
       managementCompany,
       tenanted,
       numberOfSellers,
@@ -157,26 +156,14 @@ export async function onRequestPost(context) {
       transferMortgage,
       ownersChanging,
 
-      saleTenure,
       salePrice,
-      salePostcode,
-      saleMortgageCombined,
-      managementCompanyCombined,
-      tenantedCombined,
-      numberOfSellersCombined,
 
       purchasePrice,
       purchaseMortgage,
       purchaseLender,
 
-      remortgageTransferTenure,
       remortgageTransferPrice,
-      remortgageTransferPostcode,
-      remortgageTransferCurrentLender,
       remortgageTransferNewLender,
-      remortgageTransferAdditionalBorrowing,
-      remortgageTransferOwnersChanging,
-      remortgageTransferOwnershipType,
     } = body;
 
     // Lender is preferred but not required - reviewer will confirm lender eligibility
@@ -221,7 +208,6 @@ export async function onRequestPost(context) {
       lifetime_isa: lifetimeIsa || "",
       right_to_buy: rightToBuy || "",
 
-      sale_mortgage: saleMortgage || "",
       management_company: managementCompany || "",
       tenanted: tenanted || "",
       number_of_sellers: numberOfSellers || "",
@@ -233,26 +219,13 @@ export async function onRequestPost(context) {
       transfer_mortgage: transferMortgage || "",
       owners_changing: ownersChanging || "",
 
-      sale_tenure: saleTenure || "",
-      sale_price: salePrice || "",
-      sale_postcode: salePostcode || "",
-      sale_mortgage_combined: saleMortgageCombined || "",
-      management_company_combined: managementCompanyCombined || "",
-      tenanted_combined: tenantedCombined || "",
-      number_of_sellers_combined: numberOfSellersCombined || "",
-
-      remortgage_transfer_tenure: remortgageTransferTenure || "",
-      remortgage_transfer_price: remortgageTransferPrice || "",
-      remortgage_transfer_postcode: remortgageTransferPostcode || "",
-      remortgage_transfer_current_lender:
-        remortgageTransferCurrentLender || "",
-      remortgage_transfer_new_lender: remortgageTransferNewLender || "",
-      remortgage_transfer_additional_borrowing:
-        remortgageTransferAdditionalBorrowing || "",
-      remortgage_transfer_owners_changing:
-        remortgageTransferOwnersChanging || "",
-      remortgage_transfer_ownership_type:
-        remortgageTransferOwnershipType || "",
+      // The 16 sale-leg and remortgage_transfer-leg columns previously
+      // written here are now pure shadows of quote_json fields. Phase B
+      // PR2 stops writing them; get-enquiry.js reconstructs them from
+      // quote_json (with a DB-column fallback for legacy / non-public-
+      // form rows). Columns are not yet dropped — that happens in a
+      // later cleanup PR — they will simply be NULL on new rows. See
+      // the PR2 investigation commit for the full mapping.
 
       status: "new",
       quote_json: JSON.stringify({ ...body, ...quote }),
