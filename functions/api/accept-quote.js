@@ -89,6 +89,18 @@ export async function onRequestGet(context) {
         .bind(reference)
         .run();
 
+      // Risk 1 — customer-facing endpoint. The acceptance has been
+      // recorded above (the user-facing outcome). The two notification
+      // emails below MUST NOT cause the customer to see a 500 error
+      // page just because Resend hiccupped — we now log + record their
+      // outcomes onto the enquiry's email-tracking columns and fall
+      // through to the success page either way. Previously a Resend
+      // failure on either send returned 500, telling the customer
+      // their acceptance had failed when it had not.
+      const emailErrors = [];
+      let clientEmailMessageId = null;
+      let clientEmailOk = false;
+
       const internalEmailResponse = await fetch(
         "https://api.resend.com/emails",
         {
@@ -165,7 +177,14 @@ export async function onRequestGet(context) {
       );
 
       if (!internalEmailResponse.ok) {
-        return textResponse("Failed to send internal notification email.", 500);
+        const errBody = await internalEmailResponse
+          .text()
+          .catch(() => "");
+        const detail = `HTTP ${internalEmailResponse.status} ${errBody}`.slice(0, 240);
+        emailErrors.push(`internal: ${detail}`);
+        console.error(
+          `accept-quote: internal notification failed for ref=${reference}: ${detail}`
+        );
       }
 
       const clientEmailResponse = await fetch("https://api.resend.com/emails", {
@@ -228,7 +247,47 @@ export async function onRequestGet(context) {
       });
 
       if (!clientEmailResponse.ok) {
-        return textResponse("Failed to send client confirmation email.", 500);
+        const errBody = await clientEmailResponse
+          .text()
+          .catch(() => "");
+        const detail = `HTTP ${clientEmailResponse.status} ${errBody}`.slice(0, 240);
+        emailErrors.push(`client: ${detail}`);
+        console.error(
+          `accept-quote: client confirmation failed for ref=${reference}: ${detail}`
+        );
+      } else {
+        const okJson = await clientEmailResponse.json().catch(() => ({}));
+        clientEmailMessageId = okJson?.id || null;
+        clientEmailOk = true;
+      }
+
+      // Record the email outcomes onto the enquiry — sent_at +
+      // message_id on a successful client send, last_error
+      // concatenating any failures so admin sees an actionable signal.
+      // Wrapped so a DB hiccup here doesn't lose the customer's
+      // success page either.
+      try {
+        await env.DB.prepare(
+          `UPDATE enquiries
+              SET client_email_sent_at    = COALESCE(?, client_email_sent_at),
+                  client_email_message_id = COALESCE(?, client_email_message_id),
+                  client_email_last_error = ?
+            WHERE reference = ?`
+        )
+          .bind(
+            clientEmailOk ? new Date().toISOString() : null,
+            clientEmailMessageId,
+            emailErrors.length
+              ? emailErrors.join("; ").slice(0, 240)
+              : null,
+            reference
+          )
+          .run();
+      } catch (writeErr) {
+        console.error(
+          `accept-quote: failed to record email outcome on enquiry ref=${reference}:`,
+          writeErr
+        );
       }
     }
 
