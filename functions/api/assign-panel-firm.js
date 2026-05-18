@@ -110,9 +110,52 @@ export async function onRequestPost(context) {
       env.DB.prepare(`SELECT client_name,client_email,property_address,transaction_type,price,tenure,postcode,referrer_id FROM enquiries WHERE reference=? LIMIT 1`).bind(reference).first(),
     ]);
 
-    // Pattern B: notify the referrer when their requested allocation is
-    // approved. Looks up the referrer's contact_email (preferred) or
-    // portal_email; silently skips if neither is set.
+    // Risk 1 — both notification emails (referrer + firm) used to be
+    // fire-and-forget with bare .catch(console.error) and no
+    // response.ok check, so a 4xx/5xx from Resend was swallowed in the
+    // tail log with no record on the row. We now check response.ok on
+    // each, collect a structured outcome per email, and record:
+    //   - latest sent_at + that send's message_id (firm preferred, the
+    //     primary notification) on success
+    //   - a concatenated last_error string identifying which email
+    //     failed on failure
+    // The DB allocation has already been committed above — it is the
+    // admin's action and stays committed regardless of email outcome.
+    // The admin sees the partial failure in the response body so they
+    // can retry the specific email out of band.
+
+    const sendNotification = async ({ label, payload }) => {
+      try {
+        const resp = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (resp.ok) {
+          const okJson = await resp.json().catch(() => ({}));
+          return { ok: true, label, messageId: okJson?.id || null };
+        }
+        const errBody = await resp.text().catch(() => "");
+        const detail = `HTTP ${resp.status} ${errBody}`.slice(0, 240);
+        console.error(
+          `assign-panel-firm: ${label} email failed for ref=${reference}: ${detail}`
+        );
+        return { ok: false, label, error: detail };
+      } catch (err) {
+        const detail = String(err instanceof Error ? err.message : err).slice(0, 240);
+        console.error(
+          `assign-panel-firm: ${label} email threw for ref=${reference}:`,
+          err
+        );
+        return { ok: false, label, error: detail };
+      }
+    };
+
+    const emailResults = [];
+
     if (enquiryRow?.referrer_id && env.RESEND_API_KEY) {
       const referrerRow = await env.DB.prepare(
         `SELECT referrer_name, contact_email, portal_email FROM referrers WHERE id = ? LIMIT 1`
@@ -120,10 +163,9 @@ export async function onRequestPost(context) {
       const referrerEmail = referrerRow?.contact_email || referrerRow?.portal_email;
       if (referrerEmail) {
         const txLabel = getTransactionLabel(enquiryRow?.transaction_type);
-        await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
-          body: JSON.stringify({
+        emailResults.push(await sendNotification({
+          label: "referrer",
+          payload: {
             from: "ConveyQuote <quotes@conveyquote.uk>",
             to: [referrerEmail],
             subject: `Allocated to ${firm_name} — ${reference}`,
@@ -141,8 +183,8 @@ export async function onRequestPost(context) {
                 </table>
               </div>
             </div>`,
-          }),
-        }).catch((err) => console.error("Referrer allocation email error:", err));
+          },
+        }));
       }
     }
 
@@ -153,10 +195,9 @@ export async function onRequestPost(context) {
       const transactionLabel = getTransactionLabel(enquiryRow?.transaction_type);
       const price = enquiryRow?.price ? `£${Number(enquiryRow.price).toLocaleString("en-GB")}` : "Not provided";
 
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
-        body: JSON.stringify({
+      emailResults.push(await sendNotification({
+        label: "firm",
+        payload: {
           from: "ConveyQuote <quotes@conveyquote.uk>",
           to: [firmEmail],
           subject: `New Referral – ${transactionLabel} – ${reference}`,
@@ -177,11 +218,56 @@ export async function onRequestPost(context) {
                 ? `<div style="text-align:center;margin:24px 0;"><a href="${portalUrl}" style="background:#0f2747;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Log in to Firm Portal →</a></div>`
                 : `<p>Please contact <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a> to respond to this referral.</p>`}
             </div></div>`,
-        }),
-      }).catch((err) => console.error("Firm email error:", err));
+        },
+      }));
     }
 
-    return jsonResponse({ success: true, reference });
+    // Roll results up onto the enquiry. Firm message id wins over
+    // referrer's for client_email_message_id since the firm email is
+    // the primary notification on this endpoint.
+    const failures = emailResults.filter((r) => !r.ok);
+    const successes = emailResults.filter((r) => r.ok);
+    const firmSuccess = successes.find((r) => r.label === "firm");
+    const anySuccess = successes[0];
+    const successMessageId = firmSuccess?.messageId || anySuccess?.messageId || null;
+    const lastErrorString = failures.length
+      ? failures.map((r) => `${r.label}: ${r.error}`).join("; ").slice(0, 240)
+      : null;
+
+    if (emailResults.length > 0) {
+      try {
+        await env.DB.prepare(
+          `UPDATE enquiries
+              SET client_email_sent_at    = COALESCE(?, client_email_sent_at),
+                  client_email_message_id = COALESCE(?, client_email_message_id),
+                  client_email_last_error = ?
+            WHERE reference = ?`
+        )
+          .bind(
+            successes.length > 0 ? new Date().toISOString() : null,
+            successMessageId,
+            lastErrorString,
+            reference
+          )
+          .run();
+      } catch (writeErr) {
+        console.error(
+          `assign-panel-firm: failed to record email outcome on enquiry ref=${reference}:`,
+          writeErr
+        );
+      }
+    }
+
+    return jsonResponse({
+      success: true,
+      reference,
+      emails: emailResults.map((r) => ({
+        label: r.label,
+        ok: r.ok,
+        error: r.error || null,
+      })),
+      email_error: lastErrorString,
+    });
   } catch (error) {
     return jsonResponse({ success: false, error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
