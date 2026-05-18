@@ -223,8 +223,8 @@ export async function onRequestPost(context) {
     }
 
     // Roll results up onto the enquiry. Firm message id wins over
-    // referrer's for client_email_message_id since the firm email is
-    // the primary notification on this endpoint.
+    // referrer's for notification_email_message_id since the firm email
+    // is the primary notification on this endpoint.
     const failures = emailResults.filter((r) => !r.ok);
     const successes = emailResults.filter((r) => r.ok);
     const firmSuccess = successes.find((r) => r.label === "firm");
@@ -238,9 +238,9 @@ export async function onRequestPost(context) {
       try {
         await env.DB.prepare(
           `UPDATE enquiries
-              SET client_email_sent_at    = COALESCE(?, client_email_sent_at),
-                  client_email_message_id = COALESCE(?, client_email_message_id),
-                  client_email_last_error = ?
+              SET notification_email_sent_at    = COALESCE(?, notification_email_sent_at),
+                  notification_email_message_id = COALESCE(?, notification_email_message_id),
+                  notification_email_last_error = ?
             WHERE reference = ?`
         )
           .bind(

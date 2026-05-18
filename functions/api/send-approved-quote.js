@@ -722,7 +722,7 @@ export async function onRequestPost(context) {
       try {
         await env.DB.prepare(
           `UPDATE enquiries
-              SET client_email_last_error = ?
+              SET notification_email_last_error = ?
             WHERE reference = ?`
         )
           .bind(short, quoteReference)
@@ -745,9 +745,9 @@ export async function onRequestPost(context) {
        SET approved_quote_json = ?,
            approved_quote_amount = ?,
            status = 'quote_sent',
-           client_email_sent_at = ?,
-           client_email_message_id = ?,
-           client_email_last_error = NULL
+           notification_email_sent_at = ?,
+           notification_email_message_id = ?,
+           notification_email_last_error = NULL
        WHERE reference = ?`
     )
       .bind(

@@ -744,9 +744,9 @@ export async function onRequestPost(context) {
       try {
         await env.DB.prepare(
           `UPDATE enquiries
-              SET client_email_sent_at    = COALESCE(?, client_email_sent_at),
-                  client_email_message_id = COALESCE(?, client_email_message_id),
-                  client_email_last_error = ?
+              SET notification_email_sent_at    = COALESCE(?, notification_email_sent_at),
+                  notification_email_message_id = COALESCE(?, notification_email_message_id),
+                  notification_email_last_error = ?
             WHERE reference = ?`
         )
           .bind(

@@ -134,9 +134,9 @@ export async function onRequestPost(context) {
            firm_response_notes    = ?,
            panel_status           = ?,
            updated_at             = datetime('now'),
-           client_email_sent_at   = COALESCE(?, client_email_sent_at),
-           client_email_message_id = COALESCE(?, client_email_message_id),
-           client_email_last_error = ?
+           notification_email_sent_at   = COALESCE(?, notification_email_sent_at),
+           notification_email_message_id = COALESCE(?, notification_email_message_id),
+           notification_email_last_error = ?
        WHERE reference = ?`
     )
       .bind(

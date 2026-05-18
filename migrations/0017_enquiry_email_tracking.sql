@@ -1,26 +1,34 @@
--- Risk 1 (send-failure ordering) — email delivery tracking on enquiries.
+-- Risk 1 (send-failure ordering) — notification email delivery tracking
+-- on enquiries.
 --
--- Mirrors the three columns migration 0009 added to firm_issued_quotes,
--- now applied to enquiries so the same "send first, record outcome"
--- pattern can be used by every endpoint that emails the client.
+-- Adds three columns to enquiries so any endpoint that emails ABOUT an
+-- enquiry can record whether the send went through, the Resend message
+-- id, and the error string if it did not. Unlike the same-named columns
+-- on firm_issued_quotes (migration 0009), the email recorded here is
+-- not always a client-facing email — it is whichever notification is
+-- relevant to the action being taken on the enquiry. Hence the name
+-- "notification_email_*" rather than "client_email_*":
 --
--- Used by:
---   - send-approved-quote.js    (admin sends an approved quote)
---   - referrer-submit-enquiry.js (referrer submits + optionally emails)
---   - accept-quote.js / reject-quote.js (customer-facing flows)
---   - assign-panel-firm.js      (firm + referrer notifications)
---   - firm-respond-referral.js  (admin notification)
+--   - send-approved-quote.js       records the client quote email send
+--   - referrer-submit-enquiry.js   records the client quote email send
+--   - accept-quote.js              records the customer confirmation
+--                                  + internal admin notification
+--   - reject-quote.js              records the customer ack + internal
+--                                  admin notification
+--   - firm-respond-referral.js     records the admin notification send
+--   - assign-panel-firm.js         records the firm + referrer
+--                                  allocation notifications
 --
 -- Semantics:
---   client_email_sent_at      ISO timestamp of the most recent successful
---                             send. NULL if it has not yet been emailed.
---   client_email_message_id   Resend message id from the most recent
---                             successful send (used when chasing a
---                             delivery problem with Resend).
---   client_email_last_error   Short error string from the most recent
---                             failed send. Cleared back to NULL on the
---                             next successful send so a row never shows
---                             a stale failure after recovery.
+--   notification_email_sent_at      ISO timestamp of the most recent
+--                                   successful send. NULL if not yet
+--                                   emailed.
+--   notification_email_message_id   Resend message id from the most
+--                                   recent successful send (used when
+--                                   chasing a delivery problem).
+--   notification_email_last_error   Short error string from the most
+--                                   recent failed send. Cleared back to
+--                                   NULL on the next successful send.
 --
 -- SQLite idempotency caveat
 -- -------------------------
@@ -30,6 +38,6 @@
 -- enquiries goes from 64 to 67 columns — well within the D1 100-column
 -- cap.
 
-ALTER TABLE enquiries ADD COLUMN client_email_sent_at TEXT;
-ALTER TABLE enquiries ADD COLUMN client_email_message_id TEXT;
-ALTER TABLE enquiries ADD COLUMN client_email_last_error TEXT;
+ALTER TABLE enquiries ADD COLUMN notification_email_sent_at TEXT;
+ALTER TABLE enquiries ADD COLUMN notification_email_message_id TEXT;
+ALTER TABLE enquiries ADD COLUMN notification_email_last_error TEXT;
