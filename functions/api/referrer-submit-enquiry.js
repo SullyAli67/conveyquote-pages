@@ -334,7 +334,6 @@ export async function onRequestPost(context) {
       uk_resident_for_sdlt: ukResidentForSdlt || null,
       lifetime_isa: lifetimeIsa || null,
       right_to_buy: rightToBuy || null,
-      sale_mortgage: saleMortgage || null,
       management_company: managementCompany || null,
       tenanted: tenanted || null,
       number_of_sellers: numberOfSellers || null,

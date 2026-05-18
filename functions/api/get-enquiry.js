@@ -23,6 +23,12 @@ export async function onRequestGet(context) {
     // admin UI consumes via LoadedEnquiry, plus the two *_quote_json columns
     // we parse and strip below.
     //
+    // The 16 PR2 variant columns (sale_*, *_combined, remortgage_transfer_*)
+    // are no longer selected here — migration 0016 drops them and the
+    // shadowVariantFields reconstruction below now reads only from
+    // quote_json. The Phase B backfill guarantees quote_json contains the
+    // recovered values for pre-PR-#49 referrer rows.
+    //
     // LEFT JOIN followup_state so follow-up tracking fields come back alongside
     // the enquiry. Aliased with fs_ prefix to avoid colliding with the vestigial
     // enquiries.quote_sent_at column that still exists on prod from batch 4.
@@ -36,19 +42,9 @@ export async function onRequestGet(context) {
               e.new_build, e.shared_ownership, e.help_to_buy, e.is_company,
               e.buy_to_let, e.gifted_deposit, e.additional_property,
               e.uk_resident_for_sdlt, e.lifetime_isa, e.right_to_buy,
-              e.sale_mortgage, e.management_company, e.tenanted, e.number_of_sellers,
+              e.management_company, e.tenanted, e.number_of_sellers,
               e.current_lender, e.new_lender, e.additional_borrowing,
               e.remortgage_transfer, e.transfer_mortgage, e.owners_changing,
-              e.sale_tenure, e.sale_price, e.sale_postcode,
-              e.sale_mortgage_combined, e.management_company_combined,
-              e.tenanted_combined, e.number_of_sellers_combined,
-              e.remortgage_transfer_tenure, e.remortgage_transfer_price,
-              e.remortgage_transfer_postcode,
-              e.remortgage_transfer_current_lender,
-              e.remortgage_transfer_new_lender,
-              e.remortgage_transfer_additional_borrowing,
-              e.remortgage_transfer_owners_changing,
-              e.remortgage_transfer_ownership_type,
               e.referrer_id,
               w.referrer_note,
               w.allocation_requested_at,
@@ -105,19 +101,14 @@ export async function onRequestGet(context) {
     // adminQuote prefers the saved approved version; falls back to base quote if not yet approved
     const authoritative = parsedApprovedQuote || parsedQuote;
 
-    // The snake_case shadow columns below are pure shadows of quote_json
-    // (camelCase) fields. Phase B PR1 stopped send-quote.js writing 17 of
-    // them and Phase B PR2 stopped it writing another 16 — new rows have
-    // NULL in the DB columns. We derive the snake_case fields from
-    // parsedQuote and expose them on the response, preserving the shape
-    // that the admin LoadedEnquiry in src/App.tsx consumes.
-    //
-    // PR2's 16 columns use a quote_json -> DB-column fallback because
-    // sale_mortgage is also written by referrer-submit-enquiry.js, whose
-    // quote_json doesn't include the form body. For referrer-submitted
-    // rows the DB column is the only source; for public-form rows
-    // quote_json wins and the DB column is NULL. PR1's 17 columns don't
-    // need the fallback (send-quote.js is the sole writer).
+    // The snake_case shadow fields below are pure shadows of quote_json
+    // (camelCase) fields. Phase B PR1 stopped send-quote.js writing 17
+    // and PR2 stopped it writing another 16; migration 0016 drops all 33.
+    // Reads are now quote_json-only — the previous DB-column fallback for
+    // PR2's 16 columns was retired once the Phase B backfill ensured
+    // pre-PR-#49 referrer rows had the recovered values in quote_json.
+    // Shape preserved so the admin LoadedEnquiry in src/App.tsx consumes
+    // the same keys it always has.
     const quoteSource =
       parsedQuote && typeof parsedQuote === "object" ? parsedQuote : {};
     const shadowVariantFields = {
@@ -142,56 +133,29 @@ export async function onRequestGet(context) {
       remortgage_transfer_has_mortgage:
         quoteSource.remortgageTransferHasMortgage || "",
 
-      sale_tenure: quoteSource.saleTenure || enquiry.sale_tenure || "",
-      sale_price: quoteSource.salePrice || enquiry.sale_price || "",
-      sale_postcode: quoteSource.salePostcode || enquiry.sale_postcode || "",
-      sale_mortgage: quoteSource.saleMortgage || enquiry.sale_mortgage || "",
-      sale_mortgage_combined:
-        quoteSource.saleMortgageCombined ||
-        enquiry.sale_mortgage_combined ||
-        "",
+      sale_tenure: quoteSource.saleTenure || "",
+      sale_price: quoteSource.salePrice || "",
+      sale_postcode: quoteSource.salePostcode || "",
+      sale_mortgage: quoteSource.saleMortgage || "",
+      sale_mortgage_combined: quoteSource.saleMortgageCombined || "",
       management_company_combined:
-        quoteSource.managementCompanyCombined ||
-        enquiry.management_company_combined ||
-        "",
-      tenanted_combined:
-        quoteSource.tenantedCombined || enquiry.tenanted_combined || "",
-      number_of_sellers_combined:
-        quoteSource.numberOfSellersCombined ||
-        enquiry.number_of_sellers_combined ||
-        "",
-      remortgage_transfer_tenure:
-        quoteSource.remortgageTransferTenure ||
-        enquiry.remortgage_transfer_tenure ||
-        "",
-      remortgage_transfer_price:
-        quoteSource.remortgageTransferPrice ||
-        enquiry.remortgage_transfer_price ||
-        "",
+        quoteSource.managementCompanyCombined || "",
+      tenanted_combined: quoteSource.tenantedCombined || "",
+      number_of_sellers_combined: quoteSource.numberOfSellersCombined || "",
+      remortgage_transfer_tenure: quoteSource.remortgageTransferTenure || "",
+      remortgage_transfer_price: quoteSource.remortgageTransferPrice || "",
       remortgage_transfer_postcode:
-        quoteSource.remortgageTransferPostcode ||
-        enquiry.remortgage_transfer_postcode ||
-        "",
+        quoteSource.remortgageTransferPostcode || "",
       remortgage_transfer_current_lender:
-        quoteSource.remortgageTransferCurrentLender ||
-        enquiry.remortgage_transfer_current_lender ||
-        "",
+        quoteSource.remortgageTransferCurrentLender || "",
       remortgage_transfer_new_lender:
-        quoteSource.remortgageTransferNewLender ||
-        enquiry.remortgage_transfer_new_lender ||
-        "",
+        quoteSource.remortgageTransferNewLender || "",
       remortgage_transfer_additional_borrowing:
-        quoteSource.remortgageTransferAdditionalBorrowing ||
-        enquiry.remortgage_transfer_additional_borrowing ||
-        "",
+        quoteSource.remortgageTransferAdditionalBorrowing || "",
       remortgage_transfer_owners_changing:
-        quoteSource.remortgageTransferOwnersChanging ||
-        enquiry.remortgage_transfer_owners_changing ||
-        "",
+        quoteSource.remortgageTransferOwnersChanging || "",
       remortgage_transfer_ownership_type:
-        quoteSource.remortgageTransferOwnershipType ||
-        enquiry.remortgage_transfer_ownership_type ||
-        "",
+        quoteSource.remortgageTransferOwnershipType || "",
     };
 
     const {
