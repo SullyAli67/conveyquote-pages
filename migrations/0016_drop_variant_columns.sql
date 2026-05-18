@@ -16,13 +16,13 @@
 --  ⚠ DO NOT RUN ANY STATEMENT IN THIS FILE UNTIL THE BACKFILL HAS
 --  ⚠ BEEN APPLIED AND VERIFIED.
 --
---  The backfill script — scripts/backfill-referrer-quote-json.js —
---  must have been run with --apply and its sample output reviewed
---  before any DROP COLUMN here is executed. Historical referrer
---  enquiries store sale_mortgage ONLY in the DB column (because
---  pre-PR-#49 referrer-submit-enquiry.js never spread the form body
---  into quote_json). Dropping sale_mortgage without the backfill
---  permanently loses that data, and admin re-calculation of those
+--  The backfill — migrations/0016a_backfill_referrer_quote_json.sql
+--  — must have been pasted into the D1 console and its post-check
+--  reviewed before any DROP COLUMN here is executed. Historical
+--  referrer enquiries store sale_mortgage ONLY in the DB column
+--  (because pre-PR-#49 referrer-submit-enquiry.js never spread the
+--  form body into quote_json). Dropping sale_mortgage without the
+--  backfill permanently loses that data, and admin re-calculation of
 --  enquiries would silently price them as cash sales — wrong quotes
 --  to clients.
 -- ─────────────────────────────────────────────────────────────────
