@@ -59,25 +59,13 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Record the firm's response
-    await env.DB.prepare(
-      `UPDATE enquiries
-       SET firm_response       = ?,
-           firm_responded_at   = datetime('now'),
-           firm_response_notes = ?,
-           panel_status        = ?,
-           updated_at          = datetime('now')
-       WHERE reference = ?`
-    )
-      .bind(
-        response,
-        notes || null,
-        response === "accepted" ? "firm_accepted" : "firm_declined",
-        reference
-      )
-      .run();
-
-    // Notify the ConveyQuote admin team by email
+    // Risk 1 — send the admin notification BEFORE writing the firm's
+    // response so the email outcome can be recorded onto the same row
+    // (sent_at / message_id on success, last_error on failure). The
+    // firm's response itself is the user-facing outcome and is always
+    // persisted; it is not gated on the admin email succeeding. The
+    // previous version called .catch(() => {}) on the fetch and
+    // silently swallowed every Resend failure.
     const firmRow = await env.DB.prepare(
       `SELECT firm_name FROM panel_firms WHERE id = ? LIMIT 1`
     )
@@ -88,32 +76,87 @@ export async function onRequestPost(context) {
     const action = response === "accepted" ? "accepted" : "declined";
     const adminUrl = `https://conveyquote.uk/admin?ref=${encodeURIComponent(reference)}`;
 
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: "ConveyQuote <quotes@conveyquote.uk>",
-        to: ["info@conveyquote.uk"],
-        subject: `Firm ${action} referral – ${reference}`,
-        html: `
-          <p style="font-family:sans-serif;">
-            <strong>${firmName}</strong> has <strong>${action}</strong>
-            the referral for enquiry <strong>${reference}</strong>.
-          </p>
-          ${notes ? `<p style="font-family:sans-serif;">Notes: ${notes}</p>` : ""}
-          <p style="font-family:sans-serif;">
-            <a href="${adminUrl}">View enquiry in admin panel →</a>
-          </p>
-        `,
-      }),
-    }).catch(() => {
-      // Don't fail the request if email fails
-    });
+    let emailSentAt = null;
+    let emailMessageId = null;
+    let emailLastError = null;
 
-    return jsonResponse({ success: true, reference, response });
+    if (env.RESEND_API_KEY) {
+      try {
+        const notifyResp = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: ["info@conveyquote.uk"],
+            subject: `Firm ${action} referral – ${reference}`,
+            html: `
+              <p style="font-family:sans-serif;">
+                <strong>${firmName}</strong> has <strong>${action}</strong>
+                the referral for enquiry <strong>${reference}</strong>.
+              </p>
+              ${notes ? `<p style="font-family:sans-serif;">Notes: ${notes}</p>` : ""}
+              <p style="font-family:sans-serif;">
+                <a href="${adminUrl}">View enquiry in admin panel →</a>
+              </p>
+            `,
+          }),
+        });
+        if (notifyResp.ok) {
+          const okJson = await notifyResp.json().catch(() => ({}));
+          emailMessageId = okJson?.id || null;
+          emailSentAt = new Date().toISOString();
+        } else {
+          const errBody = await notifyResp.text().catch(() => "");
+          emailLastError = `HTTP ${notifyResp.status} ${errBody}`.slice(0, 240);
+          console.error(
+            `firm-respond-referral: admin notification failed for ref=${reference} http=${notifyResp.status} body=${errBody.slice(0, 240)}`
+          );
+        }
+      } catch (notifyErr) {
+        emailLastError = String(
+          notifyErr instanceof Error ? notifyErr.message : notifyErr
+        ).slice(0, 240);
+        console.error(
+          `firm-respond-referral: admin notification threw for ref=${reference}:`,
+          notifyErr
+        );
+      }
+    }
+
+    // Record the firm's response and the email outcome together.
+    await env.DB.prepare(
+      `UPDATE enquiries
+       SET firm_response          = ?,
+           firm_responded_at      = datetime('now'),
+           firm_response_notes    = ?,
+           panel_status           = ?,
+           updated_at             = datetime('now'),
+           client_email_sent_at   = COALESCE(?, client_email_sent_at),
+           client_email_message_id = COALESCE(?, client_email_message_id),
+           client_email_last_error = ?
+       WHERE reference = ?`
+    )
+      .bind(
+        response,
+        notes || null,
+        response === "accepted" ? "firm_accepted" : "firm_declined",
+        emailSentAt,
+        emailMessageId,
+        emailLastError,
+        reference
+      )
+      .run();
+
+    return jsonResponse({
+      success: true,
+      reference,
+      response,
+      email_sent: emailSentAt !== null,
+      email_error: emailLastError,
+    });
   } catch (error) {
     return jsonResponse(
       {
