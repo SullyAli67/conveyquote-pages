@@ -342,7 +342,7 @@ export async function onRequestPost(context) {
       remortgage_transfer: remortgageTransfer || null,
       transfer_mortgage: transferMortgage || null,
       owners_changing: ownersChanging || null,
-      quote_json: JSON.stringify(quote),
+      quote_json: JSON.stringify({ ...body, ...quote }),
       status: "new",
       referrer_id: referrerId,
       referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
