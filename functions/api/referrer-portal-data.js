@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
          e.shared_ownership, e.help_to_buy, e.is_company, e.buy_to_let,
          e.gifted_deposit, e.additional_property, e.uk_resident_for_sdlt,
          e.lifetime_isa, e.right_to_buy,
-         e.sale_mortgage, e.management_company, e.tenanted, e.number_of_sellers,
+         e.management_company, e.tenanted, e.number_of_sellers,
          e.additional_borrowing, e.remortgage_transfer, e.transfer_mortgage,
          e.owners_changing,
          w.parent_enquiry_id, w.allocated_at,
@@ -65,17 +65,27 @@ export async function onRequestGet(context) {
       }
     }
 
-    // Prefer approved_quote_json (admin-reviewed, sent to client) over auto-generated quote_json
+    // Prefer approved_quote_json (admin-reviewed, sent to client) over
+    // auto-generated quote_json. sale_mortgage used to be SELECTed from
+    // its own column; migration 0016 drops that column, and PR #49 + the
+    // Phase B backfill guarantee quote_json carries saleMortgage instead.
+    // The portal's re-quote pre-fill reads enq.sale_mortgage, so surface
+    // it here from the parsed quote.
     const enquiries = rows.map((e) => {
       let quote = null;
       const rawJson = e.approved_quote_json || e.quote_json;
       if (rawJson) {
         try { quote = JSON.parse(rawJson); } catch {}
       }
+      let baseQuote = null;
+      if (e.quote_json) {
+        try { baseQuote = JSON.parse(e.quote_json); } catch {}
+      }
       const { quote_json, approved_quote_json, ...rest } = e;
       const successor = childByParent.get(Number(e.id)) || null;
       return {
         ...rest,
+        sale_mortgage: (baseQuote && baseQuote.saleMortgage) || "",
         quote,
         has_approved_quote: Boolean(e.approved_quote_json),
         successor_reference: successor ? successor.reference : null,
