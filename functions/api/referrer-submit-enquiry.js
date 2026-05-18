@@ -369,39 +369,57 @@ export async function onRequestPost(context) {
     const transactionLabel = getTransactionLabel(type);
     const adminUrl = `https://conveyquote.uk/admin/?ref=${encodeURIComponent(reference)}`;
 
-    // Email admin
+    // Risk 1 — admin notification. Previously .catch(console.error)
+    // silently swallowed any Resend failure. Now we check response.ok
+    // and log with HTTP status + body snippet. The enquiry has already
+    // been created above (the user-facing outcome), so an admin-email
+    // failure is recorded as adminEmailError on the response and in
+    // the tail log; it does not roll back the enquiry insert.
+    let adminEmailError = null;
     if (env.RESEND_API_KEY) {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: "ConveyQuote <quotes@conveyquote.uk>",
-          to: ["info@conveyquote.uk"],
-          subject: `New Referrer Enquiry – ${transactionLabel} – ${reference}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
-              <div style="background:#0f2747;padding:20px 24px;border-radius:8px 8px 0 0;">
-                <h2 style="color:#fff;margin:0;font-size:18px;">New Referrer Enquiry</h2>
-              </div>
-              <div style="padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-                <table style="border-collapse:collapse;width:100%;">
-                  <tr><td style="padding:7px 0;color:#6b7280;width:40%;">Reference</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(reference)}</td></tr>
-                  <tr><td style="padding:7px 0;color:#6b7280;">Referred by</td><td style="padding:7px 0;">${escapeHtml(referrer.referrer_name)}</td></tr>
-                  <tr><td style="padding:7px 0;color:#6b7280;">Client</td><td style="padding:7px 0;">${escapeHtml(name || email)}</td></tr>
-                  <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(transactionLabel)}</td></tr>
-                  <tr><td style="padding:7px 0;color:#6b7280;">Property value</td><td style="padding:7px 0;">${formatMoney(price)}</td></tr>
-                  ${Number(referrer.referral_fee) > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${Number(referrer.referral_fee).toFixed(2)}</td></tr>` : ""}
-                </table>
-                <div style="margin-top:16px;">
-                  <a href="${adminUrl}" style="background:#0f2747;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">
-                    Review in Admin →
-                  </a>
+      try {
+        const adminResp = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: ["info@conveyquote.uk"],
+            subject: `New Referrer Enquiry – ${transactionLabel} – ${reference}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
+                <div style="background:#0f2747;padding:20px 24px;border-radius:8px 8px 0 0;">
+                  <h2 style="color:#fff;margin:0;font-size:18px;">New Referrer Enquiry</h2>
+                </div>
+                <div style="padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+                  <table style="border-collapse:collapse;width:100%;">
+                    <tr><td style="padding:7px 0;color:#6b7280;width:40%;">Reference</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(reference)}</td></tr>
+                    <tr><td style="padding:7px 0;color:#6b7280;">Referred by</td><td style="padding:7px 0;">${escapeHtml(referrer.referrer_name)}</td></tr>
+                    <tr><td style="padding:7px 0;color:#6b7280;">Client</td><td style="padding:7px 0;">${escapeHtml(name || email)}</td></tr>
+                    <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(transactionLabel)}</td></tr>
+                    <tr><td style="padding:7px 0;color:#6b7280;">Property value</td><td style="padding:7px 0;">${formatMoney(price)}</td></tr>
+                    ${Number(referrer.referral_fee) > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${Number(referrer.referral_fee).toFixed(2)}</td></tr>` : ""}
+                  </table>
+                  <div style="margin-top:16px;">
+                    <a href="${adminUrl}" style="background:#0f2747;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">
+                      Review in Admin →
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
-          `,
-        }),
-      }).catch((e) => console.error("Referrer enquiry email error:", e));
+            `,
+          }),
+        });
+        if (!adminResp.ok) {
+          const errBody = await adminResp.text().catch(() => "");
+          adminEmailError = `HTTP ${adminResp.status} ${errBody}`.slice(0, 240);
+          console.error(
+            `referrer-submit-enquiry: admin notification failed for ref=${reference}: ${adminEmailError}`
+          );
+        }
+      } catch (e) {
+        adminEmailError = String(e instanceof Error ? e.message : e).slice(0, 240);
+        console.error("Referrer enquiry email error:", e);
+      }
     }
 
     // Optionally email the calculated quote directly to the client
@@ -680,30 +698,93 @@ export async function onRequestPost(context) {
 </body>
 </html>`;
 
-      const resendResponse = await fetch("https://api.resend.com/emails", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${env.RESEND_API_KEY}`,
-  },
-  body: JSON.stringify({
-    from: "ConveyQuote <quotes@conveyquote.uk>",
-    to: [email],
-    reply_to: "info@conveyquote.uk",
-    subject: `Your Conveyancing Quote — ${reference}`,
-    html: clientHtml,
-  }),
-});
+      // Risk 1 — client quote email already checked response.ok but
+      // failure was logged only. We now also record the outcome on the
+      // enquiry's email-tracking columns: sent_at + message_id on
+      // success, last_error on failure. The enquiry row still exists
+      // either way — the referrer's submission was the user-facing
+      // action and must not roll back on a Resend hiccup.
+      let clientEmailError = null;
+      let clientEmailMessageId = null;
+      try {
+        const resendResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: [email],
+            reply_to: "info@conveyquote.uk",
+            subject: `Your Conveyancing Quote — ${reference}`,
+            html: clientHtml,
+          }),
+        });
 
-if (!resendResponse.ok) {
-  const resendErrorText = await resendResponse.text();
-  console.error("Client quote email error:", resendErrorText);
-} else {
-  clientEmailed = true;
-}
+        if (!resendResponse.ok) {
+          const resendErrorText = await resendResponse.text().catch(() => "");
+          clientEmailError = `HTTP ${resendResponse.status} ${resendErrorText}`.slice(0, 240);
+          console.error(
+            `referrer-submit-enquiry: client quote email failed for ref=${reference}: ${clientEmailError}`
+          );
+        } else {
+          const okJson = await resendResponse.json().catch(() => ({}));
+          clientEmailMessageId = okJson?.id || null;
+          clientEmailed = true;
+        }
+      } catch (sendErr) {
+        clientEmailError = String(sendErr instanceof Error ? sendErr.message : sendErr).slice(0, 240);
+        console.error(
+          `referrer-submit-enquiry: client quote email threw for ref=${reference}:`,
+          sendErr
+        );
+      }
+
+      try {
+        await env.DB.prepare(
+          `UPDATE enquiries
+              SET notification_email_sent_at    = COALESCE(?, notification_email_sent_at),
+                  notification_email_message_id = COALESCE(?, notification_email_message_id),
+                  notification_email_last_error = ?
+            WHERE reference = ?`
+        )
+          .bind(
+            clientEmailed ? new Date().toISOString() : null,
+            clientEmailMessageId,
+            clientEmailError,
+            reference
+          )
+          .run();
+      } catch (writeErr) {
+        console.error(
+          `referrer-submit-enquiry: failed to record client email outcome on enquiry ref=${reference}:`,
+          writeErr
+        );
+      }
+
+      // Surface client-email failure to the caller so the referrer's
+      // UI can show "enquiry saved — quote email failed, please retry"
+      // instead of "quote sent" when it wasn't.
+      if (clientEmailError) {
+        return jsonResponse({
+          success: true,
+          reference,
+          quote,
+          client_emailed: false,
+          client_email_error: clientEmailError,
+          admin_email_error: adminEmailError,
+        });
+      }
     }
 
-    return jsonResponse({ success: true, reference, quote, client_emailed: clientEmailed });
+    return jsonResponse({
+      success: true,
+      reference,
+      quote,
+      client_emailed: clientEmailed,
+      admin_email_error: adminEmailError,
+    });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
   }

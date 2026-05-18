@@ -654,7 +654,6 @@ export async function onRequestPost(context) {
       </html>
     `;
 
-    // ── Step 1: Persist the approved quote BEFORE sending the email ──────────
     const approvedQuoteRecord = {
       legalFees: quoteData?.legalFees || [],
       disbursements: quoteData?.disbursements || [],
@@ -673,27 +672,19 @@ export async function onRequestPost(context) {
       manualAdjustment: adjustment || undefined,
     };
 
-    await env.DB.prepare(
-      `UPDATE enquiries
-       SET approved_quote_json = ?,
-           approved_quote_amount = ?,
-           status = 'quote_sent'
-       WHERE reference = ?`
-    )
-      .bind(
-        JSON.stringify(approvedQuoteRecord),
-        finalQuoteAmountValue,
-        quoteReference
-      )
-      .run();
-
     const firstName = safe(name).trim().split(" ")[0];
     const subjectAmount = displayQuoteAmount.split(".")[0];
     const emailSubject = firstName
       ? `${firstName}, your conveyancing quote is ready (£${subjectAmount})`
       : `Your conveyancing quote is ready (£${subjectAmount})`;
 
-    // ── Step 2: Send the email using the same data that was just saved ────────
+    // ── Step 1: Send the email FIRST ───────────────────────────────────────
+    // Risk 1 — send-failure ordering. Previously we wrote
+    // status='quote_sent' + approved_quote_json to D1 BEFORE the Resend
+    // call, then returned 500 on failure with no rollback, leaving rows
+    // permanently stamped "quote_sent" for emails the customer never
+    // actually received. We now send first; the D1 write only happens
+    // when Resend confirms acceptance.
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -716,11 +707,57 @@ export async function onRequestPost(context) {
       }),
     });
 
-    const data = await resendResponse.json();
+    const data = await resendResponse.json().catch(() => ({}));
 
     if (!resendResponse.ok) {
-      return jsonResponse({ success: false, data }, 500);
+      // Send failed — record the error on the enquiry row so admin sees
+      // an actionable "Last send failed" hint, but do NOT advance status
+      // to 'quote_sent' and do NOT persist approved_quote_json. The
+      // admin's form state still holds the values they typed, so a
+      // retry sends the same quote.
+      const detail =
+        (data && (data.message || data.error)) ||
+        `HTTP ${resendResponse.status}`;
+      const short = String(detail).slice(0, 240);
+      try {
+        await env.DB.prepare(
+          `UPDATE enquiries
+              SET notification_email_last_error = ?
+            WHERE reference = ?`
+        )
+          .bind(short, quoteReference)
+          .run();
+      } catch (writeErr) {
+        console.error(
+          "send-approved-quote: failed to record email error on enquiry:",
+          writeErr
+        );
+      }
+      return jsonResponse({ success: false, data, detail: short }, 500);
     }
+
+    // ── Step 2: Persist the approved quote and advance status ────────────
+    const messageId = data?.id || null;
+    const sentAt = new Date().toISOString();
+
+    await env.DB.prepare(
+      `UPDATE enquiries
+       SET approved_quote_json = ?,
+           approved_quote_amount = ?,
+           status = 'quote_sent',
+           notification_email_sent_at = ?,
+           notification_email_message_id = ?,
+           notification_email_last_error = NULL
+       WHERE reference = ?`
+    )
+      .bind(
+        JSON.stringify(approvedQuoteRecord),
+        finalQuoteAmountValue,
+        sentAt,
+        messageId,
+        quoteReference
+      )
+      .run();
 
     // Start (or reset) the 14-day follow-up clock now that the email is out.
     // Lives in followup_state because enquiries is at D1's column ceiling.

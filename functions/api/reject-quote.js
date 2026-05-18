@@ -349,6 +349,15 @@ const buildCustomerAckHtml = ({
   </div>
 `;
 
+// Risk 1 — customer-facing endpoint. The customer's decline is
+// recorded BEFORE these emails go out (see callers) and is the
+// user-facing outcome that must always succeed; we must never show
+// the customer a 500 error page because an internal Resend call
+// failed. This function used to throw on either email failure,
+// which the outer try/catch then surfaced as a generic 500 to the
+// customer. It now returns a structured outcome — the caller logs
+// it onto the enquiry's email-tracking columns and the customer
+// still sees the clean thank-you page either way.
 const sendDeclineEmails = async ({
   env,
   reference,
@@ -361,54 +370,118 @@ const sendDeclineEmails = async ({
   const reasonLabel = REASONS[reasonKey] || REASONS.skip;
   const reasonAckLine = CUSTOMER_REASON_ACK[reasonKey] || "";
 
-  const internalEmail = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: "ConveyQuote <quotes@conveyquote.uk>",
-      to: ["info@conveyquote.uk"],
-      reply_to: "info@conveyquote.uk",
-      subject: `Client declined quote - ${reference}`,
-      html: buildInternalEmailHtml({
-        reference,
-        clientName,
-        clientEmail,
-        transactionType,
-        reasonLabel,
-        reasonText,
-      }),
-    }),
-  });
+  const errors = [];
+  let customerOk = false;
+  let customerMessageId = null;
 
-  if (!internalEmail.ok) {
-    throw new Error("Failed to send internal notification email.");
+  try {
+    const internalEmail = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "ConveyQuote <quotes@conveyquote.uk>",
+        to: ["info@conveyquote.uk"],
+        reply_to: "info@conveyquote.uk",
+        subject: `Client declined quote - ${reference}`,
+        html: buildInternalEmailHtml({
+          reference,
+          clientName,
+          clientEmail,
+          transactionType,
+          reasonLabel,
+          reasonText,
+        }),
+      }),
+    });
+    if (!internalEmail.ok) {
+      const body = await internalEmail.text().catch(() => "");
+      const detail = `HTTP ${internalEmail.status} ${body}`.slice(0, 240);
+      errors.push(`internal: ${detail}`);
+      console.error(
+        `reject-quote: internal notification failed for ref=${reference}: ${detail}`
+      );
+    }
+  } catch (err) {
+    const detail = String(err instanceof Error ? err.message : err).slice(0, 240);
+    errors.push(`internal: ${detail}`);
+    console.error(
+      `reject-quote: internal notification threw for ref=${reference}:`,
+      err
+    );
   }
 
-  const customerEmail = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: "ConveyQuote <quotes@conveyquote.uk>",
-      to: [clientEmail],
-      reply_to: "info@conveyquote.uk",
-      subject: `We've recorded your decision - ${reference}`,
-      html: buildCustomerAckHtml({
-        reference,
-        clientName,
-        transactionType,
-        reasonAckLine,
+  try {
+    const customerEmail = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "ConveyQuote <quotes@conveyquote.uk>",
+        to: [clientEmail],
+        reply_to: "info@conveyquote.uk",
+        subject: `We've recorded your decision - ${reference}`,
+        html: buildCustomerAckHtml({
+          reference,
+          clientName,
+          transactionType,
+          reasonAckLine,
+        }),
       }),
-    }),
-  });
+    });
+    if (!customerEmail.ok) {
+      const body = await customerEmail.text().catch(() => "");
+      const detail = `HTTP ${customerEmail.status} ${body}`.slice(0, 240);
+      errors.push(`client: ${detail}`);
+      console.error(
+        `reject-quote: client confirmation failed for ref=${reference}: ${detail}`
+      );
+    } else {
+      const okJson = await customerEmail.json().catch(() => ({}));
+      customerMessageId = okJson?.id || null;
+      customerOk = true;
+    }
+  } catch (err) {
+    const detail = String(err instanceof Error ? err.message : err).slice(0, 240);
+    errors.push(`client: ${detail}`);
+    console.error(
+      `reject-quote: client confirmation threw for ref=${reference}:`,
+      err
+    );
+  }
 
-  if (!customerEmail.ok) {
-    throw new Error("Failed to send client confirmation email.");
+  return {
+    customerOk,
+    customerMessageId,
+    lastError: errors.length ? errors.join("; ").slice(0, 240) : null,
+  };
+};
+
+const recordEmailOutcome = async (env, reference, outcome) => {
+  try {
+    await env.DB.prepare(
+      `UPDATE enquiries
+          SET notification_email_sent_at    = COALESCE(?, notification_email_sent_at),
+              notification_email_message_id = COALESCE(?, notification_email_message_id),
+              notification_email_last_error = ?
+        WHERE reference = ?`
+    )
+      .bind(
+        outcome.customerOk ? new Date().toISOString() : null,
+        outcome.customerMessageId,
+        outcome.lastError,
+        reference
+      )
+      .run();
+  } catch (writeErr) {
+    console.error(
+      `reject-quote: failed to record email outcome on enquiry ref=${reference}:`,
+      writeErr
+    );
   }
 };
 
@@ -482,7 +555,7 @@ export async function onRequestGet(context) {
 
     await recordRejection(env, reference, reason, null);
 
-    await sendDeclineEmails({
+    const outcome = await sendDeclineEmails({
       env,
       reference,
       clientName: enquiry.client_name || "Client",
@@ -491,6 +564,7 @@ export async function onRequestGet(context) {
       reasonKey: reason,
       reasonText: null,
     });
+    await recordEmailOutcome(env, reference, outcome);
 
     return htmlResponse(renderThankYouPage({ alreadyRecorded: false }));
   } catch (error) {
@@ -540,7 +614,7 @@ export async function onRequestPost(context) {
 
     await recordRejection(env, reference, reasonKey, reasonText);
 
-    await sendDeclineEmails({
+    const outcome = await sendDeclineEmails({
       env,
       reference,
       clientName: enquiry.client_name || "Client",
@@ -549,6 +623,7 @@ export async function onRequestPost(context) {
       reasonKey,
       reasonText,
     });
+    await recordEmailOutcome(env, reference, outcome);
 
     return htmlResponse(renderThankYouPage({ alreadyRecorded: false }));
   } catch (error) {

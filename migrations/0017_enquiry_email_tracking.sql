@@ -1,0 +1,43 @@
+-- Risk 1 (send-failure ordering) — notification email delivery tracking
+-- on enquiries.
+--
+-- Adds three columns to enquiries so any endpoint that emails ABOUT an
+-- enquiry can record whether the send went through, the Resend message
+-- id, and the error string if it did not. Unlike the same-named columns
+-- on firm_issued_quotes (migration 0009), the email recorded here is
+-- not always a client-facing email — it is whichever notification is
+-- relevant to the action being taken on the enquiry. Hence the name
+-- "notification_email_*" rather than "client_email_*":
+--
+--   - send-approved-quote.js       records the client quote email send
+--   - referrer-submit-enquiry.js   records the client quote email send
+--   - accept-quote.js              records the customer confirmation
+--                                  + internal admin notification
+--   - reject-quote.js              records the customer ack + internal
+--                                  admin notification
+--   - firm-respond-referral.js     records the admin notification send
+--   - assign-panel-firm.js         records the firm + referrer
+--                                  allocation notifications
+--
+-- Semantics:
+--   notification_email_sent_at      ISO timestamp of the most recent
+--                                   successful send. NULL if not yet
+--                                   emailed.
+--   notification_email_message_id   Resend message id from the most
+--                                   recent successful send (used when
+--                                   chasing a delivery problem).
+--   notification_email_last_error   Short error string from the most
+--                                   recent failed send. Cleared back to
+--                                   NULL on the next successful send.
+--
+-- SQLite idempotency caveat
+-- -------------------------
+-- ALTER TABLE … ADD COLUMN is NOT idempotent in SQLite — there is no
+-- "IF NOT EXISTS" form for ADD COLUMN. Apply ONE STATEMENT AT A TIME
+-- in the D1 console; if any of these columns already exist, skip them.
+-- enquiries goes from 64 to 67 columns — well within the D1 100-column
+-- cap.
+
+ALTER TABLE enquiries ADD COLUMN notification_email_sent_at TEXT;
+ALTER TABLE enquiries ADD COLUMN notification_email_message_id TEXT;
+ALTER TABLE enquiries ADD COLUMN notification_email_last_error TEXT;

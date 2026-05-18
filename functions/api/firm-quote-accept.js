@@ -110,19 +110,36 @@ export async function onRequestGet(context) {
         // Mark as rejected
         await env.DB.prepare(`UPDATE firm_quote_tokens SET used = 1 WHERE id = ?`).bind(tokenRow.id).run();
         await env.DB.prepare(`UPDATE firm_quotes SET status = 'rejected', updated_at = datetime('now') WHERE id = ?`).bind(quote.id).run();
-        // Notify firm
+        // Notify firm. Risk 1 — replace .catch(() => {}) with a real
+        // response.ok check + console error so a failed firm-notification
+        // send is no longer silent. The customer's rejection is already
+        // recorded above and we still show them the clean confirmation
+        // page; only the internal notification is at stake here.
         const firmEmail2 = firm?.contact_email;
         if (firmEmail2 && env.RESEND_API_KEY) {
-          await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
-            body: JSON.stringify({
-              from: "ConveyQuote <noreply@conveyquote.uk>",
-              to: [firmEmail2],
-              subject: `Quote Declined – ${ref}`,
-              html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;"><p>A client has declined a quote.</p><p><strong>Reference:</strong> ${escapeHtml(ref)}</p><p><strong>Client:</strong> ${escapeHtml(quote.client_name || quote.client_email)}</p></div>`,
-            }),
-          }).catch(() => {});
+          try {
+            const notifyResp = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.RESEND_API_KEY}` },
+              body: JSON.stringify({
+                from: "ConveyQuote <noreply@conveyquote.uk>",
+                to: [firmEmail2],
+                subject: `Quote Declined – ${ref}`,
+                html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;"><p>A client has declined a quote.</p><p><strong>Reference:</strong> ${escapeHtml(ref)}</p><p><strong>Client:</strong> ${escapeHtml(quote.client_name || quote.client_email)}</p></div>`,
+              }),
+            });
+            if (!notifyResp.ok) {
+              const errBody = await notifyResp.text().catch(() => "");
+              console.error(
+                `firm-quote-accept: firm rejection notification failed for ref=${ref} firm=${firmEmail2} http=${notifyResp.status} body=${errBody.slice(0, 240)}`
+              );
+            }
+          } catch (notifyErr) {
+            console.error(
+              `firm-quote-accept: firm rejection notification threw for ref=${ref} firm=${firmEmail2}:`,
+              notifyErr
+            );
+          }
         }
         return new Response(
           page("Quote Declined", "Quote Declined", `
@@ -158,30 +175,47 @@ export async function onRequestGet(context) {
        WHERE id = ?`
     ).bind(quote.id).run();
 
-    // Notify the firm
+    // Notify the firm. Risk 1 — the customer's acceptance is already
+    // committed above and is the user-facing outcome that must succeed
+    // independently. Here we keep the customer on the success page no
+    // matter what, but a failure to notify the firm is logged with
+    // enough detail to be actionable (no more silent .catch(() => {})).
     const firmEmail = firm?.contact_email;
     if (firmEmail && env.RESEND_API_KEY) {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: "ConveyQuote <noreply@conveyquote.uk>",
-          to: [firmEmail],
-          subject: `Quote Accepted – ${ref}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
-              <p>A client has accepted a quote.</p>
-              <p><strong>Reference:</strong> ${escapeHtml(ref)}</p>
-              <p><strong>Client:</strong> ${escapeHtml(quote.client_name || quote.client_email)}</p>
-              <p>Log in to your firm portal to view the details.</p>
-              <p style="color:#9ca3af;font-size:12px;">Powered by ConveyQuote</p>
-            </div>
-          `,
-        }),
-      }).catch(() => {});
+      try {
+        const notifyResp = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "ConveyQuote <noreply@conveyquote.uk>",
+            to: [firmEmail],
+            subject: `Quote Accepted – ${ref}`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>A client has accepted a quote.</p>
+                <p><strong>Reference:</strong> ${escapeHtml(ref)}</p>
+                <p><strong>Client:</strong> ${escapeHtml(quote.client_name || quote.client_email)}</p>
+                <p>Log in to your firm portal to view the details.</p>
+                <p style="color:#9ca3af;font-size:12px;">Powered by ConveyQuote</p>
+              </div>
+            `,
+          }),
+        });
+        if (!notifyResp.ok) {
+          const errBody = await notifyResp.text().catch(() => "");
+          console.error(
+            `firm-quote-accept: firm acceptance notification failed for ref=${ref} firm=${firmEmail} http=${notifyResp.status} body=${errBody.slice(0, 240)}`
+          );
+        }
+      } catch (notifyErr) {
+        console.error(
+          `firm-quote-accept: firm acceptance notification threw for ref=${ref} firm=${firmEmail}:`,
+          notifyErr
+        );
+      }
     }
 
     return new Response(
