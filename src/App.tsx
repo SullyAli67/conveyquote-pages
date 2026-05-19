@@ -1341,6 +1341,49 @@ class ErrorBoundary extends Component<
   }
 }
 
+// ── Dirty-form registry ─────────────────────────────────────────────────────
+// A shared set of form keys with unsaved edits. Used by:
+//   • the window.beforeunload handler installed by App() — warns before
+//     a tab close or a full reload would discard unsaved changes.
+//   • the wrapped tab-nav setters (Tier 1) — prompt before switching
+//     admin/firm/referrer portal tabs while a form is dirty.
+// Forms register themselves via useDirtyForm(key, isDirty); the effect's
+// cleanup clears the key on unmount so a navigated-away form leaves no
+// stale flag behind.
+const dirtyFormRegistry = new Set<string>();
+
+function markFormDirty(key: string): void {
+  dirtyFormRegistry.add(key);
+}
+
+function markFormClean(key: string): void {
+  dirtyFormRegistry.delete(key);
+}
+
+function hasDirtyForms(): boolean {
+  return dirtyFormRegistry.size > 0;
+}
+
+function useDirtyForm(key: string, isDirty: boolean): void {
+  useEffect(() => {
+    if (isDirty) markFormDirty(key);
+    else markFormClean(key);
+    return () => {
+      markFormClean(key);
+    };
+  }, [key, isDirty]);
+}
+
+const UNSAVED_CHANGES_PROMPT = "You have unsaved changes. Leave this page?";
+
+// Returns true when navigation may proceed — either nothing is dirty, or
+// the user accepted the discard prompt. Returns false when the user
+// cancels and wants to stay.
+function confirmDiscardIfDirty(): boolean {
+  if (!hasDirtyForms()) return true;
+  return window.confirm(UNSAVED_CHANGES_PROMPT);
+}
+
 function App() {
   const { pushToast } = useToast();
   const [form, setForm] = useState<QuoteForm>(initialFormState);
@@ -1349,6 +1392,12 @@ function App() {
   >(null);
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
     initialApprovedQuoteState
+  );
+  // Baseline snapshot used by the dirty-form registry — refreshed every
+  // time the form transitions to a "clean" state (initial load of an
+  // enquiry, successful save, explicit reset).
+  const approvedQuoteBaselineRef = useRef<string>(
+    JSON.stringify(initialApprovedQuoteState)
   );
 
   const [lenders, setLenders] = useState<{ id: number; name: string }[]>([]);
@@ -1414,10 +1463,27 @@ function App() {
   type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
   const [allReferrers, setAllReferrers] = useState<ReferrerRow[]>([]);
   const [isLoadingReferrers, setIsLoadingReferrers] = useState(false);
-  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>({
-    id: null, referrer_name: "", contact_email: "", contact_phone: "",
-    referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "",
-  });
+  const initialReferrerEditorState = {
+    id: null as number | null,
+    referrer_name: "",
+    contact_email: "",
+    contact_phone: "",
+    referral_fee: "",
+    marketing_fee: "50",
+    fee_markup: "",
+    portal_email: "",
+    portal_active: false,
+    notes: "",
+    password: "",
+  };
+  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>(
+    initialReferrerEditorState
+  );
+  // Baseline snapshot — refreshed when the editor loads an existing
+  // referrer for edit, after a successful save, and on Clear.
+  const referrerEditorBaselineRef = useRef<string>(
+    JSON.stringify(initialReferrerEditorState)
+  );
   const [referrerSaveMessage, setReferrerSaveMessage] = useState("");
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
 
@@ -1429,6 +1495,9 @@ function App() {
   const [referrerPricingItems, setReferrerPricingItems] = useState<
     { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean; supplement_key?: string | null }[]
   >([]);
+  // Baseline snapshot per active (referrer, transaction-type) selection —
+  // refreshed when pricing is loaded for a referrer and after a save.
+  const referrerPricingBaselineRef = useRef<string>(JSON.stringify([]));
   const [isLoadingReferrerPricing, setIsLoadingReferrerPricing] = useState(false);
   const [isSavingReferrerPricing, setIsSavingReferrerPricing] = useState(false);
   const [referrerPricingMessage, setReferrerPricingMessage] = useState("");
@@ -1488,9 +1557,18 @@ function App() {
     const stored = localStorage.getItem("cq_firm_tab");
     return isValidFirmPortalTab(stored) ? stored : "referrals";
   });
-  const setFirmPortalTab = (tab: FirmPortalTab) => {
+  // Tier 1: prompt before switching tabs when any registered form has
+  // unsaved edits. The `force` option skips the prompt for callers that
+  // have already handled the discard (popstate / explicit reset flows)
+  // or that cannot have dirty state yet (initial login / URL hydration).
+  const setFirmPortalTab = (
+    tab: FirmPortalTab,
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_firm_tab", tab);
     setFirmPortalTabRaw(tab);
+    return true;
   };
   // Session-level "already loaded" flags so tab clicks don't refetch
   // (firmBrandingLoaded already exists below). A manual Refresh button
@@ -1592,6 +1670,12 @@ function App() {
   const [issueQuoteForm, setIssueQuoteForm] = useState<FirmIssueQuoteForm>(
     initialFirmIssueQuoteForm
   );
+  // Baseline snapshot — initial state matches initial form, so the form
+  // starts clean; bumped after a successful save so the just-saved values
+  // become the new clean baseline.
+  const issueQuoteBaselineRef = useRef<string>(
+    JSON.stringify(initialFirmIssueQuoteForm)
+  );
   const [issueQuoteFieldError, setIssueQuoteFieldError] = useState<string>("");
   const [issueQuoteCalcError, setIssueQuoteCalcError] = useState<string>("");
   const [issueQuoteResult, setIssueQuoteResult] =
@@ -1655,6 +1739,9 @@ function App() {
   // Fee config state
   const [feeConfigType, setFeeConfigType] = useState("purchase");
   const [feeConfigItems, setFeeConfigItems] = useState<FirmFeeItem[]>([]);
+  // Baseline snapshot per active feeConfigType — refreshed when fee
+  // settings load for a transaction type and after a successful save.
+  const feeConfigBaselineRef = useRef<string>(JSON.stringify([]));
   const [includeQuoteSdlt, setIncludeQuoteSdlt] = useState(false);
   const [quoteSdltAmount, setQuoteSdltAmount] = useState("");
   const [isSavingFees, setIsSavingFees] = useState(false);
@@ -1712,6 +1799,10 @@ function App() {
     logoKey: "",
   };
   const [firmBranding, setFirmBranding] = useState<FirmBranding>(initialFirmBranding);
+  // Baseline snapshot — refreshed when branding loads from the server,
+  // after a successful save, and after a logo upload (which is itself a
+  // server-side save and shouldn't count as a pending edit).
+  const firmBrandingBaselineRef = useRef<string>(JSON.stringify(initialFirmBranding));
   const [firmBrandingLoaded, setFirmBrandingLoaded] = useState(false);
   const [isLoadingFirmBranding, setIsLoadingFirmBranding] = useState(false);
   const [isSavingFirmBranding, setIsSavingFirmBranding] = useState(false);
@@ -1735,9 +1826,17 @@ function App() {
   const [referrerPortalTab, setReferrerPortalTabRaw] = useState<"dashboard" | "my_referrals" | "new_referral" | "payments">(
     () => (localStorage.getItem("cq_referrer_tab") as "dashboard" | "my_referrals" | "new_referral" | "payments") || "dashboard"
   );
-  const setReferrerPortalTab = (tab: "dashboard" | "my_referrals" | "new_referral" | "payments") => {
+  // Tier 1: see setFirmPortalTab. The referrer portal currently has no
+  // forms wired into the registry, but the prompt still fires if any
+  // other dirty form exists when navigating in/out of this portal.
+  const setReferrerPortalTab = (
+    tab: "dashboard" | "my_referrals" | "new_referral" | "payments",
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_referrer_tab", tab);
     setReferrerPortalTabRaw(tab);
+    return true;
   };
 
   // My Referrals tab UI state — hoisted out of an inline IIFE to keep
@@ -1793,9 +1892,15 @@ function App() {
   const [adminTab, setAdminTabRaw] = useState<AdminTab>(
     () => (localStorage.getItem("cq_admin_tab") as AdminTab) || "dashboard"
   );
-  const setAdminTab = (tab: AdminTab) => {
+  // Tier 1: see setFirmPortalTab.
+  const setAdminTab = (
+    tab: AdminTab,
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_admin_tab", tab);
     setAdminTabRaw(tab);
+    return true;
   };
   // Session-level "already loaded" flags for admin tabs whose data is
   // separate from the main dashboard payload. Cleared by the Refresh button.
@@ -2203,7 +2308,7 @@ function App() {
   };
 
   const handleAdminTabChange = async (tab: AdminTab) => {
-    setAdminTab(tab);
+    if (!setAdminTab(tab)) return;
 
     // Always clear the loaded enquiry when switching tabs so other tab
     // renders are not blocked by the !loadedEnquiry guards
@@ -2579,8 +2684,10 @@ function App() {
         return;
       }
 
-      // Queue empty — back to dashboard + toast.
-      setAdminTab("dashboard");
+      // Queue empty — back to dashboard + toast. This runs after a
+      // successful send (the form has been reset already), so skip the
+      // unsaved-changes prompt.
+      setAdminTab("dashboard", { force: true });
       setLoadedEnquiry(null);
       setLoadedEnquiryMessage("");
       const nextUrl = new URL(window.location.href);
@@ -2783,11 +2890,11 @@ function App() {
         setManualReference(refFromUrl);
         if (refFromUrl) {
           // Deep-link from email — jump straight to the Quote Review screen
-          // with the enquiry loaded.
-          setAdminTab("quote");
+          // with the enquiry loaded. Just-logged-in: no dirty state possible.
+          setAdminTab("quote", { force: true });
           await loadEnquiryByReference(refFromUrl);
         } else {
-          setAdminTab("dashboard");
+          setAdminTab("dashboard", { force: true });
           await loadDashboardData();
         }
       } else {
@@ -2900,7 +3007,7 @@ function App() {
   // nav. Mirrors the URL push logic in the tab-button onClick so the browser
   // back button still works after a CTA-driven tab switch.
   const goToFirmTab = (tab: FirmPortalTab) => {
-    setFirmPortalTab(tab);
+    if (!setFirmPortalTab(tab)) return;
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("tab", tab);
     const currentUrlTab = new URL(window.location.href).searchParams.get("tab");
@@ -3198,7 +3305,8 @@ function App() {
       const result = await res.json();
       if (result.success) {
         setReferrerSaveMessage(result.mode === "created" ? "Referrer created." : "Referrer updated.");
-        setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+        setReferrerEditor(initialReferrerEditorState);
+        referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
         await loadAllReferrers();
       } else {
         setReferrerSaveMessage(result.error || "Failed to save referrer.");
@@ -3245,7 +3353,7 @@ function App() {
       });
       const result = await res.json();
       if (result.success) {
-        setFeeConfigItems(
+        const loaded =
           result.fees.length > 0
             ? result.fees.map((f: Record<string, unknown>) => ({
                 label: String(f.label || ""),
@@ -3254,8 +3362,9 @@ function App() {
                 is_disbursement: Number(f.is_disbursement) === 1,
                 supplement_key: f.supplement_key ? String(f.supplement_key) : null,
               }))
-            : getDefaultFeeItems(type, "firm")
-        );
+            : getDefaultFeeItems(type, "firm");
+        setFeeConfigItems(loaded);
+        feeConfigBaselineRef.current = JSON.stringify(loaded);
       }
     } catch {}
   };
@@ -3318,20 +3427,22 @@ function App() {
       );
       const result = await res.json();
       if (result.success) {
-        setReferrerPricingItems(
-          (result.fees || []).map((f: Record<string, unknown>) => ({
-            label: String(f.label || ""),
-            amount: Number(f.amount || 0),
-            includes_vat: Number(f.includes_vat) === 1,
-            is_disbursement: Number(f.is_disbursement) === 1,
-            supplement_key: f.supplement_key ? String(f.supplement_key) : null,
-          }))
-        );
+        const loaded = (result.fees || []).map((f: Record<string, unknown>) => ({
+          label: String(f.label || ""),
+          amount: Number(f.amount || 0),
+          includes_vat: Number(f.includes_vat) === 1,
+          is_disbursement: Number(f.is_disbursement) === 1,
+          supplement_key: f.supplement_key ? String(f.supplement_key) : null,
+        }));
+        setReferrerPricingItems(loaded);
+        referrerPricingBaselineRef.current = JSON.stringify(loaded);
       } else {
         setReferrerPricingItems([]);
+        referrerPricingBaselineRef.current = JSON.stringify([]);
       }
     } catch {
       setReferrerPricingItems([]);
+      referrerPricingBaselineRef.current = JSON.stringify([]);
     } finally {
       setIsLoadingReferrerPricing(false);
     }
@@ -3365,7 +3476,13 @@ function App() {
         }),
       });
       const result = await res.json();
-      setReferrerPricingMessage(result.success ? "Pricing saved." : result.error || "Failed to save.");
+      if (result.success) {
+        setReferrerPricingMessage("Pricing saved.");
+        // The just-saved items are now the clean baseline.
+        referrerPricingBaselineRef.current = JSON.stringify(referrerPricingItems);
+      } else {
+        setReferrerPricingMessage(result.error || "Failed to save.");
+      }
     } catch {
       setReferrerPricingMessage("Something went wrong.");
     } finally {
@@ -3434,7 +3551,13 @@ function App() {
         body: JSON.stringify({ transaction_type: feeConfigType, fees: feeConfigItems }),
       });
       const result = await res.json();
-      setFeeConfigMessage(result.success ? "Fee configuration saved." : result.error || "Failed to save.");
+      if (result.success) {
+        setFeeConfigMessage("Fee configuration saved.");
+        // Current items now match the server — accept as clean baseline.
+        feeConfigBaselineRef.current = JSON.stringify(feeConfigItems);
+      } else {
+        setFeeConfigMessage(result.error || "Failed to save.");
+      }
     } catch {
       setFeeConfigMessage("Something went wrong.");
     } finally {
@@ -3485,13 +3608,15 @@ function App() {
       const result = await res.json();
       if (result.success && result.branding) {
         const logoKey = String(result.branding.logoKey || "");
-        setFirmBranding({
+        const loaded: FirmBranding = {
           displayName: String(result.branding.displayName || ""),
           address: String(result.branding.address || ""),
           phone: String(result.branding.phone || ""),
           email: String(result.branding.email || ""),
           logoKey,
-        });
+        };
+        setFirmBranding(loaded);
+        firmBrandingBaselineRef.current = JSON.stringify(loaded);
         setFirmBrandingLoaded(true);
         if (logoKey) void fetchFirmLogoPreview(logoKey);
       }
@@ -3521,13 +3646,15 @@ function App() {
       });
       const result = await res.json();
       if (result.success && result.branding) {
-        setFirmBranding({
+        const saved: FirmBranding = {
           displayName: String(result.branding.displayName || ""),
           address: String(result.branding.address || ""),
           phone: String(result.branding.phone || ""),
           email: String(result.branding.email || ""),
           logoKey: String(result.branding.logoKey || ""),
-        });
+        };
+        setFirmBranding(saved);
+        firmBrandingBaselineRef.current = JSON.stringify(saved);
         pushToast({ variant: "success", message: "Branding updated." });
       } else {
         pushToast({
@@ -3567,6 +3694,16 @@ function App() {
       if (result.success && result.key) {
         const newKey = String(result.key);
         setFirmBranding((prev) => ({ ...prev, logoKey: newKey }));
+        // The logo upload is itself a server-side save — fold the new
+        // key into the baseline so it doesn't show up as a pending edit
+        // alongside any text-field changes the user may still be making.
+        try {
+          const baseline = JSON.parse(firmBrandingBaselineRef.current) as FirmBranding;
+          firmBrandingBaselineRef.current = JSON.stringify({ ...baseline, logoKey: newKey });
+        } catch {
+          // Baseline corrupt — fall back to current state.
+          firmBrandingBaselineRef.current = JSON.stringify({ ...firmBranding, logoKey: newKey });
+        }
         void fetchFirmLogoPreview(newKey);
         pushToast({ variant: "success", message: "Logo uploaded." });
       } else {
@@ -3780,6 +3917,9 @@ function App() {
         quoteId: Number(data.quoteId) || 0,
         text: "Quote saved. Find it in Quote History.",
       });
+      // The current form values are now the source of truth on the
+      // server — accept them as the new clean baseline.
+      issueQuoteBaselineRef.current = JSON.stringify(issueQuoteForm);
     } catch (e) {
       console.error("Save firm quote error:", e);
       setIssueQuoteCalcError("Couldn't save the quote — please try again.");
@@ -3793,6 +3933,7 @@ function App() {
       return;
     }
     setIssueQuoteForm(initialFirmIssueQuoteForm);
+    issueQuoteBaselineRef.current = JSON.stringify(initialFirmIssueQuoteForm);
     setIssueQuoteResult(null);
     setIssueQuoteFieldError("");
     setIssueQuoteCalcError("");
@@ -4726,6 +4867,7 @@ function App() {
         const sentClientName = approvedQuote.clientName?.trim();
         setEmailPreviewOpen(false);
         setApprovedQuote(initialApprovedQuoteState);
+        approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
         // migrated to pushToast in claude/toast-system
@@ -4807,7 +4949,7 @@ function App() {
 
           const rebuilt = rebuildApprovedQuoteFromQuoteData(quoteData);
 
-          setApprovedQuote({
+          const loadedApprovedQuote: ApprovedQuoteForm = {
             clientName: enquiry.client_name || "",
             clientEmail: enquiry.client_email || "",
             transactionType: enquiry.transaction_type || "",
@@ -4835,7 +4977,9 @@ function App() {
             nextSteps: defaultApprovedNextSteps,
             additionalNotes: quote.additionalNotes || "",
             quoteData: rebuilt.quoteData,
-          });
+          };
+          setApprovedQuote(loadedApprovedQuote);
+          approvedQuoteBaselineRef.current = JSON.stringify(loadedApprovedQuote);
 
           if (typeof quote.legalFeesExVat === "number") {
             setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
@@ -4847,7 +4991,9 @@ function App() {
             setVatCalculatorNet(recalculatedLegalFeesExVat.toFixed(2));
           }
         } else {
-          setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
+          const rebuilt = rebuildApprovedQuoteFromEnquiry(enquiry);
+          setApprovedQuote(rebuilt);
+          approvedQuoteBaselineRef.current = JSON.stringify(rebuilt);
         }
 
         const purchasePriceForSdlt =
@@ -4912,7 +5058,7 @@ function App() {
     }
 
     const nextReference = manualReference.trim();
-    setAdminTab("quote");
+    if (!setAdminTab("quote")) return;
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", nextReference);
@@ -4924,8 +5070,8 @@ function App() {
   const handleOpenDashboardEnquiry = async (reference: string) => {
     if (!reference) return;
 
+    if (!setAdminTab("quote")) return;
     setManualReference(reference);
-    setAdminTab("quote");
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", reference);
@@ -4935,10 +5081,11 @@ function App() {
   };
 
   const handleBackToDashboard = async () => {
-    setAdminTab("dashboard");
+    if (!setAdminTab("dashboard")) return;
     setLoadedEnquiry(null);
     setLoadedEnquiryMessage("");
     setApprovedQuote(initialApprovedQuoteState);
+    approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("ref");
@@ -4995,6 +5142,53 @@ function App() {
     }
   }, []);
 
+  // ── Tier 0: beforeunload guard ─────────────────────────────────────────
+  // If any form in the dirty registry has unsaved edits, ask the browser
+  // to show its native "you have unsaved changes" prompt before a tab
+  // close or full reload. The preventDefault + returnValue contract is
+  // what triggers the prompt — the message itself is browser-controlled.
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!hasDirtyForms()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  // ── Dirty-form registrations ───────────────────────────────────────────
+  // Each form compares its current state against a baseline snapshot
+  // captured at the last "clean" moment (load / save / reset). The
+  // matter-level firm quote editor lives inside FirmReferredMatterCard
+  // and registers itself.
+  useDirtyForm(
+    "admin-quote-review",
+    loadedEnquiry !== null &&
+      JSON.stringify(approvedQuote) !== approvedQuoteBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-issue-quote",
+    JSON.stringify(issueQuoteForm) !== issueQuoteBaselineRef.current
+  );
+  useDirtyForm(
+    "admin-referrer-pricing",
+    referrerEditor.id !== null &&
+      JSON.stringify(referrerPricingItems) !== referrerPricingBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-fee-config",
+    JSON.stringify(feeConfigItems) !== feeConfigBaselineRef.current
+  );
+  useDirtyForm(
+    "admin-referrer-editor",
+    JSON.stringify(referrerEditor) !== referrerEditorBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-branding",
+    JSON.stringify(firmBranding) !== firmBrandingBaselineRef.current
+  );
+
   useEffect(() => {
     async function loadPublicLenders() {
       setLoadingLenders(true);
@@ -5048,14 +5242,15 @@ function App() {
 
     if (refFromUrl) {
       setManualReference(refFromUrl);
-      setAdminTab("quote");
+      // URL-hydration on initial portal entry — no dirty state exists yet.
+      setAdminTab("quote", { force: true });
       void loadEnquiryByReference(refFromUrl);
     } else {
       // Restore tab from URL ?tab= if valid, else fall through to
       // the persisted/default value already set by useState.
       const urlTab = new URLSearchParams(window.location.search).get("tab");
       if (isValidAdminTab(urlTab)) {
-        setAdminTab(urlTab);
+        setAdminTab(urlTab, { force: true });
       }
     }
     void loadDashboardData();
@@ -5063,6 +5258,8 @@ function App() {
 
   // Listen for browser back/forward — restore tab + loaded enquiry from
   // the URL so back/forward across tab changes works as expected.
+  // popstate fires after the URL has already changed, so we bypass the
+  // unsaved-changes prompt here — the browser already navigated.
   useEffect(() => {
     if (!isAdminPage) return;
     const onPopState = () => {
@@ -5071,15 +5268,15 @@ function App() {
       const urlTab = params.get("tab");
       if (ref) {
         setManualReference(ref);
-        setAdminTab("quote");
+        setAdminTab("quote", { force: true });
         void loadEnquiryByReference(ref);
       } else if (isValidAdminTab(urlTab)) {
-        setAdminTab(urlTab);
+        setAdminTab(urlTab, { force: true });
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
       } else {
-        setAdminTab("dashboard");
+        setAdminTab("dashboard", { force: true });
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
@@ -5102,19 +5299,21 @@ function App() {
     if (!isFirmPortalPage) return;
     const urlTab = new URLSearchParams(window.location.search).get("tab");
     if (isValidFirmPortalTab(urlTab)) {
-      setFirmPortalTab(urlTab);
+      // Initial URL hydration — no dirty state yet.
+      setFirmPortalTab(urlTab, { force: true });
     }
   }, [isFirmPortalPage]);
 
   // Listen for browser back/forward inside the firm portal — restore the tab
-  // state from the URL without re-pushing history.
+  // state from the URL without re-pushing history. popstate is reactive to a
+  // URL the browser already changed, so bypass the unsaved-changes prompt.
   useEffect(() => {
     if (!isFirmPortalPage) return;
     const onPopState = () => {
       const params = new URLSearchParams(window.location.search);
       const urlTab = params.get("tab");
       if (isValidFirmPortalTab(urlTab)) {
-        setFirmPortalTab(urlTab);
+        setFirmPortalTab(urlTab, { force: true });
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -7328,7 +7527,7 @@ function App() {
                       type="button"
                       style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: firmPortalTab === tab ? "var(--teal)" : "var(--muted)", borderBottom: firmPortalTab === tab ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
                       onClick={() => {
-                        setFirmPortalTab(tab);
+                        if (!setFirmPortalTab(tab)) return;
 
                         // Push tab to URL so browser back/forward navigates
                         // between firm portal tabs. Skip if already current.
@@ -10249,9 +10448,11 @@ function App() {
                     <div style={{ marginBottom: "12px" }}>
                       <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 16px", fontSize: "14px" }}
                         onClick={() => {
-                          setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                          setReferrerEditor(initialReferrerEditorState);
+                          referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                           setReferrerSaveMessage("");
                           setReferrerPricingItems([]);
+                          referrerPricingBaselineRef.current = JSON.stringify([]);
                           setReferrerPricingMessage("");
                           setReferrerPricingType("purchase");
                         }}>
@@ -10283,14 +10484,16 @@ function App() {
                             <div className="detail-row__value">
                               <button type="button" className="muted-button" style={{ minHeight: 32, padding: "0 10px", fontSize: "12px" }}
                                 onClick={() => {
-                                  setReferrerEditor({
+                                  const loaded = {
                                     id: r.id, referrer_name: r.referrer_name,
                                     contact_email: r.contact_email || "", contact_phone: r.contact_phone || "",
                                     referral_fee: String(r.referral_fee || ""), marketing_fee: String(r.marketing_fee ?? "50"),
                                     fee_markup: r.fee_markup ? String(r.fee_markup) : "",
                                     portal_email: r.portal_email || "",
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
-                                  });
+                                  };
+                                  setReferrerEditor(loaded);
+                                  referrerEditorBaselineRef.current = JSON.stringify(loaded);
                                   setReferrerSaveMessage("");
                                   setReferrerPricingType("purchase");
                                   setReferrerPricingMessage("");
@@ -10377,9 +10580,11 @@ function App() {
                       <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                         <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
                           onClick={() => {
-                            setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                            setReferrerEditor(initialReferrerEditorState);
+                            referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                             setReferrerSaveMessage("");
                             setReferrerPricingItems([]);
+                            referrerPricingBaselineRef.current = JSON.stringify([]);
                             setReferrerPricingMessage("");
                             setReferrerPricingType("purchase");
                           }}>
@@ -11950,9 +12155,13 @@ function App() {
                           return;
                         }
                         setApprovedQuote(initialApprovedQuoteState);
+                        approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
                         setLoadedEnquiryMessage("");
                         setLoadedEnquiry(null);
-                        setAdminTab("dashboard");
+                        // The user already confirmed clearing — skip the
+                        // tab-switch prompt that would otherwise fire on a
+                        // still-dirty registry entry pre-state-flush.
+                        setAdminTab("dashboard", { force: true });
 
                         const nextUrl = new URL(window.location.href);
                         nextUrl.searchParams.delete("ref");
@@ -12342,7 +12551,7 @@ function App() {
               {TABS.map((tab) => (
                 <button key={tab.id} type="button"
                   style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: referrerPortalTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: referrerPortalTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
-                  onClick={() => { setReferrerPortalTab?.(tab.id); if (tab.id !== "new_referral") refreshPortal(); }}>
+                  onClick={() => { if (!setReferrerPortalTab?.(tab.id)) return; if (tab.id !== "new_referral") refreshPortal(); }}>
                   {tab.label}
                 </button>
               ))}
@@ -13077,6 +13286,15 @@ function FirmReferredMatterCard({
   const [editSdlt, setEditSdlt] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  // Baseline snapshot captured when the inline editor is opened — lets
+  // the dirty-form registry tell whether any line item has been edited.
+  const editorBaselineRef = useRef<string>("");
+  useDirtyForm(
+    `firm-matter-quote-${ref}`,
+    editMode &&
+      JSON.stringify({ editLegal, editDisb, editSdlt }) !==
+        editorBaselineRef.current
+  );
 
   // View Matter panel
   const [detailOpen, setDetailOpen] = useState(false);
@@ -13149,13 +13367,20 @@ function FirmReferredMatterCard({
     ((storedQuote.legalFees?.length ?? 0) > 0 || (storedQuote.disbursements?.length ?? 0) > 0);
 
   const openEditor = () => {
-    setEditLegal((storedQuote?.legalFees ?? []).map((f) => ({ ...f })));
-    setEditDisb((storedQuote?.disbursements ?? []).map((d) => ({ ...d })));
-    setEditSdlt(
+    const initialLegal = (storedQuote?.legalFees ?? []).map((f) => ({ ...f }));
+    const initialDisb = (storedQuote?.disbursements ?? []).map((d) => ({ ...d }));
+    const initialSdlt =
       typeof storedQuote?.sdltAmount === "number"
         ? String(storedQuote.sdltAmount)
-        : ""
-    );
+        : "";
+    setEditLegal(initialLegal);
+    setEditDisb(initialDisb);
+    setEditSdlt(initialSdlt);
+    editorBaselineRef.current = JSON.stringify({
+      editLegal: initialLegal,
+      editDisb: initialDisb,
+      editSdlt: initialSdlt,
+    });
     setSaveMsg("");
     setEditMode(true);
     setQuoteOpen(true);
