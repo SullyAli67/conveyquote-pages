@@ -1341,6 +1341,49 @@ class ErrorBoundary extends Component<
   }
 }
 
+// ── Dirty-form registry ─────────────────────────────────────────────────────
+// A shared set of form keys with unsaved edits. Used by:
+//   • the window.beforeunload handler installed by App() — warns before
+//     a tab close or a full reload would discard unsaved changes.
+//   • the wrapped tab-nav setters (Tier 1) — prompt before switching
+//     admin/firm/referrer portal tabs while a form is dirty.
+// Forms register themselves via useDirtyForm(key, isDirty); the effect's
+// cleanup clears the key on unmount so a navigated-away form leaves no
+// stale flag behind.
+const dirtyFormRegistry = new Set<string>();
+
+function markFormDirty(key: string): void {
+  dirtyFormRegistry.add(key);
+}
+
+function markFormClean(key: string): void {
+  dirtyFormRegistry.delete(key);
+}
+
+function hasDirtyForms(): boolean {
+  return dirtyFormRegistry.size > 0;
+}
+
+function useDirtyForm(key: string, isDirty: boolean): void {
+  useEffect(() => {
+    if (isDirty) markFormDirty(key);
+    else markFormClean(key);
+    return () => {
+      markFormClean(key);
+    };
+  }, [key, isDirty]);
+}
+
+const UNSAVED_CHANGES_PROMPT = "You have unsaved changes. Leave this page?";
+
+// Returns true when navigation may proceed — either nothing is dirty, or
+// the user accepted the discard prompt. Returns false when the user
+// cancels and wants to stay.
+function confirmDiscardIfDirty(): boolean {
+  if (!hasDirtyForms()) return true;
+  return window.confirm(UNSAVED_CHANGES_PROMPT);
+}
+
 function App() {
   const { pushToast } = useToast();
   const [form, setForm] = useState<QuoteForm>(initialFormState);
@@ -4993,6 +5036,21 @@ function App() {
     } catch {
       // Ignore any localStorage parse errors — start fresh
     }
+  }, []);
+
+  // ── Tier 0: beforeunload guard ─────────────────────────────────────────
+  // If any form in the dirty registry has unsaved edits, ask the browser
+  // to show its native "you have unsaved changes" prompt before a tab
+  // close or full reload. The preventDefault + returnValue contract is
+  // what triggers the prompt — the message itself is browser-controlled.
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!hasDirtyForms()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
   useEffect(() => {
