@@ -20,6 +20,12 @@ export async function onRequestGet(context) {
     const firmFilter = url.searchParams.get("firm_id") || "";
     const referrerFilter = url.searchParams.get("referrer_id") || "";
 
+    // Invoice columns are now sourced from the invoices table via two
+    // single-row LEFT JOINs: the latest non-voided invoice ("current")
+    // populates invoice_ref / invoice_json / invoice_status, and the
+    // latest voided invoice populates voided_invoice_ref /
+    // voided_invoice_json. Response shape stays identical to before
+    // Phase C so existing readers keep working.
     let sql = `
       SELECT
         e.id,
@@ -35,11 +41,11 @@ export async function onRequestGet(context) {
         e.assigned_firm_name,
         e.assigned_firm_id,
         e.firm_response,
-        e.invoice_ref,
-        e.invoice_json,
-        e.invoice_status,
-        e.voided_invoice_ref,
-        e.voided_invoice_json,
+        live_inv.invoice_ref            AS invoice_ref,
+        live_inv.invoice_json           AS invoice_json,
+        live_inv.status                 AS invoice_status,
+        void_inv.invoice_ref            AS voided_invoice_ref,
+        void_inv.invoice_json           AS voided_invoice_json,
         e.referrer_id,
         e.referral_fee_payable,
         e.referral_fee_amount,
@@ -64,6 +70,14 @@ export async function onRequestGet(context) {
       LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
       LEFT JOIN referrer_workflow w2 ON w2.parent_enquiry_id = e.id
       LEFT JOIN enquiries successor ON successor.id = w2.enquiry_id
+      LEFT JOIN invoices live_inv ON live_inv.id = (
+        SELECT MAX(id) FROM invoices i
+        WHERE i.enquiry_id = e.id AND i.status != 'voided'
+      )
+      LEFT JOIN invoices void_inv ON void_inv.id = (
+        SELECT MAX(id) FROM invoices i
+        WHERE i.enquiry_id = e.id AND i.status = 'voided'
+      )
       WHERE 1 = 1
     `;
 
@@ -79,7 +93,7 @@ export async function onRequestGet(context) {
     }
 
     if (invoiced) {
-      sql += ` AND (e.invoice_ref IS NOT NULL OR e.voided_invoice_ref IS NOT NULL)`;
+      sql += ` AND (live_inv.id IS NOT NULL OR void_inv.id IS NOT NULL)`;
     }
 
     if (statusFilter) {
