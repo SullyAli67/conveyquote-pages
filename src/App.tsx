@@ -1393,6 +1393,12 @@ function App() {
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
     initialApprovedQuoteState
   );
+  // Baseline snapshot used by the dirty-form registry — refreshed every
+  // time the form transitions to a "clean" state (initial load of an
+  // enquiry, successful save, explicit reset).
+  const approvedQuoteBaselineRef = useRef<string>(
+    JSON.stringify(initialApprovedQuoteState)
+  );
 
   const [lenders, setLenders] = useState<{ id: number; name: string }[]>([]);
   const [loadingLenders, setLoadingLenders] = useState(false);
@@ -1457,10 +1463,27 @@ function App() {
   type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
   const [allReferrers, setAllReferrers] = useState<ReferrerRow[]>([]);
   const [isLoadingReferrers, setIsLoadingReferrers] = useState(false);
-  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>({
-    id: null, referrer_name: "", contact_email: "", contact_phone: "",
-    referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "",
-  });
+  const initialReferrerEditorState = {
+    id: null as number | null,
+    referrer_name: "",
+    contact_email: "",
+    contact_phone: "",
+    referral_fee: "",
+    marketing_fee: "50",
+    fee_markup: "",
+    portal_email: "",
+    portal_active: false,
+    notes: "",
+    password: "",
+  };
+  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>(
+    initialReferrerEditorState
+  );
+  // Baseline snapshot — refreshed when the editor loads an existing
+  // referrer for edit, after a successful save, and on Clear.
+  const referrerEditorBaselineRef = useRef<string>(
+    JSON.stringify(initialReferrerEditorState)
+  );
   const [referrerSaveMessage, setReferrerSaveMessage] = useState("");
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
 
@@ -1472,6 +1495,9 @@ function App() {
   const [referrerPricingItems, setReferrerPricingItems] = useState<
     { label: string; amount: number; includes_vat: boolean; is_disbursement: boolean; supplement_key?: string | null }[]
   >([]);
+  // Baseline snapshot per active (referrer, transaction-type) selection —
+  // refreshed when pricing is loaded for a referrer and after a save.
+  const referrerPricingBaselineRef = useRef<string>(JSON.stringify([]));
   const [isLoadingReferrerPricing, setIsLoadingReferrerPricing] = useState(false);
   const [isSavingReferrerPricing, setIsSavingReferrerPricing] = useState(false);
   const [referrerPricingMessage, setReferrerPricingMessage] = useState("");
@@ -1635,6 +1661,12 @@ function App() {
   const [issueQuoteForm, setIssueQuoteForm] = useState<FirmIssueQuoteForm>(
     initialFirmIssueQuoteForm
   );
+  // Baseline snapshot — initial state matches initial form, so the form
+  // starts clean; bumped after a successful save so the just-saved values
+  // become the new clean baseline.
+  const issueQuoteBaselineRef = useRef<string>(
+    JSON.stringify(initialFirmIssueQuoteForm)
+  );
   const [issueQuoteFieldError, setIssueQuoteFieldError] = useState<string>("");
   const [issueQuoteCalcError, setIssueQuoteCalcError] = useState<string>("");
   const [issueQuoteResult, setIssueQuoteResult] =
@@ -1698,6 +1730,9 @@ function App() {
   // Fee config state
   const [feeConfigType, setFeeConfigType] = useState("purchase");
   const [feeConfigItems, setFeeConfigItems] = useState<FirmFeeItem[]>([]);
+  // Baseline snapshot per active feeConfigType — refreshed when fee
+  // settings load for a transaction type and after a successful save.
+  const feeConfigBaselineRef = useRef<string>(JSON.stringify([]));
   const [includeQuoteSdlt, setIncludeQuoteSdlt] = useState(false);
   const [quoteSdltAmount, setQuoteSdltAmount] = useState("");
   const [isSavingFees, setIsSavingFees] = useState(false);
@@ -1755,6 +1790,10 @@ function App() {
     logoKey: "",
   };
   const [firmBranding, setFirmBranding] = useState<FirmBranding>(initialFirmBranding);
+  // Baseline snapshot — refreshed when branding loads from the server,
+  // after a successful save, and after a logo upload (which is itself a
+  // server-side save and shouldn't count as a pending edit).
+  const firmBrandingBaselineRef = useRef<string>(JSON.stringify(initialFirmBranding));
   const [firmBrandingLoaded, setFirmBrandingLoaded] = useState(false);
   const [isLoadingFirmBranding, setIsLoadingFirmBranding] = useState(false);
   const [isSavingFirmBranding, setIsSavingFirmBranding] = useState(false);
@@ -3241,7 +3280,8 @@ function App() {
       const result = await res.json();
       if (result.success) {
         setReferrerSaveMessage(result.mode === "created" ? "Referrer created." : "Referrer updated.");
-        setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+        setReferrerEditor(initialReferrerEditorState);
+        referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
         await loadAllReferrers();
       } else {
         setReferrerSaveMessage(result.error || "Failed to save referrer.");
@@ -3288,7 +3328,7 @@ function App() {
       });
       const result = await res.json();
       if (result.success) {
-        setFeeConfigItems(
+        const loaded =
           result.fees.length > 0
             ? result.fees.map((f: Record<string, unknown>) => ({
                 label: String(f.label || ""),
@@ -3297,8 +3337,9 @@ function App() {
                 is_disbursement: Number(f.is_disbursement) === 1,
                 supplement_key: f.supplement_key ? String(f.supplement_key) : null,
               }))
-            : getDefaultFeeItems(type, "firm")
-        );
+            : getDefaultFeeItems(type, "firm");
+        setFeeConfigItems(loaded);
+        feeConfigBaselineRef.current = JSON.stringify(loaded);
       }
     } catch {}
   };
@@ -3361,20 +3402,22 @@ function App() {
       );
       const result = await res.json();
       if (result.success) {
-        setReferrerPricingItems(
-          (result.fees || []).map((f: Record<string, unknown>) => ({
-            label: String(f.label || ""),
-            amount: Number(f.amount || 0),
-            includes_vat: Number(f.includes_vat) === 1,
-            is_disbursement: Number(f.is_disbursement) === 1,
-            supplement_key: f.supplement_key ? String(f.supplement_key) : null,
-          }))
-        );
+        const loaded = (result.fees || []).map((f: Record<string, unknown>) => ({
+          label: String(f.label || ""),
+          amount: Number(f.amount || 0),
+          includes_vat: Number(f.includes_vat) === 1,
+          is_disbursement: Number(f.is_disbursement) === 1,
+          supplement_key: f.supplement_key ? String(f.supplement_key) : null,
+        }));
+        setReferrerPricingItems(loaded);
+        referrerPricingBaselineRef.current = JSON.stringify(loaded);
       } else {
         setReferrerPricingItems([]);
+        referrerPricingBaselineRef.current = JSON.stringify([]);
       }
     } catch {
       setReferrerPricingItems([]);
+      referrerPricingBaselineRef.current = JSON.stringify([]);
     } finally {
       setIsLoadingReferrerPricing(false);
     }
@@ -3408,7 +3451,13 @@ function App() {
         }),
       });
       const result = await res.json();
-      setReferrerPricingMessage(result.success ? "Pricing saved." : result.error || "Failed to save.");
+      if (result.success) {
+        setReferrerPricingMessage("Pricing saved.");
+        // The just-saved items are now the clean baseline.
+        referrerPricingBaselineRef.current = JSON.stringify(referrerPricingItems);
+      } else {
+        setReferrerPricingMessage(result.error || "Failed to save.");
+      }
     } catch {
       setReferrerPricingMessage("Something went wrong.");
     } finally {
@@ -3477,7 +3526,13 @@ function App() {
         body: JSON.stringify({ transaction_type: feeConfigType, fees: feeConfigItems }),
       });
       const result = await res.json();
-      setFeeConfigMessage(result.success ? "Fee configuration saved." : result.error || "Failed to save.");
+      if (result.success) {
+        setFeeConfigMessage("Fee configuration saved.");
+        // Current items now match the server — accept as clean baseline.
+        feeConfigBaselineRef.current = JSON.stringify(feeConfigItems);
+      } else {
+        setFeeConfigMessage(result.error || "Failed to save.");
+      }
     } catch {
       setFeeConfigMessage("Something went wrong.");
     } finally {
@@ -3528,13 +3583,15 @@ function App() {
       const result = await res.json();
       if (result.success && result.branding) {
         const logoKey = String(result.branding.logoKey || "");
-        setFirmBranding({
+        const loaded: FirmBranding = {
           displayName: String(result.branding.displayName || ""),
           address: String(result.branding.address || ""),
           phone: String(result.branding.phone || ""),
           email: String(result.branding.email || ""),
           logoKey,
-        });
+        };
+        setFirmBranding(loaded);
+        firmBrandingBaselineRef.current = JSON.stringify(loaded);
         setFirmBrandingLoaded(true);
         if (logoKey) void fetchFirmLogoPreview(logoKey);
       }
@@ -3564,13 +3621,15 @@ function App() {
       });
       const result = await res.json();
       if (result.success && result.branding) {
-        setFirmBranding({
+        const saved: FirmBranding = {
           displayName: String(result.branding.displayName || ""),
           address: String(result.branding.address || ""),
           phone: String(result.branding.phone || ""),
           email: String(result.branding.email || ""),
           logoKey: String(result.branding.logoKey || ""),
-        });
+        };
+        setFirmBranding(saved);
+        firmBrandingBaselineRef.current = JSON.stringify(saved);
         pushToast({ variant: "success", message: "Branding updated." });
       } else {
         pushToast({
@@ -3610,6 +3669,16 @@ function App() {
       if (result.success && result.key) {
         const newKey = String(result.key);
         setFirmBranding((prev) => ({ ...prev, logoKey: newKey }));
+        // The logo upload is itself a server-side save — fold the new
+        // key into the baseline so it doesn't show up as a pending edit
+        // alongside any text-field changes the user may still be making.
+        try {
+          const baseline = JSON.parse(firmBrandingBaselineRef.current) as FirmBranding;
+          firmBrandingBaselineRef.current = JSON.stringify({ ...baseline, logoKey: newKey });
+        } catch {
+          // Baseline corrupt — fall back to current state.
+          firmBrandingBaselineRef.current = JSON.stringify({ ...firmBranding, logoKey: newKey });
+        }
         void fetchFirmLogoPreview(newKey);
         pushToast({ variant: "success", message: "Logo uploaded." });
       } else {
@@ -3823,6 +3892,9 @@ function App() {
         quoteId: Number(data.quoteId) || 0,
         text: "Quote saved. Find it in Quote History.",
       });
+      // The current form values are now the source of truth on the
+      // server — accept them as the new clean baseline.
+      issueQuoteBaselineRef.current = JSON.stringify(issueQuoteForm);
     } catch (e) {
       console.error("Save firm quote error:", e);
       setIssueQuoteCalcError("Couldn't save the quote — please try again.");
@@ -3836,6 +3908,7 @@ function App() {
       return;
     }
     setIssueQuoteForm(initialFirmIssueQuoteForm);
+    issueQuoteBaselineRef.current = JSON.stringify(initialFirmIssueQuoteForm);
     setIssueQuoteResult(null);
     setIssueQuoteFieldError("");
     setIssueQuoteCalcError("");
@@ -4769,6 +4842,7 @@ function App() {
         const sentClientName = approvedQuote.clientName?.trim();
         setEmailPreviewOpen(false);
         setApprovedQuote(initialApprovedQuoteState);
+        approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
         setLoadedEnquiryMessage("");
         setLoadedEnquiry(null);
         // migrated to pushToast in claude/toast-system
@@ -4850,7 +4924,7 @@ function App() {
 
           const rebuilt = rebuildApprovedQuoteFromQuoteData(quoteData);
 
-          setApprovedQuote({
+          const loadedApprovedQuote: ApprovedQuoteForm = {
             clientName: enquiry.client_name || "",
             clientEmail: enquiry.client_email || "",
             transactionType: enquiry.transaction_type || "",
@@ -4878,7 +4952,9 @@ function App() {
             nextSteps: defaultApprovedNextSteps,
             additionalNotes: quote.additionalNotes || "",
             quoteData: rebuilt.quoteData,
-          });
+          };
+          setApprovedQuote(loadedApprovedQuote);
+          approvedQuoteBaselineRef.current = JSON.stringify(loadedApprovedQuote);
 
           if (typeof quote.legalFeesExVat === "number") {
             setVatCalculatorNet(quote.legalFeesExVat.toFixed(2));
@@ -4890,7 +4966,9 @@ function App() {
             setVatCalculatorNet(recalculatedLegalFeesExVat.toFixed(2));
           }
         } else {
-          setApprovedQuote(rebuildApprovedQuoteFromEnquiry(enquiry));
+          const rebuilt = rebuildApprovedQuoteFromEnquiry(enquiry);
+          setApprovedQuote(rebuilt);
+          approvedQuoteBaselineRef.current = JSON.stringify(rebuilt);
         }
 
         const purchasePriceForSdlt =
@@ -4982,6 +5060,7 @@ function App() {
     setLoadedEnquiry(null);
     setLoadedEnquiryMessage("");
     setApprovedQuote(initialApprovedQuoteState);
+    approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("ref");
@@ -5052,6 +5131,38 @@ function App() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
+
+  // ── Dirty-form registrations ───────────────────────────────────────────
+  // Each form compares its current state against a baseline snapshot
+  // captured at the last "clean" moment (load / save / reset). The
+  // matter-level firm quote editor lives inside FirmReferredMatterCard
+  // and registers itself.
+  useDirtyForm(
+    "admin-quote-review",
+    loadedEnquiry !== null &&
+      JSON.stringify(approvedQuote) !== approvedQuoteBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-issue-quote",
+    JSON.stringify(issueQuoteForm) !== issueQuoteBaselineRef.current
+  );
+  useDirtyForm(
+    "admin-referrer-pricing",
+    referrerEditor.id !== null &&
+      JSON.stringify(referrerPricingItems) !== referrerPricingBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-fee-config",
+    JSON.stringify(feeConfigItems) !== feeConfigBaselineRef.current
+  );
+  useDirtyForm(
+    "admin-referrer-editor",
+    JSON.stringify(referrerEditor) !== referrerEditorBaselineRef.current
+  );
+  useDirtyForm(
+    "firm-branding",
+    JSON.stringify(firmBranding) !== firmBrandingBaselineRef.current
+  );
 
   useEffect(() => {
     async function loadPublicLenders() {
@@ -10307,9 +10418,11 @@ function App() {
                     <div style={{ marginBottom: "12px" }}>
                       <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 16px", fontSize: "14px" }}
                         onClick={() => {
-                          setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                          setReferrerEditor(initialReferrerEditorState);
+                          referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                           setReferrerSaveMessage("");
                           setReferrerPricingItems([]);
+                          referrerPricingBaselineRef.current = JSON.stringify([]);
                           setReferrerPricingMessage("");
                           setReferrerPricingType("purchase");
                         }}>
@@ -10341,14 +10454,16 @@ function App() {
                             <div className="detail-row__value">
                               <button type="button" className="muted-button" style={{ minHeight: 32, padding: "0 10px", fontSize: "12px" }}
                                 onClick={() => {
-                                  setReferrerEditor({
+                                  const loaded = {
                                     id: r.id, referrer_name: r.referrer_name,
                                     contact_email: r.contact_email || "", contact_phone: r.contact_phone || "",
                                     referral_fee: String(r.referral_fee || ""), marketing_fee: String(r.marketing_fee ?? "50"),
                                     fee_markup: r.fee_markup ? String(r.fee_markup) : "",
                                     portal_email: r.portal_email || "",
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
-                                  });
+                                  };
+                                  setReferrerEditor(loaded);
+                                  referrerEditorBaselineRef.current = JSON.stringify(loaded);
                                   setReferrerSaveMessage("");
                                   setReferrerPricingType("purchase");
                                   setReferrerPricingMessage("");
@@ -10435,9 +10550,11 @@ function App() {
                       <div className="form-footer action-row" style={{ marginTop: "14px" }}>
                         <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
                           onClick={() => {
-                            setReferrerEditor({ id: null, referrer_name: "", contact_email: "", contact_phone: "", referral_fee: "", marketing_fee: "50", fee_markup: "", portal_email: "", portal_active: false, notes: "", password: "" });
+                            setReferrerEditor(initialReferrerEditorState);
+                            referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                             setReferrerSaveMessage("");
                             setReferrerPricingItems([]);
+                            referrerPricingBaselineRef.current = JSON.stringify([]);
                             setReferrerPricingMessage("");
                             setReferrerPricingType("purchase");
                           }}>
@@ -12008,6 +12125,7 @@ function App() {
                           return;
                         }
                         setApprovedQuote(initialApprovedQuoteState);
+                        approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
                         setLoadedEnquiryMessage("");
                         setLoadedEnquiry(null);
                         setAdminTab("dashboard");
@@ -13135,6 +13253,15 @@ function FirmReferredMatterCard({
   const [editSdlt, setEditSdlt] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  // Baseline snapshot captured when the inline editor is opened — lets
+  // the dirty-form registry tell whether any line item has been edited.
+  const editorBaselineRef = useRef<string>("");
+  useDirtyForm(
+    `firm-matter-quote-${ref}`,
+    editMode &&
+      JSON.stringify({ editLegal, editDisb, editSdlt }) !==
+        editorBaselineRef.current
+  );
 
   // View Matter panel
   const [detailOpen, setDetailOpen] = useState(false);
@@ -13207,13 +13334,20 @@ function FirmReferredMatterCard({
     ((storedQuote.legalFees?.length ?? 0) > 0 || (storedQuote.disbursements?.length ?? 0) > 0);
 
   const openEditor = () => {
-    setEditLegal((storedQuote?.legalFees ?? []).map((f) => ({ ...f })));
-    setEditDisb((storedQuote?.disbursements ?? []).map((d) => ({ ...d })));
-    setEditSdlt(
+    const initialLegal = (storedQuote?.legalFees ?? []).map((f) => ({ ...f }));
+    const initialDisb = (storedQuote?.disbursements ?? []).map((d) => ({ ...d }));
+    const initialSdlt =
       typeof storedQuote?.sdltAmount === "number"
         ? String(storedQuote.sdltAmount)
-        : ""
-    );
+        : "";
+    setEditLegal(initialLegal);
+    setEditDisb(initialDisb);
+    setEditSdlt(initialSdlt);
+    editorBaselineRef.current = JSON.stringify({
+      editLegal: initialLegal,
+      editDisb: initialDisb,
+      editSdlt: initialSdlt,
+    });
     setSaveMsg("");
     setEditMode(true);
     setQuoteOpen(true);
