@@ -1,7 +1,8 @@
 // functions/api/void-invoice.js
-// Voids an invoice by clearing invoice_ref and invoice_json on the enquiry.
-// The enquiry itself is kept intact. A voided invoice no longer appears in
-// the invoices tab or counts toward totals.
+// Voids the active invoice for an enquiry by updating its row in the
+// invoices table — status='voided' and voided_at set. The previous
+// column-shuffling model is gone; voided invoices stay in the table
+// as their own rows, so any number of voids per enquiry are preserved.
 
 import {
   getTokenFromRequest,
@@ -24,30 +25,30 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Reference is required." }, 400);
     }
 
-    // Fetch the enquiry so we can log what we're voiding
     const enquiry = await env.DB.prepare(
-      `SELECT invoice_ref, invoice_json FROM enquiries WHERE reference = ? LIMIT 1`
+      `SELECT id FROM enquiries WHERE reference = ? LIMIT 1`
     ).bind(reference).first();
 
     if (!enquiry) {
       return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
     }
 
-    if (!enquiry.invoice_ref) {
+    const invoice = await env.DB.prepare(
+      `SELECT id, invoice_ref FROM invoices
+       WHERE enquiry_id = ? AND status != 'voided'
+       ORDER BY id DESC LIMIT 1`
+    ).bind(enquiry.id).first();
+
+    if (!invoice) {
       return jsonResponse({ success: false, error: "No invoice exists for this enquiry." }, 400);
     }
 
-    // Store the voided invoice data in a separate column so it is not lost,
-    // then clear the live invoice fields so it no longer appears in lists.
     await env.DB.prepare(
-      `UPDATE enquiries
-       SET voided_invoice_ref  = invoice_ref,
-           voided_invoice_json = invoice_json,
-           invoice_ref         = NULL,
-           invoice_json        = NULL,
-           invoice_status      = NULL,
-           updated_at          = datetime('now')
-       WHERE reference = ?`
+      `UPDATE invoices SET status = 'voided', voided_at = datetime('now') WHERE id = ?`
+    ).bind(invoice.id).run();
+
+    await env.DB.prepare(
+      `UPDATE enquiries SET updated_at = datetime('now') WHERE reference = ?`
     ).bind(reference).run();
 
     // Audit log
@@ -55,13 +56,13 @@ export async function onRequestPost(context) {
       await env.DB.prepare(
         `INSERT INTO audit_log (action, reference, firm_name, actor, details)
          VALUES ('invoice_voided', ?, ?, 'admin', ?)`
-      ).bind(reference, null, `Voided invoice ${enquiry.invoice_ref}`).run();
+      ).bind(reference, null, `Voided invoice ${invoice.invoice_ref}`).run();
     } catch (e) { console.error("Audit log error:", e); }
 
     return jsonResponse({
       success: true,
       reference,
-      voided_invoice_ref: enquiry.invoice_ref,
+      voided_invoice_ref: invoice.invoice_ref,
     });
   } catch (error) {
     return jsonResponse(
