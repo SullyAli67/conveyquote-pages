@@ -1557,9 +1557,18 @@ function App() {
     const stored = localStorage.getItem("cq_firm_tab");
     return isValidFirmPortalTab(stored) ? stored : "referrals";
   });
-  const setFirmPortalTab = (tab: FirmPortalTab) => {
+  // Tier 1: prompt before switching tabs when any registered form has
+  // unsaved edits. The `force` option skips the prompt for callers that
+  // have already handled the discard (popstate / explicit reset flows)
+  // or that cannot have dirty state yet (initial login / URL hydration).
+  const setFirmPortalTab = (
+    tab: FirmPortalTab,
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_firm_tab", tab);
     setFirmPortalTabRaw(tab);
+    return true;
   };
   // Session-level "already loaded" flags so tab clicks don't refetch
   // (firmBrandingLoaded already exists below). A manual Refresh button
@@ -1817,9 +1826,17 @@ function App() {
   const [referrerPortalTab, setReferrerPortalTabRaw] = useState<"dashboard" | "my_referrals" | "new_referral" | "payments">(
     () => (localStorage.getItem("cq_referrer_tab") as "dashboard" | "my_referrals" | "new_referral" | "payments") || "dashboard"
   );
-  const setReferrerPortalTab = (tab: "dashboard" | "my_referrals" | "new_referral" | "payments") => {
+  // Tier 1: see setFirmPortalTab. The referrer portal currently has no
+  // forms wired into the registry, but the prompt still fires if any
+  // other dirty form exists when navigating in/out of this portal.
+  const setReferrerPortalTab = (
+    tab: "dashboard" | "my_referrals" | "new_referral" | "payments",
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_referrer_tab", tab);
     setReferrerPortalTabRaw(tab);
+    return true;
   };
 
   // My Referrals tab UI state — hoisted out of an inline IIFE to keep
@@ -1875,9 +1892,15 @@ function App() {
   const [adminTab, setAdminTabRaw] = useState<AdminTab>(
     () => (localStorage.getItem("cq_admin_tab") as AdminTab) || "dashboard"
   );
-  const setAdminTab = (tab: AdminTab) => {
+  // Tier 1: see setFirmPortalTab.
+  const setAdminTab = (
+    tab: AdminTab,
+    options: { force?: boolean } = {}
+  ): boolean => {
+    if (!options.force && !confirmDiscardIfDirty()) return false;
     localStorage.setItem("cq_admin_tab", tab);
     setAdminTabRaw(tab);
+    return true;
   };
   // Session-level "already loaded" flags for admin tabs whose data is
   // separate from the main dashboard payload. Cleared by the Refresh button.
@@ -2285,7 +2308,7 @@ function App() {
   };
 
   const handleAdminTabChange = async (tab: AdminTab) => {
-    setAdminTab(tab);
+    if (!setAdminTab(tab)) return;
 
     // Always clear the loaded enquiry when switching tabs so other tab
     // renders are not blocked by the !loadedEnquiry guards
@@ -2661,8 +2684,10 @@ function App() {
         return;
       }
 
-      // Queue empty — back to dashboard + toast.
-      setAdminTab("dashboard");
+      // Queue empty — back to dashboard + toast. This runs after a
+      // successful send (the form has been reset already), so skip the
+      // unsaved-changes prompt.
+      setAdminTab("dashboard", { force: true });
       setLoadedEnquiry(null);
       setLoadedEnquiryMessage("");
       const nextUrl = new URL(window.location.href);
@@ -2865,11 +2890,11 @@ function App() {
         setManualReference(refFromUrl);
         if (refFromUrl) {
           // Deep-link from email — jump straight to the Quote Review screen
-          // with the enquiry loaded.
-          setAdminTab("quote");
+          // with the enquiry loaded. Just-logged-in: no dirty state possible.
+          setAdminTab("quote", { force: true });
           await loadEnquiryByReference(refFromUrl);
         } else {
-          setAdminTab("dashboard");
+          setAdminTab("dashboard", { force: true });
           await loadDashboardData();
         }
       } else {
@@ -2982,7 +3007,7 @@ function App() {
   // nav. Mirrors the URL push logic in the tab-button onClick so the browser
   // back button still works after a CTA-driven tab switch.
   const goToFirmTab = (tab: FirmPortalTab) => {
-    setFirmPortalTab(tab);
+    if (!setFirmPortalTab(tab)) return;
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("tab", tab);
     const currentUrlTab = new URL(window.location.href).searchParams.get("tab");
@@ -5033,7 +5058,7 @@ function App() {
     }
 
     const nextReference = manualReference.trim();
-    setAdminTab("quote");
+    if (!setAdminTab("quote")) return;
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", nextReference);
@@ -5045,8 +5070,8 @@ function App() {
   const handleOpenDashboardEnquiry = async (reference: string) => {
     if (!reference) return;
 
+    if (!setAdminTab("quote")) return;
     setManualReference(reference);
-    setAdminTab("quote");
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("ref", reference);
@@ -5056,7 +5081,7 @@ function App() {
   };
 
   const handleBackToDashboard = async () => {
-    setAdminTab("dashboard");
+    if (!setAdminTab("dashboard")) return;
     setLoadedEnquiry(null);
     setLoadedEnquiryMessage("");
     setApprovedQuote(initialApprovedQuoteState);
@@ -5217,14 +5242,15 @@ function App() {
 
     if (refFromUrl) {
       setManualReference(refFromUrl);
-      setAdminTab("quote");
+      // URL-hydration on initial portal entry — no dirty state exists yet.
+      setAdminTab("quote", { force: true });
       void loadEnquiryByReference(refFromUrl);
     } else {
       // Restore tab from URL ?tab= if valid, else fall through to
       // the persisted/default value already set by useState.
       const urlTab = new URLSearchParams(window.location.search).get("tab");
       if (isValidAdminTab(urlTab)) {
-        setAdminTab(urlTab);
+        setAdminTab(urlTab, { force: true });
       }
     }
     void loadDashboardData();
@@ -5232,6 +5258,8 @@ function App() {
 
   // Listen for browser back/forward — restore tab + loaded enquiry from
   // the URL so back/forward across tab changes works as expected.
+  // popstate fires after the URL has already changed, so we bypass the
+  // unsaved-changes prompt here — the browser already navigated.
   useEffect(() => {
     if (!isAdminPage) return;
     const onPopState = () => {
@@ -5240,15 +5268,15 @@ function App() {
       const urlTab = params.get("tab");
       if (ref) {
         setManualReference(ref);
-        setAdminTab("quote");
+        setAdminTab("quote", { force: true });
         void loadEnquiryByReference(ref);
       } else if (isValidAdminTab(urlTab)) {
-        setAdminTab(urlTab);
+        setAdminTab(urlTab, { force: true });
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
       } else {
-        setAdminTab("dashboard");
+        setAdminTab("dashboard", { force: true });
         setLoadedEnquiry(null);
         setLoadedEnquiryMessage("");
         setManualReference("");
@@ -5271,19 +5299,21 @@ function App() {
     if (!isFirmPortalPage) return;
     const urlTab = new URLSearchParams(window.location.search).get("tab");
     if (isValidFirmPortalTab(urlTab)) {
-      setFirmPortalTab(urlTab);
+      // Initial URL hydration — no dirty state yet.
+      setFirmPortalTab(urlTab, { force: true });
     }
   }, [isFirmPortalPage]);
 
   // Listen for browser back/forward inside the firm portal — restore the tab
-  // state from the URL without re-pushing history.
+  // state from the URL without re-pushing history. popstate is reactive to a
+  // URL the browser already changed, so bypass the unsaved-changes prompt.
   useEffect(() => {
     if (!isFirmPortalPage) return;
     const onPopState = () => {
       const params = new URLSearchParams(window.location.search);
       const urlTab = params.get("tab");
       if (isValidFirmPortalTab(urlTab)) {
-        setFirmPortalTab(urlTab);
+        setFirmPortalTab(urlTab, { force: true });
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -7497,7 +7527,7 @@ function App() {
                       type="button"
                       style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: firmPortalTab === tab ? "var(--teal)" : "var(--muted)", borderBottom: firmPortalTab === tab ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
                       onClick={() => {
-                        setFirmPortalTab(tab);
+                        if (!setFirmPortalTab(tab)) return;
 
                         // Push tab to URL so browser back/forward navigates
                         // between firm portal tabs. Skip if already current.
@@ -12128,7 +12158,10 @@ function App() {
                         approvedQuoteBaselineRef.current = JSON.stringify(initialApprovedQuoteState);
                         setLoadedEnquiryMessage("");
                         setLoadedEnquiry(null);
-                        setAdminTab("dashboard");
+                        // The user already confirmed clearing — skip the
+                        // tab-switch prompt that would otherwise fire on a
+                        // still-dirty registry entry pre-state-flush.
+                        setAdminTab("dashboard", { force: true });
 
                         const nextUrl = new URL(window.location.href);
                         nextUrl.searchParams.delete("ref");
@@ -12518,7 +12551,7 @@ function App() {
               {TABS.map((tab) => (
                 <button key={tab.id} type="button"
                   style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: referrerPortalTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: referrerPortalTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
-                  onClick={() => { setReferrerPortalTab?.(tab.id); if (tab.id !== "new_referral") refreshPortal(); }}>
+                  onClick={() => { if (!setReferrerPortalTab?.(tab.id)) return; if (tab.id !== "new_referral") refreshPortal(); }}>
                   {tab.label}
                 </button>
               ))}
