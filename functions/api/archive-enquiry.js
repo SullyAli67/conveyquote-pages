@@ -24,11 +24,18 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Reference is required." }, 400);
     }
 
-    // Fetch the enquiry — must belong to this referrer
+    // Fetch the enquiry — must belong to this referrer. The active
+    // invoice check now joins the invoices table (Phase C); the old
+    // enquiries.invoice_ref column is no longer written.
     const enquiry = await env.DB.prepare(
-      `SELECT reference, status, assigned_firm_id, invoice_ref
-       FROM enquiries
-       WHERE reference = ? AND referrer_id = ?
+      `SELECT e.id, e.reference, e.status, e.assigned_firm_id,
+              live_inv.invoice_ref AS invoice_ref
+       FROM enquiries e
+       LEFT JOIN invoices live_inv ON live_inv.id = (
+         SELECT MAX(id) FROM invoices i
+         WHERE i.enquiry_id = e.id AND i.status != 'voided'
+       )
+       WHERE e.reference = ? AND e.referrer_id = ?
        LIMIT 1`
     ).bind(reference, referrerId).first();
 

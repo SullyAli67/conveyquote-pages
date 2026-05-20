@@ -51,9 +51,14 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
     }
 
-    if (enquiry.invoice_ref) {
-      // Already invoiced — return existing
-      return jsonResponse({ success: true, invoice_ref: enquiry.invoice_ref, already_exists: true });
+    // Refuse to issue a second active invoice. A voided one does not block.
+    const existing = await env.DB.prepare(
+      `SELECT invoice_ref FROM invoices
+       WHERE enquiry_id = ? AND status != 'voided'
+       ORDER BY id DESC LIMIT 1`
+    ).bind(enquiry.id).first();
+    if (existing) {
+      return jsonResponse({ success: true, invoice_ref: existing.invoice_ref, already_exists: true });
     }
 
     const firm = await env.DB.prepare(
@@ -125,11 +130,16 @@ export async function onRequestPost(context) {
       issued_at: new Date().toISOString().slice(0, 10),
     };
 
-    // Save invoice ref on the enquiry
+    // Insert a new row into the invoices table. One row per invoice;
+    // multiple rows allowed per enquiry (voided ones survive).
     await env.DB.prepare(
-      `UPDATE enquiries SET invoice_ref = ?, invoice_json = ?, invoice_status = 'issued', updated_at = datetime('now')
-       WHERE reference = ?`
-    ).bind(invoiceRef, JSON.stringify(invoiceData), reference).run();
+      `INSERT INTO invoices (enquiry_id, invoice_ref, invoice_json, status)
+       VALUES (?, ?, ?, 'issued')`
+    ).bind(enquiry.id, invoiceRef, JSON.stringify(invoiceData)).run();
+
+    await env.DB.prepare(
+      `UPDATE enquiries SET updated_at = datetime('now') WHERE reference = ?`
+    ).bind(reference).run();
 
     // Audit log
     try {
