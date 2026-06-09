@@ -80,29 +80,4 @@
     <priority>0.9</priority>
     <changefreq>monthly</changefreq>
   </url>
-  <url>
-    <loc>https://conveyquote.uk/sdlt-calculator</loc>
-    <priority>0.7</priority>
-    <changefreq>monthly</changefreq>
-  </url>
-  <url>
-    <loc>https://conveyquote.uk/conveyancing-fees</loc>
-    <priority>0.7</priority>
-    <changefreq>monthly</changefreq>
-  </url>
-  <url>
-    <loc>https://conveyquote.uk/about</loc>
-    <priority>0.5</priority>
-    <changefreq>yearly</changefreq>
-  </url>
-  <url>
-    <loc>https://conveyquote.uk/terms</loc>
-    <priority>0.3</priority>
-    <changefreq>yearly</changefreq>
-  </url>
-  <url>
-    <loc>https://conveyquote.uk/privacy</loc>
-    <priority>0.3</priority>
-    <changefreq>yearly</changefreq>
-  </url>
 </urlset>
