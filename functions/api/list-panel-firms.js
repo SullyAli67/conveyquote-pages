@@ -1,3 +1,5 @@
+import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
+
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
@@ -6,7 +8,11 @@ const jsonResponse = (payload, status = 200) =>
 
 export async function onRequestGet(context) {
   try {
-    const { env } = context;
+    const { request, env } = context;
+    const token = getTokenFromRequest(request);
+    const session = await validateSession(env.DB, token, "admin");
+    if (!session) return unauthorised();
+
 
     const result = await env.DB.prepare(`
       SELECT

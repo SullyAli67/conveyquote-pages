@@ -1,3 +1,5 @@
+import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
+
 const jsonResponse = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -7,6 +9,10 @@ const jsonResponse = (body, status = 200) =>
 export async function onRequestGet(context) {
   try {
     const { request, env } = context;
+    const token = getTokenFromRequest(request);
+    const session = await validateSession(env.DB, token, "admin");
+    if (!session) return unauthorised();
+
     const url = new URL(request.url);
     const reference = url.searchParams.get("ref");
 
