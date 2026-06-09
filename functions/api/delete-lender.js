@@ -1,5 +1,9 @@
+import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
 export async function onRequestPost({ request, env }) {
   try {
+    const token = getTokenFromRequest(request);
+    const session = await validateSession(env.DB, token, "admin");
+    if (!session) return unauthorised();
     const body = await request.json();
     const { id } = body;
 
