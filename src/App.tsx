@@ -1958,6 +1958,7 @@ function App() {
   const isFeesPage = isFeesArticlePage;
   const currentUrl = new URL(window.location.href);
   const refFromUrl = currentUrl.searchParams.get("ref") || "";
+  const cityFromUrl = currentUrl.searchParams.get("city") || "";
 
   const selectedFirm = useMemo(
     () => dashboardFirms.find((firm) => firm.id === selectedFirmId) || null,
@@ -6110,7 +6111,7 @@ function App() {
             <section className="card card--form">
               <div className="section-heading">
                 <div>
-                  <h2>Get a Quote</h2>
+                  <h2>{cityFromUrl ? `Get a Quote for your ${cityFromUrl} property` : "Get a Quote"}</h2>
                   <p>
                     Select your transaction type and we will ask only the questions relevant to your matter. Your quote will be reviewed by our team before being issued.
                   </p>
