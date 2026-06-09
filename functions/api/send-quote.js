@@ -305,34 +305,63 @@ export async function onRequestPost(context) {
       </html>
     `;
 
-    // Send notification email - awaited so failures are caught and reported
+    // Internal notification email — best-effort. A Resend failure must never
+    // 500 the customer: the row is already saved and notification_email_*
+    // columns record the outcome for manual follow-up.
     let emailSent = false;
+    let emailMessageId = null;
+    let emailError = null;
 
     if (env.RESEND_API_KEY) {
-      const resendResponse = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: "ConveyQuote <quotes@conveyquote.uk>",
-          to: ["info@conveyquote.uk"],
-          reply_to: email || undefined,
-          subject: `New Quote - ${prettyType} - ${reference}`,
-          html: internalHtml,
-        }),
-      });
+      try {
+        const resendResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "ConveyQuote <quotes@conveyquote.uk>",
+            to: ["info@conveyquote.uk"],
+            reply_to: email || undefined,
+            subject: `New Quote - ${prettyType} - ${reference}`,
+            html: internalHtml,
+          }),
+        });
 
-      const resendText = await resendResponse.text();
+        const resendText = await resendResponse.text();
 
-      if (!resendResponse.ok) {
-        throw new Error(
-          `Resend email failed: ${resendResponse.status} ${resendText}`
-        );
+        if (resendResponse.ok) {
+          emailSent = true;
+          try { emailMessageId = JSON.parse(resendText)?.id ?? null; } catch {}
+        } else {
+          emailError = `Resend ${resendResponse.status}: ${resendText.slice(0, 300)}`;
+          console.error(`Notification email failed for ${reference}:`, emailError);
+        }
+      } catch (emailEx) {
+        emailError = emailEx instanceof Error ? emailEx.message : String(emailEx);
+        console.error(`Notification email threw for ${reference}:`, emailEx);
       }
 
-      emailSent = true;
+      // Record outcome on the enquiry row — best-effort, never throw
+      try {
+        await env.DB.prepare(
+          `UPDATE enquiries
+             SET notification_email_sent_at = ?,
+                 notification_email_message_id = ?,
+                 notification_email_last_error = ?
+           WHERE reference = ?`
+        )
+          .bind(
+            emailSent ? new Date().toISOString() : null,
+            emailMessageId,
+            emailError,
+            reference
+          )
+          .run();
+      } catch (trackEx) {
+        console.error(`Failed to record email outcome for ${reference}:`, trackEx);
+      }
     }
 
     // Best-effort customer confirmation email. Fires AFTER the internal
@@ -450,11 +479,11 @@ export async function onRequestPost(context) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : "";
+    console.error("send-quote unhandled error:", message, stack);
     return jsonResponse(
       {
         success: false,
-        error: message,
-        detail: stack?.slice(0, 300),
+        error: "Sorry, there was a problem processing your enquiry. Please try again or contact us at info@conveyquote.uk.",
       },
       500
     );
