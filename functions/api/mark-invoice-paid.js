@@ -1,6 +1,7 @@
 // functions/api/mark-invoice-paid.js
 // Admin marks an invoice as paid (or reverts to issued).
-// Updates enquiries.invoice_status and writes an audit log entry.
+// Updates the active (non-voided) row in the invoices table for the
+// given enquiry reference and writes an audit log entry.
 
 import {
   getTokenFromRequest,
@@ -34,30 +35,38 @@ export async function onRequestPost(context) {
     }
 
     const enquiry = await env.DB.prepare(
-      `SELECT invoice_ref, invoice_status, assigned_firm_name
-       FROM enquiries WHERE reference = ? LIMIT 1`
+      `SELECT id, assigned_firm_name FROM enquiries WHERE reference = ? LIMIT 1`
     ).bind(reference).first();
 
     if (!enquiry) {
       return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
     }
 
-    if (!enquiry.invoice_ref) {
+    const invoice = await env.DB.prepare(
+      `SELECT id, invoice_ref FROM invoices
+       WHERE enquiry_id = ? AND status != 'voided'
+       ORDER BY id DESC LIMIT 1`
+    ).bind(enquiry.id).first();
+
+    if (!invoice) {
       return jsonResponse({ success: false, error: "No invoice exists for this enquiry." }, 400);
     }
 
     const newStatus = mark_as_paid ? "paid" : "issued";
 
     await env.DB.prepare(
-      `UPDATE enquiries SET invoice_status = ?, updated_at = datetime('now')
-       WHERE reference = ?`
-    ).bind(newStatus, reference).run();
+      `UPDATE invoices SET status = ? WHERE id = ?`
+    ).bind(newStatus, invoice.id).run();
+
+    await env.DB.prepare(
+      `UPDATE enquiries SET updated_at = datetime('now') WHERE reference = ?`
+    ).bind(reference).run();
 
     await writeAudit(env.DB, {
       action: mark_as_paid ? "invoice_marked_paid" : "invoice_marked_unpaid",
       reference,
       firm_name: enquiry.assigned_firm_name || null,
-      details: `Invoice ${enquiry.invoice_ref} marked as ${newStatus}`,
+      details: `Invoice ${invoice.invoice_ref} marked as ${newStatus}`,
     });
 
     return jsonResponse({ success: true, reference, invoice_status: newStatus });

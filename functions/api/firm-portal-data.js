@@ -35,20 +35,26 @@ export async function onRequestGet(context) {
 
     if (!firm) return unauthorised();
 
-    // Load enquiries assigned to this firm
+    // Load enquiries assigned to this firm. invoice_ref now comes from
+    // the latest non-voided row in the invoices table (Phase C).
     const enquiriesResult = await env.DB.prepare(
       `SELECT
-         id, reference, client_name, client_email, client_phone,
-         transaction_type, tenure, price, postcode, property_address,
-         mortgage, lender, negotiator_name,
-         status, panel_status, firm_response, firm_responded_at,
-         firm_response_notes, referred_at, created_at,
-         referral_fee_payable, referral_fee_amount,
-         case_status, eta_date, invoice_ref,
-         quote_json, approved_quote_json, approved_quote_amount
-       FROM enquiries
-       WHERE assigned_firm_id = ?
-       ORDER BY referred_at DESC`
+         e.id, e.reference, e.client_name, e.client_email, e.client_phone,
+         e.transaction_type, e.tenure, e.price, e.postcode, e.property_address,
+         e.mortgage, e.lender, e.negotiator_name,
+         e.status, e.panel_status, e.firm_response, e.firm_responded_at,
+         e.firm_response_notes, e.referred_at, e.created_at,
+         e.referral_fee_payable, e.referral_fee_amount,
+         e.case_status, e.eta_date,
+         live_inv.invoice_ref AS invoice_ref,
+         e.quote_json, e.approved_quote_json, e.approved_quote_amount
+       FROM enquiries e
+       LEFT JOIN invoices live_inv ON live_inv.id = (
+         SELECT MAX(id) FROM invoices i
+         WHERE i.enquiry_id = e.id AND i.status != 'voided'
+       )
+       WHERE e.assigned_firm_id = ?
+       ORDER BY e.referred_at DESC`
     )
       .bind(firmId)
       .all();
