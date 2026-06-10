@@ -873,8 +873,16 @@ function getSellerCount(numberOfSellers?: string) {
   return 1;
 }
 
+// Residential SDLT rates from 1 April 2025 (the temporary 23 Sep 2022 –
+// 31 Mar 2025 thresholds no longer apply): 0% to £125k, 2% to £250k,
+// 5% to £925k, 10% to £1.5m, 12% above. MUST STAY IN SYNC with
+// functions/lib/calculate-quote.js and src/buildQuoteData.ts.
 function calculateStandardSdlt(price: number) {
   let tax = 0;
+
+  if (price > 125000) {
+    tax += (Math.min(price, 250000) - 125000) * 0.02;
+  }
 
   if (price > 250000) {
     tax += (Math.min(price, 925000) - 250000) * 0.05;
@@ -891,15 +899,17 @@ function calculateStandardSdlt(price: number) {
   return Math.max(0, tax);
 }
 
+// First-time buyer relief from 1 April 2025: 0% to £300k, 5% on
+// £300k–£500k; no relief at all above a £500k purchase price.
 function calculateFirstTimeBuyerSdlt(price: number) {
-  if (price > 625000) {
+  if (price > 500000) {
     return calculateStandardSdlt(price);
   }
 
   let tax = 0;
 
-  if (price > 425000) {
-    tax += (price - 425000) * 0.05;
+  if (price > 300000) {
+    tax += (price - 300000) * 0.05;
   }
 
   return Math.max(0, tax);
@@ -14002,8 +14012,11 @@ function StandaloneSdltCalculator() {
   const [isCompany, setIsCompany] = useState("no");
   const [sharedOwnership, setSharedOwnership] = useState("no");
 
+  // Rates from 1 April 2025 — MUST STAY IN SYNC with calculateStandardSdlt
+  // / calculateFirstTimeBuyerSdlt above and functions/lib/calculate-quote.js.
   function calcStandard(p: number) {
     let tax = 0;
+    if (p > 125000) tax += (Math.min(p, 250000) - 125000) * 0.02;
     if (p > 250000) tax += (Math.min(p, 925000) - 250000) * 0.05;
     if (p > 925000) tax += (Math.min(p, 1500000) - 925000) * 0.1;
     if (p > 1500000) tax += (p - 1500000) * 0.12;
@@ -14011,9 +14024,9 @@ function StandaloneSdltCalculator() {
   }
 
   function calcFTB(p: number) {
-    if (p > 625000) return calcStandard(p);
+    if (p > 500000) return calcStandard(p);
     let tax = 0;
-    if (p > 425000) tax += (p - 425000) * 0.05;
+    if (p > 300000) tax += (p - 300000) * 0.05;
     return Math.max(0, tax);
   }
 
@@ -14123,7 +14136,7 @@ function StandaloneSdltCalculator() {
             ))}
           </tbody>
         </table>
-        <p style={{ fontSize: "12px", color: "var(--muted)", marginTop: "12px" }}>First-time buyers pay 0% on the first £425,000 (properties up to £625,000). Non-UK residents pay an additional 2% surcharge.</p>
+        <p style={{ fontSize: "12px", color: "var(--muted)", marginTop: "12px" }}>First-time buyers pay 0% on the first £300,000 (properties up to £500,000). Non-UK residents pay an additional 2% surcharge.</p>
       </div>
     </div>
   );
@@ -14462,7 +14475,7 @@ function ReferrerSimpleForm({
               </select>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Additional property? (3% SDLT surcharge)</label>
+              <label style={labelStyle}>Additional property? (5% SDLT surcharge)</label>
               <select style={inputStyle} value={form.additionalProperty} onChange={(e) => set("additionalProperty", e.target.value)}>
                 <option value="no">No</option>
                 <option value="yes">Yes</option>

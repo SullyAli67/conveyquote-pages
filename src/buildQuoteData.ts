@@ -160,27 +160,41 @@ const getOwnersChangingCount = (value?: string) => {
   return 1;
 };
 
+// Residential SDLT rates from 1 April 2025 (the temporary 23 Sep 2022 –
+// 31 Mar 2025 thresholds no longer apply): 0% to £125k, 2% to £250k,
+// 5% to £925k, 10% to £1.5m, 12% above. MUST STAY IN SYNC with
+// functions/lib/calculate-quote.js.
 function calculateStandardResidentialSdlt(price: number) {
-  if (price <= 250000) return 0;
-  if (price <= 925000) return (price - 250000) * 0.05;
+  if (price <= 125000) return 0;
+  if (price <= 250000) return (price - 125000) * 0.02;
+  if (price <= 925000) {
+    return (250000 - 125000) * 0.02 + (price - 250000) * 0.05;
+  }
   if (price <= 1500000) {
-    return (925000 - 250000) * 0.05 + (price - 925000) * 0.1;
+    return (
+      (250000 - 125000) * 0.02 +
+      (925000 - 250000) * 0.05 +
+      (price - 925000) * 0.1
+    );
   }
   return (
+    (250000 - 125000) * 0.02 +
     (925000 - 250000) * 0.05 +
     (1500000 - 925000) * 0.1 +
     (price - 1500000) * 0.12
   );
 }
 
+// First-time buyer relief from 1 April 2025: 0% to £300k, 5% on
+// £300k–£500k; no relief at all above a £500k purchase price.
 function calculateFirstTimeBuyerSdlt(price: number) {
-  if (price > 625000) {
+  if (price > 500000) {
     return calculateStandardResidentialSdlt(price);
   }
-  if (price <= 425000) {
+  if (price <= 300000) {
     return 0;
   }
-  return (price - 425000) * 0.05;
+  return (price - 300000) * 0.05;
 }
 
 function getSdltResult(input: {
@@ -202,9 +216,12 @@ function getSdltResult(input: {
     return { sdltNote: "SDLT subject to review" as string };
   }
 
-  let sdlt = yes(input.firstTimeBuyer)
-    ? calculateFirstTimeBuyerSdlt(price)
-    : calculateStandardResidentialSdlt(price);
+  // FTB relief is unavailable on additional-dwelling purchases — matches
+  // the server engine in functions/lib/calculate-quote.js.
+  let sdlt =
+    yes(input.firstTimeBuyer) && !yes(input.additionalProperty)
+      ? calculateFirstTimeBuyerSdlt(price)
+      : calculateStandardResidentialSdlt(price);
 
   if (yes(input.additionalProperty)) {
     sdlt += price * 0.05;

@@ -132,8 +132,15 @@ function getBespokeNote(value) {
   return (Number(value) || 0) >= 1500000 ? BESPOKE_PRICING_NOTE : null;
 }
 
+// Residential SDLT rates from 1 April 2025 (the temporary 23 Sep 2022 –
+// 31 Mar 2025 thresholds no longer apply): 0% to £125k, 2% to £250k,
+// 5% to £925k, 10% to £1.5m, 12% above.
 function calculateStandardSdlt(price) {
   let tax = 0;
+
+  if (price > 125000) {
+    tax += (Math.min(price, 250000) - 125000) * 0.02;
+  }
 
   if (price > 250000) {
     tax += (Math.min(price, 925000) - 250000) * 0.05;
@@ -150,15 +157,17 @@ function calculateStandardSdlt(price) {
   return Math.max(0, tax);
 }
 
+// First-time buyer relief from 1 April 2025: 0% to £300k, 5% on
+// £300k–£500k; no relief at all above a £500k purchase price.
 function calculateFirstTimeBuyerSdlt(price) {
-  if (price > 625000) {
+  if (price > 500000) {
     return calculateStandardSdlt(price);
   }
 
   let tax = 0;
 
-  if (price > 425000) {
-    tax += (price - 425000) * 0.05;
+  if (price > 300000) {
+    tax += (price - 300000) * 0.05;
   }
 
   return Math.max(0, tax);
