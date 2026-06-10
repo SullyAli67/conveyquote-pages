@@ -12484,6 +12484,23 @@ function App() {
             </div>
           </section>
         )}
+        {isHomePage && (
+          <section className="card" style={{ marginTop: "28px" }}>
+            <div className="section-heading">
+              <div>
+                <h2>Are you an estate agent or broker?</h2>
+                <p>
+                  Earn from conveyancing referrals with complete transparency —
+                  your client stays yours, your name goes on every quote, and
+                  commission is typically £100–£300 per completed transaction.{" "}
+                  <a href="/conveyancing-referral-program">
+                    Explore the referral programme →
+                  </a>
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ── Referrer Login ── */}
@@ -13268,6 +13285,7 @@ function App() {
                 <a href="/conveyancing-quotes">Conveyancing Quotes Explained</a>
                 <a href="/sdlt-calculator/">SDLT Calculator</a>
                 <a href="/conveyancing-fees/">Conveyancing Fees Guide</a>
+                <a href="/conveyancing-referral-program">Agent Partners</a>
                 <a href="/firm-login/">Firm Portal</a>
                 <a href="/referrer-login/">Referrer Portal</a>
               </div>
