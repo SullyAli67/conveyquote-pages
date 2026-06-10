@@ -12501,6 +12501,74 @@ function App() {
             </div>
           </section>
         )}
+        {isHomePage && (
+          <section
+            className="card"
+            style={{ marginTop: "28px" }}
+            aria-labelledby="home-reviews-heading"
+          >
+            <div className="section-heading">
+              <div>
+                <h2 id="home-reviews-heading">Real customers, real moves</h2>
+                <p>What people tell us after using their quote.</p>
+              </div>
+            </div>
+            <div
+              style={{
+                borderLeft: "4px solid var(--teal)",
+                background: "var(--bg)",
+                borderRadius: "0 12px 12px 0",
+                padding: "16px 20px",
+                marginBottom: "14px",
+              }}
+            >
+              <p style={{ fontStyle: "italic", margin: 0 }}>
+                "I had no idea where to start with conveyancing costs.
+                ConveyQuote gave me instant, transparent quotes from vetted
+                solicitors without any of the usual back-and-forth. I found a
+                firm within my budget in minutes and the whole process felt so
+                much less daunting. Genuinely wish I'd found this sooner."
+              </p>
+              <p
+                style={{
+                  fontWeight: 700,
+                  color: "var(--navy)",
+                  fontSize: "14px",
+                  margin: "10px 0 0",
+                }}
+              >
+                — Sarah M., First-Time Buyer – Manchester
+              </p>
+            </div>
+            <div
+              style={{
+                borderLeft: "4px solid var(--teal)",
+                background: "var(--bg)",
+                borderRadius: "0 12px 12px 0",
+                padding: "16px 20px",
+              }}
+            >
+              <p style={{ fontStyle: "italic", margin: 0 }}>
+                "We were selling and buying simultaneously so we needed a firm
+                that could handle both sides efficiently. ConveyQuote matched
+                us with a local solicitor who specialised in chain
+                transactions. The quote was clear, no hidden extras, and the
+                firm they referred us to was excellent. Would use again
+                without hesitation."
+              </p>
+              <p
+                style={{
+                  fontWeight: 700,
+                  color: "var(--navy)",
+                  fontSize: "14px",
+                  margin: "10px 0 0",
+                }}
+              >
+                — James &amp; Priya T., Home Movers – Birmingham
+              </p>
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ── Referrer Login ── */}
