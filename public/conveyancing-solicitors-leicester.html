@@ -23,7 +23,7 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "ProfessionalService",
+  "@type": "LegalService",
   "name": "ConveyQuote",
   "description": "Fixed fee conveyancing quotes for Leicester properties, reviewed before issue.",
   "url": "https://conveyquote.uk/conveyancing-solicitors-leicester",
@@ -34,8 +34,41 @@
     "@type": "City",
     "name": "Leicester"
   },
-  "serviceType": "Residential Conveyancing",
+  "serviceType": "Conveyancing",
   "priceRange": "££",
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Conveyancing services in Leicester",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Property purchase conveyancing",
+          "serviceType": "Conveyancing",
+          "areaServed": "Leicester"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Property sale conveyancing",
+          "serviceType": "Conveyancing",
+          "areaServed": "Leicester"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Remortgage conveyancing",
+          "serviceType": "Conveyancing",
+          "areaServed": "Leicester"
+        }
+      }
+    ]
+  },
   "parentOrganization": {
     "@type": "Organization",
     "name": "Essentially Law Limited",
