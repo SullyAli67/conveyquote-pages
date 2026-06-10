@@ -13265,6 +13265,7 @@ function App() {
               <h4>Services</h4>
               <div className="site-footer__links">
                 <a href="/">Get a Quote</a>
+                <a href="/conveyancing-quotes">Conveyancing Quotes Explained</a>
                 <a href="/sdlt-calculator/">SDLT Calculator</a>
                 <a href="/conveyancing-fees/">Conveyancing Fees Guide</a>
                 <a href="/firm-login/">Firm Portal</a>
