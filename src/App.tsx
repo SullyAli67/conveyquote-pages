@@ -12388,6 +12388,77 @@ function App() {
           </section>
         )}
         {isHomePage && (
+          <section
+            className="card"
+            style={{ marginTop: "28px" }}
+            aria-labelledby="home-faq-heading"
+          >
+            <div className="section-heading">
+              <div>
+                <h2 id="home-faq-heading">Conveyancing questions, answered</h2>
+                <p>
+                  Plain-English answers to the questions buyers and sellers ask
+                  most. The wording below matches the guidance in our quotes.
+                </p>
+              </div>
+            </div>
+            <div>
+              <h3>How much does conveyancing cost in the UK?</h3>
+              <p>
+                For a straightforward residential purchase in England and Wales,
+                expect total conveyancing costs of roughly £1,500 to £2,500.
+                That is made up of the solicitor's legal fee — typically £900 to
+                £1,500 plus VAT — and disbursements, which are third-party costs
+                such as searches and Land Registry fees. Selling usually costs
+                less, around £900 to £1,500 in total, and leasehold properties
+                cost more because extra legal work is involved. A reviewed,
+                itemised quote shows your exact figure before you commit to
+                anything.
+              </p>
+              <h3>How long does conveyancing take?</h3>
+              <p>
+                Most transactions complete within ten to fourteen weeks of an
+                offer being accepted, and around twelve weeks is a realistic
+                average. Leasehold purchases, long chains and new-build
+                developer deadlines can extend this, while a simple freehold
+                sale with no chain can be quicker. A proactive solicitor who
+                chases the other side regularly is the biggest single factor in
+                keeping things moving.
+              </p>
+              <h3>What is included in a conveyancing quote?</h3>
+              <p>
+                A proper conveyancing quote itemises three things: the legal
+                fee for the solicitor's work (plus VAT), the disbursements —
+                third-party costs such as local authority searches, Land
+                Registry fees and bank transfer charges — and a Stamp Duty
+                estimate where it applies. ConveyQuote quotes are fixed and
+                reviewed by our team before they are issued, so nothing is
+                added later without explanation.
+              </p>
+              <h3>Do I need a solicitor to buy a house?</h3>
+              <p>
+                If you are buying with a mortgage, yes in practice — your
+                lender will require a solicitor or licensed conveyancer to act
+                for them before releasing funds. Cash buyers can legally do
+                their own conveyancing, but it is risky: searches, contracts
+                and Land Registry registration carry real legal consequences if
+                they are mishandled. In practice nearly all buyers instruct a
+                regulated professional.
+              </p>
+              <h3>What is the difference between freehold and leasehold conveyancing?</h3>
+              <p>
+                Freehold means you own the building and the land it stands on
+                outright. Leasehold means you own the property for the length
+                of a lease and usually pay ground rent and service charges to a
+                freeholder. Leasehold conveyancing involves extra work —
+                reviewing the lease, the management pack and the service charge
+                accounts — so it typically costs more and takes a few weeks
+                longer.
+              </p>
+            </div>
+          </section>
+        )}
+        {isHomePage && (
           <section className="city-coverage" aria-labelledby="city-coverage-heading">
             <h2 id="city-coverage-heading">Conveyancing solicitors across England &amp; Wales</h2>
             <p>
