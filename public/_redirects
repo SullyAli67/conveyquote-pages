@@ -1,34 +1,10 @@
-/admin /index.html 200
-/admin/ /index.html 200
-/admin/* /index.html 200
-/firm-login /index.html 200
-/firm-login/ /index.html 200
-/firm-login/* /index.html 200
-/firm-portal /index.html 200
-/firm-portal/ /index.html 200
-/firm-portal/* /index.html 200
-/referrer-login /index.html 200
-/referrer-login/ /index.html 200
-/referrer-login/* /index.html 200
-/referrer-portal /index.html 200
-/referrer-portal/ /index.html 200
-/referrer-portal/* /index.html 200
-/about /index.html 200
-/about/ /index.html 200
-/about/* /index.html 200
-/terms /index.html 200
-/terms/ /index.html 200
-/terms/* /index.html 200
-/privacy /index.html 200
-/privacy/ /index.html 200
-/privacy/* /index.html 200
-/sdlt-calculator /index.html 200
-/sdlt-calculator/ /index.html 200
-/sdlt-calculator/* /index.html 200
-/conveyancing-fees /index.html 200
-/conveyancing-fees/ /index.html 200
-/conveyancing-fees/* /index.html 200
-/firm-quote-accept /index.html 200
-/firm-quote-accept/ /index.html 200
-/firm-quote-accept/* /index.html 200
+# SPA fallback — serve the app shell for any path that doesn't match a
+# static asset. Cloudflare Pages serves static assets (including the
+# prerendered /conveyancing-solicitors-* pages) ahead of this catch-all.
+#
+# Do NOT add explicit per-path rules like "/about /index.html 200".
+# On Cloudflare Pages those rules make the bare URL (no trailing slash)
+# answer with "308 Permanent Redirect → /" instead of a 200 rewrite,
+# which Google Search Console reports as "Page with redirect".
+# Unmatched paths fall through to this catch-all and get a clean 200.
 /* /index.html 200
