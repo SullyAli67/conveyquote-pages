@@ -13353,6 +13353,7 @@ function App() {
                 <a href="/conveyancing-quotes">Conveyancing Quotes Explained</a>
                 <a href="/home-buying-guide">Home Buying Guide</a>
                 <a href="/home-selling-guide">Home Selling Guide</a>
+                <a href="/guides">Free Guides</a>
                 <a href="/sdlt-calculator/">SDLT Calculator</a>
                 <a href="/conveyancing-fees/">Conveyancing Fees Guide</a>
                 <a href="/conveyancing-referral-program">Agent Partners</a>

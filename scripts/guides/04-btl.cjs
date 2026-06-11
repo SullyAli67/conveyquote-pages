@@ -1,0 +1,116 @@
+// Guide 4 — Buy-to-Let Conveyancing Guide (consumer/investor, ~12pp)
+module.exports = {
+  id: "04",
+  file: "Buy-to-Let-Conveyancing-Guide.pdf",
+  category: "Investor Guide",
+  headerLabel: "Buy-to-Let Conveyancing Guide",
+  icon: "coins",
+  title: "The Buy-to-Let Conveyancing Guide",
+  subtitle: "Conveyancing, Stamp Duty and due diligence for landlords",
+  coverBlurb:
+    "Buying an investment property has its own rules — a higher Stamp Duty bill, extra due diligence, and pitfalls that catch out first-time landlords. This guide walks through the conveyancing, the 5% surcharge, and the checks that protect your investment.",
+  coverFootCta: "Get your free quote at conveyquote.uk",
+  pagesTarget: 12,
+  blocks: [
+    { type: "h1", text: "Buy-to-let is a different game", icon: "coins" },
+    { type: "lead", text: "Conveyancing for a buy-to-let purchase follows the same broad path as buying a home — instruct, search, enquire, exchange, complete — but with a bigger tax bill and a layer of investor due diligence on top." },
+    { type: "para", text: "Whether you're buying your first rental or adding to a portfolio, the legal process is where risks to your investment surface: a problematic lease, an unsafe property, a restriction on letting. This guide covers the costs and the checks that matter." },
+
+    { type: "h1", text: "The 5% Stamp Duty surcharge", icon: "coins" },
+    { type: "para", text: "The biggest financial difference with buy-to-let is Stamp Duty. Because the property is an additional residential property, you pay a 5% surcharge on top of the standard rates — applied to the whole price, in every band. The surcharge has been 5% since 31 October 2024." },
+    { type: "para", text: "That makes the standard bands look like this for an additional property:" },
+    { type: "table", widths: [50, 50], headers: ["Portion of price", "Additional-property rate"], rows: [
+      ["Up to £125,000", "5%"],
+      ["£125,001 to £250,000", "7%"],
+      ["£250,001 to £925,000", "10%"],
+      ["£925,001 to £1.5 million", "15%"],
+      ["Above £1.5 million", "17%"],
+    ] },
+    { type: "h2", text: "What that means in pounds" },
+    { type: "table", widths: [26, 36, 38], headers: ["Price", "Standard buyer", "Buy-to-let / additional"], rows: [
+      ["**£150,000", "£500", "£8,000"],
+      ["**£200,000", "£1,500", "£11,500"],
+      ["**£250,000", "£2,500", "£15,000"],
+      ["**£350,000", "£7,500", "£25,000"],
+      ["**£500,000", "£15,000", "£40,000"],
+    ] },
+    { type: "callout", title: "Worked example", text: "On a £200,000 buy-to-let: a standard buyer pays £1,500, but as an additional property you pay £11,500 — the £1,500 plus 5% of the whole £200,000 (£10,000). Always model the surcharge into your yield before you offer; it is often the single largest upfront cost." },
+    { type: "callout", title: "Buying through a company?", text: "Many landlords buy via a limited company for tax reasons. Companies pay the same 5% surcharge, and lenders treat company purchases differently. The conveyancing also differs slightly — your conveyancer will act for the company and its lender. Take tax advice before deciding how to hold the property." },
+
+    { type: "h1", text: "The buy-to-let conveyancing timeline", icon: "clock" },
+    { type: "para", text: "Expect a similar timeframe to a standard purchase — around 8 to 12 weeks for a freehold with no chain — with extra time if the property is leasehold or tenanted." },
+    { type: "timeline", stages: [
+      { n: 1, title: "Instruct and verify", dur: "Week 1", text: "Instruct your conveyancer, complete ID and source-of-funds checks, and confirm whether you're buying personally or through a company." },
+      { n: 2, title: "Searches & enquiries", dur: "Weeks 2–6", text: "Standard searches, plus extra enquiries on tenancies, licensing, and (if leasehold) the right to let and the management pack." },
+      { n: 3, title: "Mortgage & valuation", dur: "Weeks 3–6", text: "Your BTL lender values the property and assesses the expected rent. Buy-to-let mortgage conditions can be stricter than residential ones." },
+      { n: 4, title: "Report, exchange & complete", dur: "Weeks 7–12", text: "Your conveyancer reports on title, you exchange and pay the deposit, then complete — taking on any existing tenancy from the seller." },
+    ] },
+
+    { type: "h1", text: "Due diligence for landlords", icon: "shield" },
+    { type: "para", text: "This is where good conveyancing protects your investment. Beyond the standard checks, make sure these are covered before you exchange." },
+    { type: "h3", text: "Your investor checklist" },
+    { type: "checklist", items: [
+      "EPC rating of at least E — properties below this generally cannot legally be let (MEES rules)",
+      "Whether the property is sold with vacant possession or an existing tenant in situ",
+      "If tenanted: the tenancy agreement, deposit protection, and rent record",
+      "Selective or HMO licensing requirements in the local authority area",
+      "For leasehold: that the lease permits letting, and any subletting consent or fee",
+      "Fire, gas and electrical safety obligations you'll inherit as landlord",
+    ] },
+    { type: "callout", title: "Tenant in situ", text: "Buying a property with a tenant already in place can mean instant rental income — but you inherit that tenancy exactly as it stands, including the rent, the deposit arrangements and any disputes. Your conveyancer should obtain and review the full tenancy paperwork before you commit." },
+
+    { type: "h1", text: "Personal name or limited company?", icon: "doc" },
+    { type: "para", text: "One of the first decisions a landlord makes is whether to buy in their own name or through a limited company — often a special purpose vehicle (SPV). It's primarily a tax question, but it shapes the mortgage and the conveyancing too." },
+    { type: "table", widths: [24, 38, 38], headers: ["", "Personal name", "Limited company"], rows: [
+      ["**Tax on rent", "Income tax on profits", "Corporation tax; interest fully deductible"],
+      ["**Mortgages", "Wider choice, often cheaper", "Fewer lenders, usually higher rates"],
+      ["**Stamp Duty", "5% surcharge applies", "5% surcharge applies — no saving"],
+      ["**Conveyancing", "Standard process", "Conveyancer acts for the company and lender"],
+      ["**Best suited to", "Single properties, lower-rate taxpayers", "Portfolios, higher-rate taxpayers"],
+    ] },
+    { type: "callout", title: "Take advice first", text: "There's no universally right answer — it depends on your tax position, how many properties you plan to hold, and your long-term plans. Speak to an accountant before you decide, and your conveyancer can then act accordingly." },
+
+    { type: "h1", text: "Your obligations as a landlord", icon: "shield" },
+    { type: "para", text: "Conveyancing gets you to completion — but being a landlord brings continuing legal duties. Knowing them before you buy helps you budget accurately and avoid penalties later." },
+    { type: "h3", text: "The core compliance checklist" },
+    { type: "checklist", items: [
+      "Annual gas safety certificate (CP12) wherever there are gas appliances",
+      "An Electrical Installation Condition Report (EICR) at least every five years",
+      "A valid EPC of band E or above — below it, the property generally can't be let",
+      "Protect the tenant's deposit in a government-approved scheme within 30 days",
+      "Carry out Right to Rent immigration checks on adult occupiers",
+      "Hold any selective or HMO licence your local authority requires",
+      "Meet smoke and carbon-monoxide alarm rules and provide the How to Rent guide",
+    ] },
+    { type: "callout", title: "Budget for compliance", text: "Safety certificates, licensing and periodic inspections are ongoing costs of being a landlord. Factor them into your yield alongside the mortgage, ground rent and any service charge — modest individually, but they add up." },
+
+    { type: "h1", text: "Common pitfalls", icon: "doc" },
+    { type: "bullets", items: [
+      "Underestimating Stamp Duty — the 5% surcharge can turn a marginal yield negative if it's an afterthought.",
+      "Assuming you can let a leasehold flat freely — some leases restrict or prohibit subletting.",
+      "Missing licensing — letting without a required selective or HMO licence can mean heavy penalties.",
+      "Ignoring the EPC — a sub-E rating can make a property unlettable until you spend on improvements.",
+      "Overlooking ground rent and service charge — they eat into yield on leasehold investments.",
+    ] },
+
+    { type: "h1", text: "What it costs", icon: "pound" },
+    { type: "para", text: "Buy-to-let conveyancing costs a little more than a standard purchase because of the extra checks — and considerably more once the Stamp Duty surcharge is included." },
+    { type: "table", widths: [38, 30, 32], headers: ["Cost", "Standard purchase", "Buy-to-let"], rows: [
+      ["**Legal fee", "£900–£1,500 +VAT", "£950–£1,700 +VAT"],
+      ["**Searches & disbursements", "£300–£500", "£300–£550"],
+      ["**Stamp Duty", "Standard rates", "Standard + 5% surcharge"],
+      ["**Extra enquiries / company", "—", "May add a modest supplement"],
+    ] },
+    { type: "callout", title: "Build the full number before you offer", text: "Your true acquisition cost is price + Stamp Duty (with surcharge) + legal fees + lender fees. Modelling all of it before you offer is what separates a confident investor from a surprised one." },
+
+    { type: "h1", text: "Common questions", icon: "doc" },
+    { type: "h3", text: "Can I avoid the 5% surcharge?" },
+    { type: "para", text: "Only in specific circumstances — for example, if it genuinely replaces your sole main residence. For a true additional property or buy-to-let, the surcharge applies. Always take tax advice for your situation." },
+    { type: "h3", text: "Do I need a solicitor for a buy-to-let?" },
+    { type: "para", text: "Yes — and arguably more so than for a home, because of the extra due diligence on tenancies, licensing and leases. The conveyancing is where investment risks are found before they become your problem." },
+    { type: "h3", text: "Is buying through a company worth it?" },
+    { type: "para", text: "It depends entirely on your tax position and plans. It can be efficient for higher-rate taxpayers building a portfolio, but it adds cost and complexity. Speak to an accountant before deciding — then your conveyancer can act accordingly." },
+
+    { type: "cta", heading: "Investing in property?", text: "Get a fixed, itemised buy-to-let conveyancing quote with a clear Stamp Duty figure including the surcharge — reviewed before it reaches you, with no surprises.", url: "conveyquote.uk" },
+  ],
+};
