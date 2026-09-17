@@ -405,6 +405,28 @@ type QuoteForm = {
   sharePercent: string;
   continuingMortgage: string;
 
+  // ── Enfranchisement family (statutory + informal lease extension) ──
+  // These feed the qualification gate in
+  // functions/lib/enfranchisement/qualification.js as well as pricing.
+  // Blank is meaningful: an unanswered question produces "needs review"
+  // rather than being read as a clean answer, so none of these may be
+  // defaulted to "no".
+  propertyType: string;
+  originalLeaseTermYears: string;
+  unexpiredTermYears: string;
+  groundRent: string;
+  isBusinessTenancy: string;
+  landlordIdentifiable: string;
+  noticeAlreadyServed: string;
+  existingClaim: string;
+  staircasedToFull: string;
+  landlordIsNationalTrust: string;
+  landlordIsCrown: string;
+  landlordIsCharitableHousingTrust: string;
+  unregisteredTitle: string;
+  intermediateLandlord: string;
+  missingLeaseDocuments: string;
+
   saleTenure: string;
   salePrice: string;
   salePostcode: string;
@@ -628,6 +650,283 @@ type MembershipEditorState = {
   last_checked_at: string;
 };
 
+// ── Enfranchisement quote blocks ─────────────────────────────────────
+//
+// Everything on a lease extension quote that is NOT our fee. Rendered
+// wherever a quote is shown to a human, so the separation between what
+// the client pays us and what they pay other people is made the same way
+// every time.
+//
+// The premium and the landlord's s.60 costs dwarf the legal fee, so a
+// screen showing only the fee total would badly mislead. These blocks
+// deliberately sit BELOW the fee table, under their own headings, and
+// lead with the statement that the amounts are estimates we neither set
+// nor control.
+function EnfranchisementQuoteBlocks({
+  quote,
+}: {
+  quote: import("./buildQuoteData").BuiltQuoteData;
+}) {
+  if (quote.matterFamily !== "enfranchisement") return null;
+
+  const money = (n: number) =>
+    `£${Number(n || 0).toLocaleString("en-GB", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const estimate = (low: number | null, high: number | null) => {
+    if (low == null && high == null) return "A valuation is required";
+    if (low === high) return `${money(low as number)} (estimate)`;
+    return `${money(low as number)} – ${money(high as number)} (estimate)`;
+  };
+
+  const amber = { bg: "#fffaf0", border: "#e2c275", text: "#7a4b00" };
+  const red = { bg: "#fdecea", border: "#d9857a", text: "#8a2f22" };
+  const blue = { bg: "#eef6ff", border: "#c9dcef", text: "#24446b" };
+
+  const notice = (
+    tone: { bg: string; border: string; text: string },
+    title: string,
+    body: React.ReactNode
+  ) => (
+    <div
+      style={{
+        background: tone.bg,
+        border: `1px solid ${tone.border}`,
+        borderRadius: "10px",
+        padding: "14px 16px",
+        marginBottom: "16px",
+        color: tone.text,
+        fontSize: "14px",
+        lineHeight: 1.7,
+      }}
+    >
+      <strong>{title}</strong>
+      <div style={{ marginTop: "6px" }}>{body}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: "20px" }}>
+      {quote.qualification?.outcome === "does_not_qualify" &&
+        notice(
+          red,
+          "We cannot quote for a statutory claim on this information",
+          <ul style={{ margin: 0, paddingLeft: "20px" }}>
+            {quote.qualification.reasons
+              .filter((r) => r.severity === "bar")
+              .map((r, i) => (
+                <li key={i} style={{ marginBottom: "4px" }}>
+                  {r.message}
+                  {r.statutoryRef ? (
+                    <em style={{ display: "block", fontSize: "13px" }}>
+                      {r.statutoryRef}
+                    </em>
+                  ) : null}
+                </li>
+              ))}
+          </ul>
+        )}
+
+      {quote.qualification?.outcome === "needs_review" &&
+        notice(
+          amber,
+          "This quote is provisional",
+          <>
+            A solicitor needs to check the following before we can confirm it:
+            <ul style={{ margin: "6px 0 0 0", paddingLeft: "20px" }}>
+              {quote.qualification.reasons
+                .filter((r) => r.severity === "review")
+                .map((r, i) => (
+                  <li key={i} style={{ marginBottom: "4px" }}>
+                    {r.message}
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
+
+      {quote.marriageValue?.status === "payable" &&
+        notice(red, "Marriage value is payable", quote.marriageValue.reason)}
+      {quote.marriageValue?.status === "approaching" &&
+        notice(amber, "Act soon", quote.marriageValue.reason)}
+
+      {quote.thirdPartyCosts && quote.thirdPartyCosts.length > 0 && (
+        <div
+          style={{
+            background: amber.bg,
+            border: `1px solid ${amber.border}`,
+            borderRadius: "10px",
+            padding: "16px 18px",
+            marginBottom: "16px",
+          }}
+        >
+          <h4 style={{ margin: "0 0 6px", color: amber.text, fontSize: "16px" }}>
+            Not included — payable by you to others
+          </h4>
+          <p
+            style={{
+              margin: "0 0 12px",
+              fontSize: "13px",
+              lineHeight: 1.7,
+              color: amber.text,
+              fontWeight: 700,
+            }}
+          >
+            The amounts below are not our fees. We do not set them, we do not
+            control them and we do not receive them. The figures shown are
+            estimates only and the actual amounts may be higher or lower.
+          </p>
+
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
+            <tbody>
+              {quote.thirdPartyCosts.map((cost, i) => (
+                <tr key={i} style={{ borderTop: `1px solid ${amber.border}` }}>
+                  <td style={{ padding: "10px 0", color: amber.text, verticalAlign: "top" }}>
+                    <strong>{cost.label}</strong>
+                    <div style={{ fontSize: "12.5px", lineHeight: 1.6, marginTop: "4px" }}>
+                      {cost.note}
+                      {cost.statutoryRef ? <em style={{ display: "block" }}>{cost.statutoryRef}</em> : null}
+                      {cost.survivesWithdrawalNote ? (
+                        <strong style={{ display: "block", marginTop: "4px", color: red.text }}>
+                          {cost.survivesWithdrawalNote}
+                        </strong>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td
+                    style={{
+                      padding: "10px 0 10px 12px",
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                      fontWeight: 600,
+                      color: amber.text,
+                      verticalAlign: "top",
+                    }}
+                  >
+                    {estimate(cost.amountLow, cost.amountHigh)}
+                  </td>
+                </tr>
+              ))}
+              {quote.indicativeTotalExcludingPremium && (
+                <tr style={{ borderTop: `2px solid ${amber.border}` }}>
+                  <td style={{ padding: "10px 0", fontWeight: 700, color: amber.text }}>
+                    Indicative total, excluding the premium
+                    <div style={{ fontSize: "12.5px", fontWeight: 400, lineHeight: 1.6, marginTop: "4px" }}>
+                      {quote.indicativeTotalExcludingPremium.note}
+                    </div>
+                  </td>
+                  <td
+                    style={{
+                      padding: "10px 0 10px 12px",
+                      textAlign: "right",
+                      whiteSpace: "nowrap",
+                      fontWeight: 700,
+                      color: amber.text,
+                      verticalAlign: "top",
+                    }}
+                  >
+                    {money(quote.indicativeTotalExcludingPremium.low)} –{" "}
+                    {money(quote.indicativeTotalExcludingPremium.high)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {quote.abortivePolicy &&
+        notice(
+          blue,
+          "If the matter does not complete",
+          <>
+            {quote.abortivePolicy.appliesToThisMatter ? (
+              <>
+                {quote.abortivePolicy.summary}
+                <div style={{ marginTop: "8px" }}>Our fee does become payable if:</div>
+                <ul style={{ margin: "4px 0 0 0", paddingLeft: "20px" }}>
+                  {quote.abortivePolicy.faultConditions.map((c, i) => (
+                    <li key={i} style={{ marginBottom: "4px" }}>
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              quote.abortivePolicy.disapplicationReason
+            )}
+            <strong style={{ display: "block", marginTop: "10px", color: red.text }}>
+              {quote.abortivePolicy.thirdPartyDisclosure}
+            </strong>
+          </>
+        )}
+
+      {quote.exclusions && quote.exclusions.length > 0 && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid var(--border)",
+            borderRadius: "10px",
+            padding: "14px 16px",
+            marginBottom: "16px",
+            fontSize: "14px",
+            lineHeight: 1.7,
+          }}
+        >
+          <strong style={{ color: blue.text }}>Also not included in this fee</strong>
+          <ul style={{ margin: "6px 0 0 0", paddingLeft: "20px" }}>
+            {quote.exclusions.map((item, i) => (
+              <li key={i} style={{ marginBottom: "6px" }}>
+                <strong>{item.label}</strong>
+                {item.note ? (
+                  <div style={{ fontSize: "13px", color: "var(--muted)" }}>{item.note}</div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {quote.routeComparison && quote.routeComparison.rows.length > 0 && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid var(--border)",
+            borderRadius: "10px",
+            padding: "14px 16px",
+            fontSize: "14px",
+          }}
+        >
+          <strong style={{ color: blue.text }}>Statutory route vs informal route</strong>
+          <p style={{ margin: "6px 0 10px", color: "var(--muted)", fontSize: "13px", lineHeight: 1.7 }}>
+            {quote.routeComparison.note}
+          </p>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--muted)" }}>
+                <th style={{ padding: "6px 8px 6px 0" }} />
+                <th style={{ padding: "6px 8px" }}>Statutory</th>
+                <th style={{ padding: "6px 0 6px 8px" }}>Informal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quote.routeComparison.rows.map((r, i) => (
+                <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                  <td style={{ padding: "8px 8px 8px 0", fontWeight: 600 }}>{r.feature}</td>
+                  <td style={{ padding: "8px" }}>{r.statutory}</td>
+                  <td style={{ padding: "8px 0 8px 8px" }}>{r.informal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const initialFormState: QuoteForm = {
   type: "",
 
@@ -708,6 +1007,24 @@ const initialFormState: QuoteForm = {
   remortgageTransferMortgageAmount: "",
   remortgageTransferSharePercent: "",
   remortgageTransferContinuingMortgage: "",
+
+  // Enfranchisement. Intentionally blank rather than "no" — see the
+  // note on QuoteForm above.
+  propertyType: "",
+  originalLeaseTermYears: "",
+  unexpiredTermYears: "",
+  groundRent: "",
+  isBusinessTenancy: "",
+  landlordIdentifiable: "",
+  noticeAlreadyServed: "",
+  existingClaim: "",
+  staircasedToFull: "",
+  landlordIsNationalTrust: "",
+  landlordIsCrown: "",
+  landlordIsCharitableHousingTrust: "",
+  unregisteredTitle: "",
+  intermediateLandlord: "",
+  missingLeaseDocuments: "",
 };
 
 const defaultApprovedNextSteps =
@@ -1594,7 +1911,9 @@ function App() {
     | "remortgage"
     | "transfer"
     | "sale_purchase"
-    | "remortgage_transfer";
+    | "remortgage_transfer"
+    | "lease_extension_statutory"
+    | "lease_extension_informal";
 
   type FirmIssueQuoteForm = {
     clientName: string;
@@ -1611,6 +1930,26 @@ function App() {
     lender: string;
     sharePercent: string;
     continuingMortgage: string;
+
+    // ── Enfranchisement family ───────────────────────────────────────
+    propertyType: string;
+    originalLeaseTermYears: string;
+    unexpiredTermYears: string;
+    groundRent: string;
+    premium: string;
+    isBusinessTenancy: string;
+    landlordIdentifiable: string;
+    noticeAlreadyServed: string;
+    sharedOwnership: string;
+    staircasedToFull: string;
+    intermediateLandlordCount: string;
+    enfranchisementSupplements: {
+      unregisteredTitle: boolean;
+      intermediateLandlord: boolean;
+      missingLeaseDocuments: boolean;
+      lenderConsentComplex: boolean;
+    };
+
     supplements: {
       newBuild: boolean;
       sharedOwnership: boolean;
@@ -1644,6 +1983,27 @@ function App() {
     lender: "",
     sharePercent: "",
     continuingMortgage: "",
+
+    // Enfranchisement. Blank rather than "no": an unanswered question
+    // must produce "needs review", not a false pass.
+    propertyType: "flat",
+    originalLeaseTermYears: "",
+    unexpiredTermYears: "",
+    groundRent: "",
+    premium: "",
+    isBusinessTenancy: "",
+    landlordIdentifiable: "",
+    noticeAlreadyServed: "",
+    sharedOwnership: "",
+    staircasedToFull: "",
+    intermediateLandlordCount: "1",
+    enfranchisementSupplements: {
+      unregisteredTitle: false,
+      intermediateLandlord: false,
+      missingLeaseDocuments: false,
+      lenderConsentComplex: false,
+    },
+
     supplements: {
       newBuild: false,
       sharedOwnership: false,
@@ -1762,19 +2122,52 @@ function App() {
   // functions/lib/calculate-firm-quote-core.js and the validator in
   // functions/api/firm-fee-config.js. The 11 entries below cover every
   // supplement the Issue Quote form can trigger.
-  const SUPPLEMENT_OPTIONS: { key: string; label: string }[] = [
-    { key: "leasehold", label: "Leasehold supplement" },
-    { key: "mortgagePresent", label: "Acting for lender supplement" },
-    { key: "newBuild", label: "New build supplement" },
-    { key: "sharedOwnership", label: "Shared ownership supplement" },
-    { key: "helpToBuy", label: "Help to Buy supplement" },
-    { key: "buyToLet", label: "Buy to let supplement" },
-    { key: "companyBuyer", label: "Buying via company supplement" },
-    { key: "giftedDeposit", label: "Gifted deposit supplement" },
-    { key: "lifetimeIsa", label: "Lifetime ISA supplement" },
-    { key: "rightToBuy", label: "Right to Buy supplement" },
-    { key: "additionalProperty", label: "Additional property supplement" },
+  // Supplement keys, tagged by matter family. The conveyancing set must
+  // stay in step with SUPPLEMENT_KEYS in
+  // functions/lib/calculate-firm-quote-core.js and
+  // functions/lib/calculate-referrer-quote-core.js; the enfranchisement
+  // set is defined once in
+  // functions/lib/enfranchisement/price-book.js.
+  //
+  // Tagging by family matters because the two sets are mutually
+  // exclusive: offering "Help to Buy supplement" on a lease extension,
+  // or "Absent landlord" on a purchase, would let a firm configure a fee
+  // row the engine will never trigger.
+  const SUPPLEMENT_OPTIONS: {
+    key: string;
+    label: string;
+    family: "conveyancing" | "enfranchisement";
+  }[] = [
+    { key: "leasehold", label: "Leasehold supplement", family: "conveyancing" },
+    { key: "mortgagePresent", label: "Acting for lender supplement", family: "conveyancing" },
+    { key: "newBuild", label: "New build supplement", family: "conveyancing" },
+    { key: "sharedOwnership", label: "Shared ownership supplement", family: "conveyancing" },
+    { key: "helpToBuy", label: "Help to Buy supplement", family: "conveyancing" },
+    { key: "buyToLet", label: "Buy to let supplement", family: "conveyancing" },
+    { key: "companyBuyer", label: "Buying via company supplement", family: "conveyancing" },
+    { key: "giftedDeposit", label: "Gifted deposit supplement", family: "conveyancing" },
+    { key: "lifetimeIsa", label: "Lifetime ISA supplement", family: "conveyancing" },
+    { key: "rightToBuy", label: "Right to Buy supplement", family: "conveyancing" },
+    { key: "additionalProperty", label: "Additional property supplement", family: "conveyancing" },
+
+    { key: "absentLandlord", label: "Absent landlord supplement (vesting order)", family: "enfranchisement" },
+    { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "enfranchisement" },
+    { key: "unregisteredTitle", label: "Unregistered title supplement", family: "enfranchisement" },
+    { key: "missingLeaseDocuments", label: "Missing or defective lease documentation supplement", family: "enfranchisement" },
+    { key: "lenderConsentComplex", label: "Complex lender consent supplement", family: "enfranchisement" },
   ];
+
+  const ENFRANCHISEMENT_FEE_TYPES = new Set([
+    "lease_extension_statutory",
+    "lease_extension_informal",
+  ]);
+
+  const supplementOptionsForType = (transactionType: string) => {
+    const family = ENFRANCHISEMENT_FEE_TYPES.has(transactionType)
+      ? "enfranchisement"
+      : "conveyancing";
+    return SUPPLEMENT_OPTIONS.filter((o) => o.family === family);
+  };
 
   const legalFeeItems = useMemo(
     () => feeConfigItems.filter((f) => !f.is_disbursement && !f.supplement_key),
@@ -3424,6 +3817,32 @@ function App() {
         { label: "Office copy entries", amount: 20, includes_vat: false, is_disbursement: true },
         { label: "ID checks", amount: 14.4, includes_vat: false, is_disbursement: true },
       ],
+
+      // ── Enfranchisement family ─────────────────────────────────────
+      // Disbursements are NOT seeded for these: the enfranchisement
+      // engine sources them centrally (office copies, ID checks, and the
+      // Land Registry fee, which cannot be computed until the premium is
+      // agreed). Only legal fees are configurable here, which is the
+      // pricing-isolation rule the other types already follow.
+      //
+      // Supplement rows carry a supplement_key so they are charged only
+      // when the matter actually attracts them. absentLandlord is
+      // triggered by the qualification gate rather than a checkbox.
+      lease_extension_statutory: [
+        { label: "Legal fee", amount: 1200, includes_vat: true, is_disbursement: false },
+        { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false },
+        { label: "Intermediate landlord supplement", amount: 300, includes_vat: true, is_disbursement: false },
+        { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
+        { label: "Missing or defective lease documentation supplement", amount: 250, includes_vat: true, is_disbursement: false },
+        { label: "Complex lender consent supplement", amount: 175, includes_vat: true, is_disbursement: false },
+      ],
+      lease_extension_informal: [
+        { label: "Legal fee", amount: 950, includes_vat: true, is_disbursement: false },
+        { label: "Intermediate landlord supplement", amount: 300, includes_vat: true, is_disbursement: false },
+        { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
+        { label: "Missing or defective lease documentation supplement", amount: 250, includes_vat: true, is_disbursement: false },
+        { label: "Complex lender consent supplement", amount: 175, includes_vat: true, is_disbursement: false },
+      ],
     };
     return defaults[type] || [{ label: "Legal fee", amount: 0, includes_vat: true, is_disbursement: false }];
   };
@@ -3779,7 +4198,17 @@ function App() {
     transfer: "Transfer of Equity",
     sale_purchase: "Sale + Purchase",
     remortgage_transfer: "Remortgage + Transfer",
+    lease_extension_statutory: "Lease Extension (statutory)",
+    lease_extension_informal: "Lease Extension (informal)",
   };
+
+  const ENFRANCHISEMENT_ISSUE_TYPES: FirmIssueTransactionType[] = [
+    "lease_extension_statutory",
+    "lease_extension_informal",
+  ];
+
+  const isEnfranchisementIssueType = (t: FirmIssueTransactionType) =>
+    ENFRANCHISEMENT_ISSUE_TYPES.includes(t);
 
   const TRANSACTION_TYPES_WITH_SDLT: FirmIssueTransactionType[] = [
     "purchase",
@@ -3828,14 +4257,51 @@ function App() {
       form.transactionType === "transfer" || form.transactionType === "remortgage_transfer"
         ? form.continuingMortgage
         : "",
-    supplements: form.supplements,
+    supplements: isEnfranchisementIssueType(form.transactionType)
+      ? {
+          ...form.enfranchisementSupplements,
+          // absentLandlord is derived by the qualification gate from
+          // landlordIdentifiable, not from a checkbox, so it is not sent
+          // here — see functions/lib/enfranchisement/qualification.js.
+        }
+      : form.supplements,
     sdltFlags: TRANSACTION_TYPES_WITH_SDLT.includes(form.transactionType)
       ? form.sdltFlags
       : { firstTimeBuyer: false, ukResident: true, additionalProperty: false },
+
+    // ── Enfranchisement answers ──────────────────────────────────────
+    // Sent for every type; the server ignores them unless the matter is
+    // an enfranchisement one, and sending blanks preserves the
+    // "unanswered means review" semantics of the qualification gate.
+    propertyType: form.propertyType,
+    originalLeaseTermYears: form.originalLeaseTermYears,
+    unexpiredTermYears: form.unexpiredTermYears,
+    groundRent: form.groundRent,
+    premium: form.premium,
+    isBusinessTenancy: form.isBusinessTenancy,
+    landlordIdentifiable: form.landlordIdentifiable,
+    noticeAlreadyServed: form.noticeAlreadyServed,
+    sharedOwnership: form.sharedOwnership,
+    staircasedToFull: form.staircasedToFull,
+    intermediateLandlordCount: form.intermediateLandlordCount,
+    partyCount: form.buyerCount,
   });
 
   const validateIssueQuoteForm = (form: FirmIssueQuoteForm): string => {
     if (!form.clientName.trim()) return "Client name is required.";
+
+    // A lease extension is not driven by a consideration figure. What it
+    // needs is the information the qualification gate runs on.
+    if (isEnfranchisementIssueType(form.transactionType)) {
+      if (!form.propertyType) {
+        return "Please say whether the property is a flat or a house.";
+      }
+      if (!form.unexpiredTermYears || Number(form.unexpiredTermYears) <= 0) {
+        return "The unexpired term of the lease is required.";
+      }
+      return "";
+    }
+
     if (!form.price || Number(form.price) <= 0) return "Property price is required.";
     if (form.transactionType === "sale_purchase" &&
         (!form.salePrice || Number(form.salePrice) <= 0)) {
@@ -5370,7 +5836,14 @@ function App() {
   const isRemortgage = form.type === "remortgage";
   const isTransfer = form.type === "transfer";
   const isRemortgageTransfer = form.type === "remortgage_transfer";
+  const isStatutoryLeaseExtension = form.type === "lease_extension_statutory";
+  const isInformalLeaseExtension = form.type === "lease_extension_informal";
+  const isLeaseExtension =
+    isStatutoryLeaseExtension || isInformalLeaseExtension;
 
+  // Lease extensions do not use the shared Matter Details block: there
+  // is no consideration figure and no mortgage question. They get their
+  // own field group driven by the statutory qualification tests.
   const usesSingleMatterDetails =
     isPurchase || isSale || isRemortgage || isTransfer;
 
@@ -6148,9 +6621,303 @@ function App() {
                       <option value="remortgage_transfer">
                         Remortgage and Transfer of Equity
                       </option>
+                      <option value="lease_extension_statutory">
+                        Lease Extension (statutory) — flat
+                      </option>
+                      <option value="lease_extension_informal">
+                        Lease Extension (informal) — flat
+                      </option>
                     </select>
                   </div>
                 </div>
+
+                {isLeaseExtension && (
+                  <>
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                      <div>
+                        <h2>Your Lease</h2>
+                        <p>
+                          These questions establish whether you have a statutory
+                          right to extend your lease. Please answer them as
+                          accurately as you can — if you are not sure of an
+                          answer, leave it blank and we will check it for you.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="propertyType">Is the property a flat or a house?</label>
+                        <select
+                          id="propertyType"
+                          name="propertyType"
+                          value={form.propertyType}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Please select</option>
+                          <option value="flat">Flat</option>
+                          <option value="house">House</option>
+                        </select>
+                        <small>
+                          Flats extend under the Leasehold Reform, Housing and
+                          Urban Development Act 1993. Houses fall under the
+                          Leasehold Reform Act 1967 — please contact us
+                          directly for those.
+                        </small>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="postcode">Property postcode</label>
+                        <input
+                          id="postcode"
+                          name="postcode"
+                          type="text"
+                          value={form.postcode}
+                          onChange={handleChange}
+                          placeholder="e.g. B15 3TR"
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="unexpiredTermYears">
+                          Years left on your lease
+                        </label>
+                        <input
+                          id="unexpiredTermYears"
+                          name="unexpiredTermYears"
+                          type="number"
+                          min="0"
+                          value={form.unexpiredTermYears}
+                          onChange={handleChange}
+                          placeholder="e.g. 72"
+                          required
+                        />
+                        <small>
+                          This drives both the price of the extension and how
+                          urgent it is. Once the term drops below 80 years the
+                          cost rises significantly.
+                        </small>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="originalLeaseTermYears">
+                          Term the lease was originally granted for
+                        </label>
+                        <input
+                          id="originalLeaseTermYears"
+                          name="originalLeaseTermYears"
+                          type="number"
+                          min="0"
+                          value={form.originalLeaseTermYears}
+                          onChange={handleChange}
+                          placeholder="e.g. 125"
+                        />
+                        <small>
+                          Usually shown on the first page of your lease. The
+                          statutory right applies only to a long lease —
+                          originally granted for more than 21 years.
+                        </small>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="groundRent">Current annual ground rent</label>
+                        <input
+                          id="groundRent"
+                          name="groundRent"
+                          type="number"
+                          min="0"
+                          value={form.groundRent}
+                          onChange={handleChange}
+                          placeholder="e.g. 250"
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="landlordIdentifiable">
+                          Do you know who your landlord is?
+                        </label>
+                        <select
+                          id="landlordIdentifiable"
+                          name="landlordIdentifiable"
+                          value={form.landlordIdentifiable}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No — they cannot be traced</option>
+                        </select>
+                        <small>
+                          If the landlord cannot be traced, the claim has to go
+                          through the county court for a vesting order. That is
+                          more work and is charged as a supplement.
+                        </small>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="noticeAlreadyServed">
+                          Has a notice already been served?
+                        </label>
+                        <select
+                          id="noticeAlreadyServed"
+                          name="noticeAlreadyServed"
+                          value={form.noticeAlreadyServed}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="sharedOwnership">
+                          Is this a shared ownership lease?
+                        </label>
+                        <select
+                          id="sharedOwnership"
+                          name="sharedOwnership"
+                          value={form.sharedOwnership}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+
+                      {form.sharedOwnership === "yes" && (
+                        <div className="field">
+                          <label htmlFor="staircasedToFull">
+                            Have you staircased to 100%?
+                          </label>
+                          <select
+                            id="staircasedToFull"
+                            name="staircasedToFull"
+                            value={form.staircasedToFull}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                          <small>
+                            The statutory right generally does not arise until
+                            you own the full share.
+                          </small>
+                        </div>
+                      )}
+
+                      <div className="field">
+                        <label htmlFor="isBusinessTenancy">
+                          Is the lease a business tenancy?
+                        </label>
+                        <select
+                          id="isBusinessTenancy"
+                          name="isBusinessTenancy"
+                          value={form.isBusinessTenancy}
+                          onChange={handleChange}
+                        >
+                          <option value="">Please select</option>
+                          <option value="no">No — it is my home</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                      <div>
+                        <h2>Anything unusual?</h2>
+                        <p>
+                          These do not stop a claim, but they add work and are
+                          charged as supplements. Leave blank if you are unsure.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="unregisteredTitle">
+                          Is the title unregistered?
+                        </label>
+                        <select
+                          id="unregisteredTitle"
+                          name="unregisteredTitle"
+                          value={form.unregisteredTitle}
+                          onChange={handleChange}
+                        >
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="intermediateLandlord">
+                          Is there a head lease or intermediate landlord?
+                        </label>
+                        <select
+                          id="intermediateLandlord"
+                          name="intermediateLandlord"
+                          value={form.intermediateLandlord}
+                          onChange={handleChange}
+                        >
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="missingLeaseDocuments">
+                          Is your lease lost, or the plan defective?
+                        </label>
+                        <select
+                          id="missingLeaseDocuments"
+                          name="missingLeaseDocuments"
+                          value={form.missingLeaseDocuments}
+                          onChange={handleChange}
+                        >
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div
+                      className="card"
+                      style={{
+                        marginTop: "12px",
+                        padding: "14px 16px",
+                        background: "#fffaf0",
+                        border: "1px solid #e2c275",
+                      }}
+                    >
+                      <strong style={{ color: "#7a4b00" }}>
+                        What this quote does and does not cover
+                      </strong>
+                      <p
+                        style={{
+                          margin: "8px 0 0 0",
+                          fontSize: "14px",
+                          lineHeight: 1.7,
+                          color: "#7a4b00",
+                        }}
+                      >
+                        Our quote covers our own legal fees and the
+                        disbursements we can fix. It does <strong>not</strong>{" "}
+                        include the premium payable to your landlord for the new
+                        lease, which is a valuation question for a surveyor, nor
+                        your landlord&rsquo;s own legal and valuation costs,
+                        which you are liable for under section 60 of the 1993
+                        Act. Those are estimates outside our control — we do not
+                        set them and we do not receive them. Your quote will set
+                        them out separately.
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 {usesSingleMatterDetails && (
                   <>
@@ -7868,27 +8635,242 @@ function App() {
                             ))}
                           </select>
                         </div>
-                        <div className="field">
-                          <label htmlFor="iq-price">
-                            {issueQuoteForm.transactionType === "sale_purchase"
-                              ? "Purchase price (£)"
-                              : issueQuoteForm.transactionType === "remortgage" ||
-                                issueQuoteForm.transactionType === "remortgage_transfer"
-                              ? "Property value (£)"
-                              : "Property price (£)"}
-                          </label>
-                          <input
-                            id="iq-price"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            value={issueQuoteForm.price}
-                            onChange={(e) =>
-                              setIssueQuoteForm((f) => ({ ...f, price: e.target.value }))
-                            }
-                            required
-                          />
-                        </div>
+                        {/* A lease extension has no consideration figure —
+                            the fee is not driven by property value — so the
+                            price field is replaced by the lease questions
+                            the qualification gate actually runs on. */}
+                        {!isEnfranchisementIssueType(issueQuoteForm.transactionType) && (
+                          <div className="field">
+                            <label htmlFor="iq-price">
+                              {issueQuoteForm.transactionType === "sale_purchase"
+                                ? "Purchase price (£)"
+                                : issueQuoteForm.transactionType === "remortgage" ||
+                                  issueQuoteForm.transactionType === "remortgage_transfer"
+                                ? "Property value (£)"
+                                : "Property price (£)"}
+                            </label>
+                            <input
+                              id="iq-price"
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              value={issueQuoteForm.price}
+                              onChange={(e) =>
+                                setIssueQuoteForm((f) => ({ ...f, price: e.target.value }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+
+                        {isEnfranchisementIssueType(issueQuoteForm.transactionType) && (
+                          <>
+                            <div className="field">
+                              <label htmlFor="iq-propertyType">Flat or house</label>
+                              <select
+                                id="iq-propertyType"
+                                value={issueQuoteForm.propertyType}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, propertyType: e.target.value }))
+                                }
+                              >
+                                <option value="">Please select</option>
+                                <option value="flat">Flat</option>
+                                <option value="house">House (1967 Act — not supported)</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-unexpired">Unexpired term (years)</label>
+                              <input
+                                id="iq-unexpired"
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                value={issueQuoteForm.unexpiredTermYears}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, unexpiredTermYears: e.target.value }))
+                                }
+                              />
+                              <small>
+                                Below 80 years marriage value is payable and the
+                                premium rises sharply.
+                              </small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-originalTerm">Original lease term (years)</label>
+                              <input
+                                id="iq-originalTerm"
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                value={issueQuoteForm.originalLeaseTermYears}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, originalLeaseTermYears: e.target.value }))
+                                }
+                              />
+                              <small>Must exceed 21 years to be a long lease.</small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-groundRent">Annual ground rent (£)</label>
+                              <input
+                                id="iq-groundRent"
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                value={issueQuoteForm.groundRent}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, groundRent: e.target.value }))
+                                }
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-premium">Premium, if a valuation is to hand (£)</label>
+                              <input
+                                id="iq-premium"
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                value={issueQuoteForm.premium}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, premium: e.target.value }))
+                                }
+                              />
+                              <small>
+                                Leave blank unless a valuer has reported. We do not
+                                calculate the premium. Supplying it lets us compute
+                                the Land Registry fee, which is assessed on the
+                                premium plus rent; without it that line shows as
+                                "to be confirmed".
+                              </small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-landlordIdentifiable">Landlord traceable?</label>
+                              <select
+                                id="iq-landlordIdentifiable"
+                                value={issueQuoteForm.landlordIdentifiable}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, landlordIdentifiable: e.target.value }))
+                                }
+                              >
+                                <option value="">Please select</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No — vesting order required</option>
+                              </select>
+                              <small>
+                                "No" applies the absent-landlord supplement
+                                automatically and takes the matter outside
+                                no-completion-no-fee.
+                              </small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-noticeServed">Notice already served?</label>
+                              <select
+                                id="iq-noticeServed"
+                                value={issueQuoteForm.noticeAlreadyServed}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, noticeAlreadyServed: e.target.value }))
+                                }
+                              >
+                                <option value="">Please select</option>
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-businessTenancy">Business tenancy?</label>
+                              <select
+                                id="iq-businessTenancy"
+                                value={issueQuoteForm.isBusinessTenancy}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, isBusinessTenancy: e.target.value }))
+                                }
+                              >
+                                <option value="">Please select</option>
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-sharedOwnership">Shared ownership?</label>
+                              <select
+                                id="iq-sharedOwnership"
+                                value={issueQuoteForm.sharedOwnership}
+                                onChange={(e) =>
+                                  setIssueQuoteForm((f) => ({ ...f, sharedOwnership: e.target.value }))
+                                }
+                              >
+                                <option value="">Please select</option>
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                              </select>
+                            </div>
+                            {issueQuoteForm.sharedOwnership === "yes" && (
+                              <div className="field">
+                                <label htmlFor="iq-staircased">Staircased to 100%?</label>
+                                <select
+                                  id="iq-staircased"
+                                  value={issueQuoteForm.staircasedToFull}
+                                  onChange={(e) =>
+                                    setIssueQuoteForm((f) => ({ ...f, staircasedToFull: e.target.value }))
+                                  }
+                                >
+                                  <option value="">Please select</option>
+                                  <option value="yes">Yes</option>
+                                  <option value="no">No</option>
+                                </select>
+                              </div>
+                            )}
+                            <div className="field" style={{ gridColumn: "1 / -1" }}>
+                              <label>Supplements</label>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", marginTop: "6px" }}>
+                                {([
+                                  ["unregisteredTitle", "Unregistered title"],
+                                  ["intermediateLandlord", "Intermediate landlord"],
+                                  ["missingLeaseDocuments", "Missing / defective lease"],
+                                  ["lenderConsentComplex", "Complex lender consent"],
+                                ] as [keyof FirmIssueQuoteForm["enfranchisementSupplements"], string][]).map(
+                                  ([key, label]) => (
+                                    <label key={key} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={issueQuoteForm.enfranchisementSupplements[key]}
+                                        onChange={(e) =>
+                                          setIssueQuoteForm((f) => ({
+                                            ...f,
+                                            enfranchisementSupplements: {
+                                              ...f.enfranchisementSupplements,
+                                              [key]: e.target.checked,
+                                            },
+                                          }))
+                                        }
+                                      />
+                                      {label}
+                                    </label>
+                                  )
+                                )}
+                              </div>
+                              <small>
+                                Routine lender consent is inside the basic fee —
+                                tick "complex" only where a deed of substituted
+                                security is needed or the lender is obstructive.
+                              </small>
+                            </div>
+                            {issueQuoteForm.enfranchisementSupplements.intermediateLandlord && (
+                              <div className="field">
+                                <label htmlFor="iq-intermediateCount">Number of intermediate interests</label>
+                                <input
+                                  id="iq-intermediateCount"
+                                  type="number"
+                                  min="1"
+                                  value={issueQuoteForm.intermediateLandlordCount}
+                                  onChange={(e) =>
+                                    setIssueQuoteForm((f) => ({ ...f, intermediateLandlordCount: e.target.value }))
+                                  }
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
                         {issueQuoteForm.transactionType === "sale_purchase" && (
                           <div className="field">
                             <label htmlFor="iq-salePrice">Sale price (£)</label>
@@ -8540,6 +9522,8 @@ function App() {
                         <option value="transfer">Transfer of Equity</option>
                         <option value="sale_purchase">Sale and purchase</option>
                         <option value="remortgage_transfer">Remortgage and transfer of equity</option>
+                        <option value="lease_extension_statutory">Lease extension (statutory)</option>
+                        <option value="lease_extension_informal">Lease extension (informal)</option>
                       </select>
                     </div>
 
@@ -8672,9 +9656,9 @@ function App() {
                           .map((f) => f.supplement_key)
                           .filter((k): k is string => !!k)
                       );
-                      const availableSupplements = SUPPLEMENT_OPTIONS.filter(
-                        (o) => !configuredKeys.has(o.key)
-                      );
+                      const availableSupplements = supplementOptionsForType(
+                        feeConfigType
+                      ).filter((o) => !configuredKeys.has(o.key));
                       if (availableSupplements.length === 0) {
                         return (
                           <p className="form-note" style={{ marginBottom: "20px", fontSize: "13px" }}>
@@ -10650,6 +11634,8 @@ function App() {
                         <option value="transfer">Transfer of Equity</option>
                         <option value="sale_purchase">Sale and purchase</option>
                         <option value="remortgage_transfer">Remortgage and transfer of equity</option>
+                        <option value="lease_extension_statutory">Lease extension (statutory)</option>
+                        <option value="lease_extension_informal">Lease extension (informal)</option>
                       </select>
                     </div>
 
@@ -10785,9 +11771,9 @@ function App() {
                           .map((f) => f.supplement_key)
                           .filter((k): k is string => !!k)
                       );
-                      const availableSupplements = SUPPLEMENT_OPTIONS.filter(
-                        (o) => !configuredKeys.has(o.key)
-                      );
+                      const availableSupplements = supplementOptionsForType(
+                        referrerPricingType
+                      ).filter((o) => !configuredKeys.has(o.key));
                       if (availableSupplements.length === 0) {
                         return (
                           <p className="form-note" style={{ marginBottom: "20px", fontSize: "13px" }}>
@@ -14337,6 +15323,24 @@ type ReferrerFormState = {
   remortgageTransfer: string;
   transferMortgage: string;
   ownersChanging: string;
+
+  // ── Enfranchisement family ─────────────────────────────────────────
+  // The referrer rail quotes lease extensions too, so it collects the
+  // same qualification answers the public form does. Blank is
+  // meaningful — an unanswered question yields "needs review" rather
+  // than being read as a clean answer.
+  propertyType: string;
+  originalLeaseTermYears: string;
+  unexpiredTermYears: string;
+  groundRent: string;
+  isBusinessTenancy: string;
+  landlordIdentifiable: string;
+  noticeAlreadyServed: string;
+  staircasedToFull: string;
+  unregisteredTitle: string;
+  intermediateLandlord: string;
+  missingLeaseDocuments: string;
+
   referrerNote: string;
 };
 
@@ -14370,6 +15374,20 @@ const REFERRER_FORM_DEFAULTS: ReferrerFormState = {
   remortgageTransfer: "no",
   transferMortgage: "no",
   ownersChanging: "one",
+
+  // Enfranchisement. Blank, not "no" — see the note on ReferrerFormState.
+  propertyType: "",
+  originalLeaseTermYears: "",
+  unexpiredTermYears: "",
+  groundRent: "",
+  isBusinessTenancy: "",
+  landlordIdentifiable: "",
+  noticeAlreadyServed: "",
+  staircasedToFull: "",
+  unregisteredTitle: "",
+  intermediateLandlord: "",
+  missingLeaseDocuments: "",
+
   referrerNote: "",
 };
 
@@ -14407,6 +15425,9 @@ function ReferrerSimpleForm({
   const isSale = form.type === "sale";
   const isRemortgage = form.type === "remortgage";
   const isTransfer = form.type === "transfer";
+  const isLeaseExtension =
+    form.type === "lease_extension_statutory" ||
+    form.type === "lease_extension_informal";
 
   const handlePreview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -14473,6 +15494,7 @@ function ReferrerSimpleForm({
       purchase: "Purchase", sale: "Sale", sale_purchase: "Sale & Purchase",
       remortgage: "Remortgage", transfer: "Transfer of Equity",
     };
+    const isEnfranchisement = preview.matterFamily === "enfranchisement";
     return (
       <div>
         <button type="button" onClick={() => setStep("form")}
@@ -14485,7 +15507,13 @@ function ReferrerSimpleForm({
             Quote for {form.property_address || "this property"}
           </h3>
           <p style={{ color: "var(--muted)", margin: "0 0 16px", fontSize: "14px" }}>
-            {typeLabel[form.type] || form.type} · {form.tenure} · {form.price ? `£${Number(form.price).toLocaleString("en-GB")}` : ""}
+            {isEnfranchisement
+              ? `${preview.transactionLabel ?? ""}${
+                  form.unexpiredTermYears ? ` · ${form.unexpiredTermYears} years unexpired` : ""
+                }`
+              : `${typeLabel[form.type] || form.type} · ${form.tenure} · ${
+                  form.price ? `£${Number(form.price).toLocaleString("en-GB")}` : ""
+                }`}
           </p>
 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
@@ -14493,7 +15521,14 @@ function ReferrerSimpleForm({
               {[...preview.legalFees, ...preview.disbursements].map((item, i) => (
                 <tr key={i} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td style={{ padding: "8px 0", color: "#374151" }}>{item.label}</td>
-                  <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 500 }}>{fmt(item.amount)}</td>
+                  <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 500 }}>
+                    {/* The Land Registry fee on a lease extension is assessed on
+                        the premium, which we deliberately do not calculate, so
+                        it must show as pending rather than as zero. */}
+                    {(item as { status?: string }).status === "tbc"
+                      ? <span style={{ color: "var(--muted)", fontWeight: 400 }}>To be confirmed</span>
+                      : fmt(item.amount)}
+                  </td>
                 </tr>
               ))}
               <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
@@ -14510,7 +15545,9 @@ function ReferrerSimpleForm({
             <tfoot>
               <tr style={{ background: "var(--navy)" }}>
                 <td style={{ padding: "10px 12px", color: "#fff", fontWeight: 700, borderRadius: "0 0 0 8px" }}>
-                  Total (inc. VAT{typeof preview.sdltAmount === "number" ? " & SDLT" : ""})
+                  {isEnfranchisement
+                    ? "Total payable to us (inc. VAT)"
+                    : `Total (inc. VAT${typeof preview.sdltAmount === "number" ? " & SDLT" : ""})`}
                 </td>
                 <td style={{ padding: "10px 12px", color: "#fff", fontWeight: 700, textAlign: "right", fontSize: "16px", borderRadius: "0 0 8px 0" }}>
                   {fmt(preview.totalIncludingSdlt ?? preview.grandTotal)}
@@ -14519,6 +15556,8 @@ function ReferrerSimpleForm({
             </tfoot>
           </table>
         </div>
+
+        <EnfranchisementQuoteBlocks quote={preview} />
 
         <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
           <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
@@ -14577,21 +15616,27 @@ function ReferrerSimpleForm({
                 <option value="sale">Sale</option>
                 <option value="remortgage">Remortgage</option>
                 <option value="transfer">Transfer of Equity</option>
+                <option value="lease_extension_statutory">Lease Extension (statutory)</option>
+                <option value="lease_extension_informal">Lease Extension (informal)</option>
               </select>
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Tenure</label>
-              <select style={inputStyle} value={form.tenure} onChange={(e) => set("tenure", e.target.value)}>
-                <option value="freehold">Freehold</option>
-                <option value="leasehold">Leasehold</option>
-              </select>
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Property price / value <span style={{ color: "#dc2626" }}>*</span></label>
-              <input style={inputStyle} type="number" value={form.price}
-                onChange={(e) => set("price", e.target.value)}
-                placeholder="e.g. 275000" required min="1" />
-            </div>
+            {!isLeaseExtension && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Tenure</label>
+                <select style={inputStyle} value={form.tenure} onChange={(e) => set("tenure", e.target.value)}>
+                  <option value="freehold">Freehold</option>
+                  <option value="leasehold">Leasehold</option>
+                </select>
+              </div>
+            )}
+            {!isLeaseExtension && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Property price / value <span style={{ color: "#dc2626" }}>*</span></label>
+                <input style={inputStyle} type="number" value={form.price}
+                  onChange={(e) => set("price", e.target.value)}
+                  placeholder="e.g. 275000" required min="1" />
+              </div>
+            )}
             <div style={fieldStyle}>
               <label style={labelStyle}>Postcode</label>
               <input style={inputStyle} type="text" value={form.postcode}
@@ -14601,6 +15646,109 @@ function ReferrerSimpleForm({
           </div>
         </div>
       </div>
+
+      {/* ── Section: Lease extension ── */}
+      {isLeaseExtension && (
+        <div style={sectionStyle}>
+          <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Lease Details</h4>
+          <p style={{ margin: "0 0 14px", fontSize: "13px", color: "var(--muted)", lineHeight: 1.7 }}>
+            These answers decide whether your client has a statutory right to
+            extend. Leave anything you are unsure of blank — a blank answer
+            sends the quote for review rather than being treated as a "no".
+          </p>
+          <div className="form-grid">
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Flat or house? <span style={{ color: "#dc2626" }}>*</span></label>
+              <select style={inputStyle} value={form.propertyType} onChange={(e) => set("propertyType", e.target.value)}>
+                <option value="">Please select</option>
+                <option value="flat">Flat</option>
+                <option value="house">House</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Years left on the lease <span style={{ color: "#dc2626" }}>*</span></label>
+              <input style={inputStyle} type="number" min="0" value={form.unexpiredTermYears}
+                onChange={(e) => set("unexpiredTermYears", e.target.value)} placeholder="e.g. 72" />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Original lease term (years)</label>
+              <input style={inputStyle} type="number" min="0" value={form.originalLeaseTermYears}
+                onChange={(e) => set("originalLeaseTermYears", e.target.value)} placeholder="e.g. 125" />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Annual ground rent</label>
+              <input style={inputStyle} type="number" min="0" value={form.groundRent}
+                onChange={(e) => set("groundRent", e.target.value)} placeholder="e.g. 250" />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Is the landlord traceable?</label>
+              <select style={inputStyle} value={form.landlordIdentifiable} onChange={(e) => set("landlordIdentifiable", e.target.value)}>
+                <option value="">Please select</option>
+                <option value="yes">Yes</option>
+                <option value="no">No — cannot be traced</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Notice already served?</label>
+              <select style={inputStyle} value={form.noticeAlreadyServed} onChange={(e) => set("noticeAlreadyServed", e.target.value)}>
+                <option value="">Please select</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Shared ownership lease?</label>
+              <select style={inputStyle} value={form.sharedOwnership} onChange={(e) => set("sharedOwnership", e.target.value)}>
+                <option value="">Please select</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            {form.sharedOwnership === "yes" && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Staircased to 100%?</label>
+                <select style={inputStyle} value={form.staircasedToFull} onChange={(e) => set("staircasedToFull", e.target.value)}>
+                  <option value="">Please select</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+            )}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Business tenancy?</label>
+              <select style={inputStyle} value={form.isBusinessTenancy} onChange={(e) => set("isBusinessTenancy", e.target.value)}>
+                <option value="">Please select</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Unregistered title?</label>
+              <select style={inputStyle} value={form.unregisteredTitle} onChange={(e) => set("unregisteredTitle", e.target.value)}>
+                <option value="">Not sure</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Head lease / intermediate landlord?</label>
+              <select style={inputStyle} value={form.intermediateLandlord} onChange={(e) => set("intermediateLandlord", e.target.value)}>
+                <option value="">Not sure</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Lease lost or plan defective?</label>
+              <select style={inputStyle} value={form.missingLeaseDocuments} onChange={(e) => set("missingLeaseDocuments", e.target.value)}>
+                <option value="">Not sure</option>
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Section: Purchase details ── */}
       {isPurchase && (

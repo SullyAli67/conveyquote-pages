@@ -40,6 +40,7 @@ import {
 } from "./disbursement-constants.js";
 import { isEnfranchisementType } from "./enfranchisement/types.js";
 import { buildConfigRailEnfranchisementQuote } from "./enfranchisement/config-rail.js";
+import { VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS } from "./enfranchisement/price-book.js";
 
 const VAT_RATE = 0.2;
 
@@ -131,7 +132,15 @@ const SUPPLEMENT_KEYS = [
 // Exported so the referrer-fee-config endpoint can validate
 // supplement_key values sent by the frontend without re-declaring the
 // list. Same canonical set as the firm engine.
-export const VALID_SUPPLEMENT_KEYS = SUPPLEMENT_KEYS.map((e) => e.key);
+//
+// The union covers BOTH matter families — see the note on the firm
+// engine's copy. Fee Settings offers only the keys for the selected
+// type's family, but this whitelist must accept either or saving
+// enfranchisement fees is rejected server-side.
+export const VALID_SUPPLEMENT_KEYS = [
+  ...SUPPLEMENT_KEYS.map((e) => e.key),
+  ...VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS,
+];
 
 function round2(n) {
   return Number((Number(n) || 0).toFixed(2));
