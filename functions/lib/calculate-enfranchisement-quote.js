@@ -650,15 +650,22 @@ function buildUnqualifiedBreakdown(qualification) {
 function buildDisclaimerLines(quote) {
   const lines = [];
 
-  if (quote.marriageValue.status === "payable") {
-    lines.push(`IMPORTANT: ${quote.marriageValue.reason}`);
-  } else if (quote.marriageValue.status === "approaching") {
-    lines.push(`ACT SOON: ${quote.marriageValue.reason}`);
+  // Stated plainly, using the assessment's own heading. Shouting in
+  // capitals reads as alarmist on a professional document; the point is
+  // made by saying it clearly and first.
+  if (
+    quote.marriageValue.status === "payable" ||
+    quote.marriageValue.status === "approaching"
+  ) {
+    lines.push(`${quote.marriageValue.heading}. ${quote.marriageValue.reason}`);
+    if (quote.marriageValue.reformNote) {
+      lines.push(quote.marriageValue.reformNote);
+    }
   }
 
   if (quote.qualification.outcome === QUALIFICATION_OUTCOME.NEEDS_REVIEW) {
     lines.push(
-      "This quote is PROVISIONAL. Some of your answers need to be checked by a " +
+      "This quote is provisional. Some of your answers need to be checked by a " +
         "solicitor before we can confirm it."
     );
   }

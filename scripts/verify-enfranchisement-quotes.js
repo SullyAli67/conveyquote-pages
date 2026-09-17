@@ -234,7 +234,7 @@ checkTrue("non-qualifying claim explains why", /Leasehold Reform Act 1967/.test(
 const provisional = buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", sharedOwnership: "yes", staircasedToFull: "no" });
 checkTrue("needs_review claim is still priced", provisional.priced);
 check("needs_review claim cannot be auto-issued", provisional.mayAutoIssue, false);
-checkTrue("needs_review claim is marked provisional", provisional.disclaimerLines.some((l) => /PROVISIONAL/.test(l)));
+checkTrue("needs_review claim is marked provisional", provisional.disclaimerLines.some((l) => /provisional/i.test(l)));
 checkTrue("clean claim may be auto-issued", statutory.mayAutoIssue);
 
 // Informal route stays available to someone barred from the statutory
@@ -247,10 +247,39 @@ check("route comparison marks statutory as unavailable", houseInformal.routeComp
 section("8. Marriage value and route comparison");
 // ═══════════════════════════════════════════════════════════════════
 
-check("sub-80-year term: marriage value payable", buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: 72 }).marriageValue.status, "payable");
-check("82-year term: approaching the threshold", buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: 82 }).marriageValue.status, "approaching");
-check("95-year term: not applicable", buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: 95 }).marriageValue.status, "not_applicable");
-checkTrue("sub-80 warning is surfaced in the disclaimers", statutory.disclaimerLines.some((l) => /marriage value/i.test(l)));
+const mvStatus = (years) =>
+  buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: years })
+    .marriageValue.status;
+
+check("72-year term: marriage value applies", mvStatus(72), "payable");
+check("82-year term: approaching the threshold", mvStatus(82), "approaching");
+check("95-year term: not applicable", mvStatus(95), "not_applicable");
+
+// ── Statutory boundary ───────────────────────────────────────────────
+// Sch 13 para 4(2A) makes marriage value nil only where the unexpired
+// term EXCEEDS eighty years. A term of exactly eighty does not exceed
+// eighty, so marriage value applies at 80.00 and stops at 80.01. This
+// was previously wrong (the test was `< 80`), which exempted a lease
+// sitting exactly on the threshold.
+check("79.99 years: applies", mvStatus(79.99), "payable");
+check("exactly 80 years: applies (does not EXCEED eighty)", mvStatus(80), "payable");
+check("80.01 years: does not apply", mvStatus(80.01), "approaching");
+
+checkTrue("marriage value is explained, not just named", /increase in the combined value/i.test(statutory.marriageValue.reason));
+checkTrue("marriage value cites its statutory source", /Schedule 13/.test(statutory.marriageValue.statutoryRef));
+checkTrue("marriage value flags the pending abolition", /not yet in force/i.test(statutory.marriageValue.reformNote));
+checkTrue("marriage value is described as part of the premium, not a separate charge", /not a separate charge/i.test(statutory.marriageValue.reason));
+checkTrue("marriage value surfaces in the disclaimers", statutory.disclaimerLines.some((l) => /marriage value/i.test(l)));
+checkTrue("disclaimers do not shout in capitals", !statutory.disclaimerLines.some((l) => /^(IMPORTANT|ACT SOON):/.test(l)));
+
+// The approaching band must explain that the test bites at the date the
+// notice is served, which is the whole reason timing matters.
+checkTrue(
+  "approaching warning explains the relevant date",
+  /date your notice is served/i.test(
+    buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: 82 }).marriageValue.reason
+  )
+);
 check("route comparison offers six points of difference", statutory.routeComparison.rows.length, 6);
 checkTrue("comparison covers ground rent", statutory.routeComparison.rows.some((r) => /ground rent/i.test(r.feature)));
 checkTrue("comparison covers price protection", statutory.routeComparison.rows.some((r) => /price protection/i.test(r.feature)));

@@ -131,7 +131,17 @@ export type BuiltQuoteData = {
   statutoryBasis?: string;
   priced?: boolean;
   qualification?: EnfranchisementQualification;
-  marriageValue?: { status: string; reason: string };
+  marriageValue?: {
+    // "payable" | "approaching" | "not_applicable" | "unknown".
+    // Marriage value is nil only where the unexpired term EXCEEDS eighty
+    // years (Sch 13 para 4(2A), 1993 Act), so a term of exactly eighty
+    // is "payable" — see functions/lib/enfranchisement/regime.js.
+    status: string;
+    heading: string | null;
+    reason: string;
+    statutoryRef: string | null;
+    reformNote: string | null;
+  };
   routeComparison?: {
     statutoryAvailable: boolean;
     note: string;

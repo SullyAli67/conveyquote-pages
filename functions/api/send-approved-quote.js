@@ -378,9 +378,9 @@ export async function onRequestPost(context) {
         ? `
           <tr>
             <td style="padding:0 28px 24px 28px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #d8e0ea;">
                 <tr>
-                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#062a63;">
                     <strong>SDLT</strong><br />
                     ${escapeHtml(sdltNote)}
                   </td>
@@ -484,9 +484,9 @@ export async function onRequestPost(context) {
           .map(
             (cost) => `
               <tr>
-                <td style="padding:10px 12px;border:1px solid #e2c275;background:#fffaf0;vertical-align:top;">
+                <td style="padding:10px 12px;border:1px solid #d8e0ea;background:#f7f9fc;vertical-align:top;">
                   <strong>${escapeHtml(cost.label)}</strong>
-                  <div style="font-size:12px;color:#7a4b00;margin-top:4px;line-height:1.6;">
+                  <div style="font-size:12px;color:#062a63;margin-top:4px;line-height:1.6;">
                     ${escapeHtml(cost.note || "")}
                     ${
                       cost.statutoryRef
@@ -500,7 +500,7 @@ export async function onRequestPost(context) {
                     }
                   </div>
                 </td>
-                <td style="padding:10px 12px;border:1px solid #e2c275;background:#fffaf0;text-align:right;white-space:nowrap;vertical-align:top;">
+                <td style="padding:10px 12px;border:1px solid #d8e0ea;background:#f7f9fc;text-align:right;white-space:nowrap;vertical-align:top;">
                   ${escapeHtml(formatEstimate(cost.amountLow, cost.amountHigh))}
                 </td>
               </tr>`
@@ -511,10 +511,10 @@ export async function onRequestPost(context) {
         const indicativeRow = indicative
           ? `
               <tr>
-                <td style="padding:12px;border:1px solid #e2c275;background:#fdf1d6;font-weight:bold;color:#7a4b00;">
+                <td style="padding:12px;border:1px solid #d8e0ea;background:#eef2f7;font-weight:bold;color:#062a63;">
                   Indicative total, EXCLUDING the premium
                 </td>
-                <td style="padding:12px;border:1px solid #e2c275;background:#fdf1d6;text-align:right;font-weight:bold;color:#7a4b00;white-space:nowrap;">
+                <td style="padding:12px;border:1px solid #d8e0ea;background:#eef2f7;text-align:right;font-weight:bold;color:#062a63;white-space:nowrap;">
                   £${Number(indicative.low).toFixed(2)} – £${Number(indicative.high).toFixed(2)}
                 </td>
               </tr>`
@@ -523,8 +523,8 @@ export async function onRequestPost(context) {
         enfranchisementBlocksHtml += `
           <tr>
             <td style="padding:0 28px 24px 28px;">
-              <h3 style="margin:24px 0 6px 0;color:#7a4b00;">Not included — payable by you to others</h3>
-              <p style="margin:0 0 12px 0;font-size:13px;line-height:1.7;color:#7a4b00;">
+              <h3 style="margin:24px 0 6px 0;color:#062a63;">Not included — payable by you to others</h3>
+              <p style="margin:0 0 12px 0;font-size:13px;line-height:1.7;color:#062a63;">
                 <strong>The amounts below are not our fees. We do not set them, we do not
                 control them and we do not receive them. The figures shown are estimates
                 only and the actual amounts may be higher or lower.</strong>
@@ -557,7 +557,7 @@ export async function onRequestPost(context) {
                         : escapeHtml(policy.disapplicationReason || "")
                     }
                     <br /><br />
-                    <strong style="color:#8a2f22;">${escapeHtml(policy.thirdPartyDisclosure)}</strong>
+                    <strong style="color:#062a63;">${escapeHtml(policy.thirdPartyDisclosure)}</strong>
                   </td>
                 </tr>
               </table>
@@ -593,11 +593,21 @@ export async function onRequestPost(context) {
         enfranchisementBlocksHtml += `
           <tr>
             <td style="padding:0 28px 24px 28px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fdecea;border:1px solid #d9857a;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f7f9fc;border:1px solid #d8e0ea;border-left:3px solid #062a63;">
                 <tr>
-                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#8a2f22;">
-                    <strong>${marriageValue.status === "payable" ? "Marriage value is payable" : "Act soon"}</strong><br />
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
+                    <strong style="color:#062a63;">${escapeHtml(marriageValue.heading || "Marriage value")}</strong><br />
                     ${escapeHtml(marriageValue.reason)}
+                    ${
+                      marriageValue.reformNote
+                        ? `<br /><br />${escapeHtml(marriageValue.reformNote)}`
+                        : ""
+                    }
+                    ${
+                      marriageValue.statutoryRef
+                        ? `<br /><span style="font-size:12px;color:#52606d;">${escapeHtml(marriageValue.statutoryRef)}</span>`
+                        : ""
+                    }
                   </td>
                 </tr>
               </table>
@@ -714,9 +724,9 @@ export async function onRequestPost(context) {
 
                         <tr>
                           <td style="padding:0 28px 24px 28px;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #e2c275;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fff8e6;border:1px solid #d8e0ea;">
                               <tr>
-                                <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#7a4b00;">
+                                <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#062a63;">
                                   <strong>Important Information</strong><br />
                                   This estimate is based on the information currently available. If further information comes to light or the matter involves additional complexity, we will discuss any change to costs with you before proceeding with that work.
                                 </td>

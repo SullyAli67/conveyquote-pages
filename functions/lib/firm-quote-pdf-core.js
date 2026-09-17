@@ -26,10 +26,14 @@ const TEAL = rgb(0x0a / 255, 0xa6 / 255, 0xb5 / 255);
 const WHITE = rgb(1, 1, 1);
 const BLACK = rgb(0, 0, 0);
 const MUTED = rgb(0.42, 0.45, 0.5);
-// Used for the blocks a client must not skim past: third-party costs
-// they are liable for but we do not control, and the no-completion-no-fee
-// carve-outs.
-const ALERT = rgb(0.70, 0.18, 0.12);
+// Blocks a client must not skim past — third-party costs they are liable
+// for but we do not control, and the no-completion-no-fee carve-outs —
+// are given weight through type, not through colour. A quote is a
+// professional document, so emphasis stays within the brand palette:
+// bold navy for the point being made, muted grey for the explanation.
+const EMPHASIS = NAVY;
+// Light rule used to box the third-party section off from our own fees.
+const RULE = rgb(0.84, 0.86, 0.89);
 
 // A4 in points (1/72 inch).
 const PAGE_WIDTH = 595.28;
@@ -550,23 +554,29 @@ const drawEnfranchisementNotices = (renderer, fonts, output) => {
     });
   }
 
-  if (marriageValue?.status === "payable") {
-    notices.push({ title: "Marriage value is payable", body: marriageValue.reason });
-  } else if (marriageValue?.status === "approaching") {
-    notices.push({ title: "Act soon", body: marriageValue.reason });
+  if (marriageValue?.status === "payable" || marriageValue?.status === "approaching") {
+    notices.push({
+      title: marriageValue.heading || "Marriage value",
+      body: marriageValue.reason,
+      footnotes: [marriageValue.statutoryRef, marriageValue.reformNote].filter(Boolean),
+    });
   }
 
   if (notices.length === 0) return;
 
   for (const notice of notices) {
     renderer.ensureRoom(50);
-    drawText(renderer.get().page, notice.title.toUpperCase(), MARGIN_X, renderer.get().y, {
+    drawText(renderer.get().page, notice.title, MARGIN_X, renderer.get().y, {
       font: fonts.bold,
-      size: 10,
-      color: ALERT,
+      size: 10.5,
+      color: EMPHASIS,
     });
-    renderer.advance(14);
+    renderer.advance(15);
     drawWrappedParagraph(renderer, fonts, notice.body, { size: 9, color: BLACK });
+    for (const footnote of notice.footnotes || []) {
+      renderer.advance(3);
+      drawWrappedParagraph(renderer, fonts, footnote, { size: 8.5, color: MUTED });
+    }
     renderer.advance(8);
   }
 
@@ -593,12 +603,14 @@ const drawThirdPartyCostsSection = (renderer, fonts, output) => {
   drawWrappedParagraph(
     renderer,
     fonts,
-    "The amounts below are NOT our fees. We do not set them, we do not control them " +
+    "The amounts below are not our fees. We do not set them, we do not control them " +
       "and we do not receive them. The figures shown are estimates only and the actual " +
       "amounts may be higher or lower.",
-    { size: 9, bold: true, color: ALERT }
+    { size: 9, bold: true, color: EMPHASIS }
   );
-  renderer.advance(8);
+  renderer.advance(4);
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(10);
 
   const rightX = PAGE_WIDTH - MARGIN_X;
   const lineHeight = 15;
@@ -639,7 +651,7 @@ const drawThirdPartyCostsSection = (renderer, fonts, output) => {
     if (cost.survivesWithdrawalNote) {
       drawWrappedParagraph(renderer, fonts, cost.survivesWithdrawalNote, {
         size: 8.5,
-        color: ALERT,
+        color: EMPHASIS,
         indent: 10,
       });
     }
@@ -714,7 +726,7 @@ const drawAbortivePolicySection = (renderer, fonts, output) => {
   } else {
     drawWrappedParagraph(renderer, fonts, policy.disapplicationReason || "", {
       size: 9,
-      color: ALERT,
+      color: EMPHASIS,
     });
   }
 
@@ -724,7 +736,7 @@ const drawAbortivePolicySection = (renderer, fonts, output) => {
   drawWrappedParagraph(renderer, fonts, policy.thirdPartyDisclosure, {
     size: 9,
     bold: true,
-    color: ALERT,
+    color: EMPHASIS,
   });
 
   renderer.advance(8);

@@ -681,29 +681,37 @@ function EnfranchisementQuoteBlocks({
     return `${money(low as number)} – ${money(high as number)} (estimate)`;
   };
 
-  const amber = { bg: "#fffaf0", border: "#e2c275", text: "#7a4b00" };
-  const red = { bg: "#fdecea", border: "#d9857a", text: "#8a2f22" };
-  const blue = { bg: "#eef6ff", border: "#c9dcef", text: "#24446b" };
+  // A quote is a professional document. Emphasis comes from type weight
+  // and a navy rule down the left edge, not from amber and red washes —
+  // a page of warning colours reads as alarmist rather than careful, and
+  // when everything shouts nothing does.
+  const panel = { bg: "#f7f9fc", border: "#d8e0ea", text: "#24446b" };
+  const ink = "#062a63";
+  const quiet = "#52606d";
 
   const notice = (
-    tone: { bg: string; border: string; text: string },
     title: string,
-    body: React.ReactNode
+    body: React.ReactNode,
+    footnote?: string | null
   ) => (
     <div
       style={{
-        background: tone.bg,
-        border: `1px solid ${tone.border}`,
-        borderRadius: "10px",
+        background: panel.bg,
+        border: `1px solid ${panel.border}`,
+        borderLeft: `3px solid ${ink}`,
+        borderRadius: "8px",
         padding: "14px 16px",
         marginBottom: "16px",
-        color: tone.text,
+        color: panel.text,
         fontSize: "14px",
         lineHeight: 1.7,
       }}
     >
-      <strong>{title}</strong>
+      <strong style={{ color: ink }}>{title}</strong>
       <div style={{ marginTop: "6px" }}>{body}</div>
+      {footnote ? (
+        <div style={{ marginTop: "8px", fontSize: "12.5px", color: quiet }}>{footnote}</div>
+      ) : null}
     </div>
   );
 
@@ -711,7 +719,6 @@ function EnfranchisementQuoteBlocks({
     <div style={{ marginBottom: "20px" }}>
       {quote.qualification?.outcome === "does_not_qualify" &&
         notice(
-          red,
           "We cannot quote for a statutory claim on this information",
           <ul style={{ margin: 0, paddingLeft: "20px" }}>
             {quote.qualification.reasons
@@ -731,7 +738,6 @@ function EnfranchisementQuoteBlocks({
 
       {quote.qualification?.outcome === "needs_review" &&
         notice(
-          amber,
           "This quote is provisional",
           <>
             A solicitor needs to check the following before we can confirm it:
@@ -747,31 +753,41 @@ function EnfranchisementQuoteBlocks({
           </>
         )}
 
-      {quote.marriageValue?.status === "payable" &&
-        notice(red, "Marriage value is payable", quote.marriageValue.reason)}
-      {quote.marriageValue?.status === "approaching" &&
-        notice(amber, "Act soon", quote.marriageValue.reason)}
+      {(quote.marriageValue?.status === "payable" ||
+        quote.marriageValue?.status === "approaching") &&
+        notice(
+          quote.marriageValue.heading || "Marriage value",
+          <>
+            {quote.marriageValue.reason}
+            {quote.marriageValue.reformNote ? (
+              <div style={{ marginTop: "8px" }}>{quote.marriageValue.reformNote}</div>
+            ) : null}
+          </>,
+          quote.marriageValue.statutoryRef
+        )}
 
       {quote.thirdPartyCosts && quote.thirdPartyCosts.length > 0 && (
         <div
           style={{
-            background: amber.bg,
-            border: `1px solid ${amber.border}`,
+            background: panel.bg,
+            border: `1px solid ${panel.border}`,
             borderRadius: "10px",
             padding: "16px 18px",
             marginBottom: "16px",
           }}
         >
-          <h4 style={{ margin: "0 0 6px", color: amber.text, fontSize: "16px" }}>
+          <h4 style={{ margin: "0 0 6px", color: ink, fontSize: "16px" }}>
             Not included — payable by you to others
           </h4>
           <p
             style={{
               margin: "0 0 12px",
+              paddingBottom: "12px",
+              borderBottom: `1px solid ${panel.border}`,
               fontSize: "13px",
               lineHeight: 1.7,
-              color: amber.text,
-              fontWeight: 700,
+              color: ink,
+              fontWeight: 600,
             }}
           >
             The amounts below are not our fees. We do not set them, we do not
@@ -782,14 +798,14 @@ function EnfranchisementQuoteBlocks({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
             <tbody>
               {quote.thirdPartyCosts.map((cost, i) => (
-                <tr key={i} style={{ borderTop: `1px solid ${amber.border}` }}>
-                  <td style={{ padding: "10px 0", color: amber.text, verticalAlign: "top" }}>
+                <tr key={i} style={{ borderTop: `1px solid ${panel.border}` }}>
+                  <td style={{ padding: "10px 0", color: panel.text, verticalAlign: "top" }}>
                     <strong>{cost.label}</strong>
                     <div style={{ fontSize: "12.5px", lineHeight: 1.6, marginTop: "4px" }}>
                       {cost.note}
                       {cost.statutoryRef ? <em style={{ display: "block" }}>{cost.statutoryRef}</em> : null}
                       {cost.survivesWithdrawalNote ? (
-                        <strong style={{ display: "block", marginTop: "4px", color: red.text }}>
+                        <strong style={{ display: "block", marginTop: "4px", color: ink }}>
                           {cost.survivesWithdrawalNote}
                         </strong>
                       ) : null}
@@ -801,7 +817,7 @@ function EnfranchisementQuoteBlocks({
                       textAlign: "right",
                       whiteSpace: "nowrap",
                       fontWeight: 600,
-                      color: amber.text,
+                      color: panel.text,
                       verticalAlign: "top",
                     }}
                   >
@@ -810,8 +826,8 @@ function EnfranchisementQuoteBlocks({
                 </tr>
               ))}
               {quote.indicativeTotalExcludingPremium && (
-                <tr style={{ borderTop: `2px solid ${amber.border}` }}>
-                  <td style={{ padding: "10px 0", fontWeight: 700, color: amber.text }}>
+                <tr style={{ borderTop: `2px solid ${panel.border}` }}>
+                  <td style={{ padding: "10px 0", fontWeight: 700, color: panel.text }}>
                     Indicative total, excluding the premium
                     <div style={{ fontSize: "12.5px", fontWeight: 400, lineHeight: 1.6, marginTop: "4px" }}>
                       {quote.indicativeTotalExcludingPremium.note}
@@ -823,7 +839,7 @@ function EnfranchisementQuoteBlocks({
                       textAlign: "right",
                       whiteSpace: "nowrap",
                       fontWeight: 700,
-                      color: amber.text,
+                      color: panel.text,
                       verticalAlign: "top",
                     }}
                   >
@@ -839,7 +855,6 @@ function EnfranchisementQuoteBlocks({
 
       {quote.abortivePolicy &&
         notice(
-          blue,
           "If the matter does not complete",
           <>
             {quote.abortivePolicy.appliesToThisMatter ? (
@@ -857,7 +872,7 @@ function EnfranchisementQuoteBlocks({
             ) : (
               quote.abortivePolicy.disapplicationReason
             )}
-            <strong style={{ display: "block", marginTop: "10px", color: red.text }}>
+            <strong style={{ display: "block", marginTop: "10px", color: ink }}>
               {quote.abortivePolicy.thirdPartyDisclosure}
             </strong>
           </>
@@ -875,7 +890,7 @@ function EnfranchisementQuoteBlocks({
             lineHeight: 1.7,
           }}
         >
-          <strong style={{ color: blue.text }}>Also not included in this fee</strong>
+          <strong style={{ color: ink }}>Also not included in this fee</strong>
           <ul style={{ margin: "6px 0 0 0", paddingLeft: "20px" }}>
             {quote.exclusions.map((item, i) => (
               <li key={i} style={{ marginBottom: "6px" }}>
@@ -899,7 +914,7 @@ function EnfranchisementQuoteBlocks({
             fontSize: "14px",
           }}
         >
-          <strong style={{ color: blue.text }}>Statutory route vs informal route</strong>
+          <strong style={{ color: ink }}>Statutory route vs informal route</strong>
           <p style={{ margin: "6px 0 10px", color: "var(--muted)", fontSize: "13px", lineHeight: 1.7 }}>
             {quote.routeComparison.note}
           </p>
@@ -6890,11 +6905,12 @@ function App() {
                       style={{
                         marginTop: "12px",
                         padding: "14px 16px",
-                        background: "#fffaf0",
-                        border: "1px solid #e2c275",
+                        background: "#f7f9fc",
+                        border: "1px solid #d8e0ea",
+                        borderLeft: "3px solid #062a63",
                       }}
                     >
-                      <strong style={{ color: "#7a4b00" }}>
+                      <strong style={{ color: "#062a63" }}>
                         What this quote does and does not cover
                       </strong>
                       <p
@@ -6902,7 +6918,7 @@ function App() {
                           margin: "8px 0 0 0",
                           fontSize: "14px",
                           lineHeight: 1.7,
-                          color: "#7a4b00",
+                          color: "#24446b",
                         }}
                       >
                         Our quote covers our own legal fees and the
