@@ -465,27 +465,25 @@ function buildSaleQuote(
     );
   }
 
+  // One TT always, to send the net proceeds to the seller. A second is
+  // added where there is a mortgage to redeem, because funds must also
+  // be wired to the lender. Labels and ordering match
+  // functions/lib/calculate-quote.js exactly.
+  addItem(
+    legalFees,
+    "Telegraphic transfer fee",
+    config.legalFees.telegraphicTransferFee
+  );
+
   if (yes(input.saleMortgage)) {
     addItem(
       legalFees,
-      "Mortgage redemption",
+      "Mortgage redemption supplement",
       config.legalFees.mortgageRedemptionSupplement
     );
     addItem(
       legalFees,
-      "Telegraphic transfer fee - lender redemption",
-      config.legalFees.telegraphicTransferFee
-    );
-    addItem(
-      legalFees,
-      "Telegraphic transfer fee - balance to client",
-      config.legalFees.telegraphicTransferFee
-    );
-  } else {
-    // No mortgage: still need 1x TT to send net proceeds to the seller
-    addItem(
-      legalFees,
-      "Telegraphic transfer fee",
+      "Telegraphic transfer fee (mortgage redemption)",
       config.legalFees.telegraphicTransferFee
     );
   }
@@ -493,7 +491,7 @@ function buildSaleQuote(
   if (yes(input.managementCompany)) {
     addItem(
       legalFees,
-      "Management company",
+      "Management company / service charge supplement",
       config.legalFees.managementCompanySupplement
     );
   }
@@ -501,7 +499,7 @@ function buildSaleQuote(
   if (yes(input.tenanted)) {
     addItem(
       legalFees,
-      "Tenanted property",
+      "Tenanted property supplement",
       config.legalFees.tenantedPropertySupplement
     );
   }
@@ -587,7 +585,7 @@ function buildPurchaseQuote(
   if (yes(input.giftedDeposit)) {
     addItem(
       legalFees,
-      "Gifted deposit",
+      "Gifted deposit supplement",
       config.legalFees.giftedDepositSupplement
     );
   }
@@ -623,7 +621,7 @@ function buildPurchaseQuote(
   if (yes(input.lifetimeIsa)) {
     addItem(
       legalFees,
-      "Lifetime ISA fee",
+      "Lifetime ISA admin fee",
       config.legalFees.lifetimeIsaSupplement
     );
   }
@@ -774,7 +772,7 @@ function buildRemortgageQuote(
   if (yes(input.additionalBorrowing)) {
     addItem(
       legalFees,
-      "Additional borrowing",
+      "Additional borrowing supplement",
       config.legalFees.additionalBorrowingSupplement
     );
   }
@@ -891,11 +889,19 @@ function buildTransferQuote(
     );
   }
 
-  if (input.ownersChanging === "two" || input.ownersChanging === "more") {
+  if (input.ownersChanging === "two") {
     addItem(
       legalFees,
-      "Additional owner change",
+      "Additional ownership change supplement",
       config.legalFees.additionalOwnerChangeSupplement
+    );
+  }
+
+  if (input.ownersChanging === "more") {
+    addItem(
+      legalFees,
+      "Complex ownership change supplement",
+      config.legalFees.complexOwnerChangeSupplement
     );
   }
 

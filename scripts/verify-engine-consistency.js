@@ -19,20 +19,38 @@
 // scenario, 1 if any divergence (per-line amount, missing line, or
 // grand-total mismatch beyond a 1p rounding tolerance).
 //
-// ── Known pre-existing divergences (tracked separately, NOT fixed here)
-// At time of writing, the following divergences are known and will cause
-// non-zero exit until they're fixed in their own PRs:
-//   1. Leasehold supplement on purchase: JS hardcodes £350,
-//      TS reads £300 from priceConfig.ts. Affects every leasehold purchase
-//      and the purchase leg of every leasehold sale_purchase.
-//   2. Telegraphic Transfer fee on remortgage: TS adds a £45 line, JS
-//      does not. Affects every remortgage (single or combined).
-//   3. remortgage_transfer composition: JS uses a dedicated function
-//      with a minimal fee set; TS composes buildRemortgage + buildTransfer
-//      and emits a richer fee list (two TT fees, two leasehold supplements
-//      on leasehold matters, etc.). Affects every remortgage_transfer.
-// If you fix one of the above, the harness will start passing for that
-// scenario row. When all three are fixed, exit code becomes 0.
+// ── Outstanding divergences ─────────────────────────────────────────
+// The three divergences originally listed here (purchase leasehold
+// supplement, remortgage TT fee, remortgage_transfer composition) have
+// since been fixed and are covered by the fixtures below.
+//
+// A supplement-coverage audit then found ELEVEN further divergences that
+// this harness could not see, because every fixture left the optional
+// supplements switched off. Six were reconciled by adopting the LOWER of
+// the two figures. Supplement fixtures have been added so the gap cannot
+// reopen.
+//
+// STILL OUTSTANDING — awaiting a pricing/treatment decision, so this
+// harness exits non-zero until they are resolved:
+//
+//   1. Five purchase supplements exist in src/priceConfig.ts and are
+//      entirely absent from functions/lib/calculate-quote.js, so the
+//      website quotes them and the emailed quote does not charge them:
+//        Company buyer      £350      Shared ownership  £250
+//        New build          £200      Help to Buy       £200
+//        Buy to let         £150
+//      Resolving these means either adding them to the JS engine or
+//      removing them from the price book — a commercial decision, not a
+//      code one.
+//
+//   2. SDLT on a Help to Buy purchase. The TS engine routes it to manual
+//      review ("SDLT subject to review"); the JS engine computes it
+//      normally. On a £400k purchase that is a £10,000 difference
+//      between the figure shown on the website and the figure emailed.
+//      Note that SDLT on a Help to Buy equity loan is ordinarily payable
+//      on the full purchase price, which suggests the JS behaviour is
+//      right and the TS gate is over-cautious — but that is a tax
+//      treatment question to confirm before changing either engine.
 
 import * as esbuild from "esbuild";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
@@ -249,6 +267,56 @@ const SCENARIOS = [
     name: "Sale £350k (no LR fee)",
     input: { type: "sale", price: "350000", tenure: "freehold", numberOfSellers: "1" },
   },
+
+  // ── Supplement coverage ──────────────────────────────────────────
+  //
+  // ⚠ THE GAP THAT LET THE ENGINES DRIFT.
+  // Every fixture above leaves the optional supplements switched off,
+  // so the harness reported 33/33 green while the two engines disagreed
+  // on eleven supplement paths by up to £420 on a single matter — the
+  // customer being shown one price on the website and billed another.
+  //
+  // Any new supplement MUST get a fixture here, or it is untested by
+  // construction.
+  { name: "Purchase + gifted deposit", input: { ...purchaseDefaults, price: "400000", giftedDeposit: "yes" } },
+  { name: "Purchase + Lifetime ISA", input: { ...purchaseDefaults, price: "400000", lifetimeIsa: "yes" } },
+  { name: "Purchase + new build", input: { ...purchaseDefaults, price: "400000", newBuild: "yes" } },
+  { name: "Purchase + shared ownership", input: { ...purchaseDefaults, price: "400000", tenure: "leasehold", sharedOwnership: "yes" } },
+  { name: "Purchase + Help to Buy", input: { ...purchaseDefaults, price: "400000", helpToBuy: "yes" } },
+  { name: "Purchase + buy to let", input: { ...purchaseDefaults, price: "400000", additionalProperty: "yes", buyToLet: "yes" } },
+  { name: "Purchase via company", input: { ...purchaseDefaults, price: "400000", isCompany: "yes" } },
+  { name: "Purchase, cash buyer (no acting-for-lender fee)", input: { ...purchaseDefaults, price: "400000", mortgage: "cash" } },
+
+  { name: "Sale + management company", input: { type: "sale", price: "400000", tenure: "leasehold", numberOfSellers: "1", managementCompany: "yes" } },
+  { name: "Sale + tenanted", input: { type: "sale", price: "400000", tenure: "freehold", numberOfSellers: "1", tenanted: "yes" } },
+  { name: "Sale + mortgage redemption (second TT fee)", input: { type: "sale", price: "400000", tenure: "freehold", numberOfSellers: "1", saleMortgage: "yes" } },
+  { name: "Sale, 3 sellers", input: { type: "sale", price: "400000", tenure: "freehold", numberOfSellers: "3" } },
+
+  { name: "Remortgage + additional borrowing", input: { ...remortgageDefaults, price: "400000", mortgageAmount: "300000", additionalBorrowing: "yes" } },
+  { name: "Remortgage + transfer of equity", input: { ...remortgageDefaults, price: "400000", mortgageAmount: "300000", remortgageTransfer: "yes" } },
+
+  { name: "Transfer, two owners changing", input: { ...transferDefaults, price: "400000", ownersChanging: "two" } },
+  { name: "Transfer, more than two owners changing", input: { ...transferDefaults, price: "400000", ownersChanging: "more" } },
+  { name: "Transfer, no mortgage", input: { ...transferDefaults, price: "400000", tenure: "leasehold", transferMortgage: "no" } },
+
+  {
+    name: "Sale+Purchase with every supplement on",
+    input: {
+      ...salePurchaseDefaults,
+      salePrice: "400000",
+      purchasePrice: "500000",
+      saleTenure: "leasehold",
+      purchaseTenure: "leasehold",
+      numberOfSellersCombined: "2",
+      saleMortgageCombined: "yes",
+      managementCompanyCombined: "yes",
+      tenantedCombined: "yes",
+      purchaseGiftedDeposit: "yes",
+      purchaseLifetimeIsa: "yes",
+      purchaseOwnershipType: "joint",
+    },
+  },
+
 ];
 
 // ── Bundle the TS engine via esbuild and dynamically import it ──────

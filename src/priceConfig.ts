@@ -1,5 +1,24 @@
 export const VAT_RATE = 0.2;
 
+// ── Supplement reconciliation, engine drift audit ────────────────────
+// The supplement amounts below were, until this change, different from
+// the hardcoded values in functions/lib/calculate-quote.js. Because that
+// file is the authoritative engine for the quote actually emailed to a
+// client while this file drives the website preview, customers were
+// shown one price and billed another — by up to £420 on a single matter.
+//
+// scripts/verify-engine-consistency.js did not catch it: none of its
+// fixtures switched a supplement on. Supplement scenarios have now been
+// added there so the two engines cannot drift again.
+//
+// Where the two engines disagreed, the LOWER figure was adopted:
+//   Gifted deposit          £250 -> £95
+//   Lifetime ISA            £100 -> £50
+//   Management company      £175 -> £150   (lowered in calculate-quote.js)
+//   Additional borrowing    £100 -> £75
+//   Owner change, two       £100 -> £75
+//   Owner change, more      £150 -> £100   (lowered in calculate-quote.js)
+
 // MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
 // Changing pricing requires editing both files.
 export function getPurchaseBaseFee(price: number): number {
@@ -73,13 +92,13 @@ export const PRICE_CONFIG = {
       leaseholdSupplement: 300,
       actingForLenderSupplement: 125,
       telegraphicTransferFee: 45,
-      giftedDepositSupplement: 250,
+      giftedDepositSupplement: 95,
       newBuildSupplement: 200,
       sharedOwnershipSupplement: 250,
       helpToBuySupplement: 200,
       companyBuyerSupplement: 350,
       buyToLetSupplement: 150,
-      lifetimeIsaSupplement: 100,
+      lifetimeIsaSupplement: 50,
     },
     disbursements: {
       searchPack: 350,
@@ -97,7 +116,7 @@ export const PRICE_CONFIG = {
   remortgage: {
     legalFees: {
       leaseholdSupplement: 250,
-      additionalBorrowingSupplement: 100,
+      additionalBorrowingSupplement: 75,
       transferOfEquitySupplement: 250,
       telegraphicTransferFee: 45,
     },
@@ -115,7 +134,8 @@ export const PRICE_CONFIG = {
     legalFees: {
       leaseholdSupplement: 250,
       mortgageSupplement: 150,
-      additionalOwnerChangeSupplement: 100,
+      additionalOwnerChangeSupplement: 75,
+      complexOwnerChangeSupplement: 100,
       telegraphicTransferFee: 45,
     },
     disbursements: {

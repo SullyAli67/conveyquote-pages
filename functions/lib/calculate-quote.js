@@ -432,7 +432,8 @@ function buildSaleQuote(input, options = {}) {
   }
 
   if (input.managementCompany === "yes") {
-    addItem(legalFees, "Management company / service charge supplement", 175);
+    // £175 here vs £150 in src/priceConfig.ts. Reconciled to the lower.
+    addItem(legalFees, "Management company / service charge supplement", 150);
   }
 
   if (input.tenanted === "yes") {
@@ -550,7 +551,8 @@ function buildTransferQuote(input, options = {}) {
   }
 
   if (input.ownersChanging === "more") {
-    addItem(legalFees, "Complex ownership change supplement", 150);
+    // £150 here vs £100 in src/priceConfig.ts. Reconciled to the lower.
+    addItem(legalFees, "Complex ownership change supplement", 100);
   }
 
   // Office copy entries: tenure-based estimate. In a combined
