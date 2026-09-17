@@ -2,6 +2,16 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "./disbursement-constants.js";
+import {
+  SEARCH_PACK_FEE,
+  ID_CHECKS_PER_BUYER,
+  OS1_SEARCH_FEE,
+  BANKRUPTCY_SEARCH_PER_BUYER,
+  SDLT_SUBMISSION_FEE,
+  AP1_SUBMISSION_FEE,
+} from "./pass-through-costs.js";
+import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { buildEnfranchisementQuote } from "./calculate-enfranchisement-quote.js";
 
 // Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
 // engine can source the same values — these costs must not diverge
@@ -16,12 +26,18 @@ import {
 // statutory sliding scale exported from ./disbursement-constants.js.
 // Call getLandRegistryFee({ transactionType, purchasePrice,
 // mortgageAmount, propertyValue }) directly. HMLR fees are NOT VAT-able.
-export const SEARCH_PACK_FEE = 350;
-export const ID_CHECKS_PER_BUYER = 14.4;
-export const OS1_SEARCH_FEE = 8.8;
-export const BANKRUPTCY_SEARCH_PER_BUYER = 7.6;
-export const SDLT_SUBMISSION_FEE = 6;
-export const AP1_SUBMISSION_FEE = 6;
+// The constants themselves now live in ./pass-through-costs.js so that
+// engines needing them (notably the enfranchisement engine, which this
+// module dispatches to below) can import them without creating a cycle.
+// Re-exported here so existing imports from this module keep working.
+export {
+  SEARCH_PACK_FEE,
+  ID_CHECKS_PER_BUYER,
+  OS1_SEARCH_FEE,
+  BANKRUPTCY_SEARCH_PER_BUYER,
+  SDLT_SUBMISSION_FEE,
+  AP1_SUBMISSION_FEE,
+} from "./pass-through-costs.js";
 
 function toNumber(value) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
@@ -689,6 +705,15 @@ function combineQuotes(title, first, second, sdltFromSecond = false, bespokeNote
 
 export function buildQuoteData(input) {
   const type = input.type || "";
+
+  // Enfranchisement matters are a separate matter family with their own
+  // engine, their own qualification gate and their own output contract.
+  // Dispatching here means every existing caller — send-quote.js,
+  // send-approved-quote.js and the TS client — picks up the new family
+  // without changing how it calls this function.
+  if (isEnfranchisementType(type)) {
+    return buildEnfranchisementQuote(input);
+  }
 
   if (type === "purchase") {
     return buildPurchaseQuote(input);

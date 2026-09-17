@@ -27,6 +27,8 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "./disbursement-constants.js";
+import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { buildConfigRailEnfranchisementQuote } from "./enfranchisement/config-rail.js";
 
 const VAT_RATE = 0.2;
 
@@ -173,6 +175,35 @@ export async function calculateFirmQuote({ db, firmId, body }) {
   }
 
   const transactionType = String(body.transactionType || "").trim();
+
+  // Enfranchisement matters have their own engine, their own
+  // qualification gate and their own third-party cost block. Legal fees
+  // still come 100% from this firm's own configuration — the pricing
+  // isolation rule is unchanged — so the rows are loaded here and passed
+  // straight through to the shared adapter.
+  if (isEnfranchisementType(transactionType)) {
+    const enfConfig = await db
+      .prepare(
+        `SELECT id, label, amount, includes_vat, is_disbursement, sort_order, supplement_key
+           FROM firm_fee_configs
+          WHERE firm_id = ?
+            AND transaction_type = ?
+          ORDER BY sort_order, id`
+      )
+      .bind(firmId, transactionType)
+      .all();
+
+    return buildConfigRailEnfranchisementQuote({
+      feeRows: (enfConfig.results || []).filter(
+        (r) => Number(r.is_disbursement) === 0
+      ),
+      body,
+      transactionType,
+      providerName: firm.firm_name,
+      providerLabelKey: "firmName",
+    });
+  }
+
   if (!SUPPORTED_TRANSACTION_TYPES.has(transactionType)) {
     return {
       ok: false,

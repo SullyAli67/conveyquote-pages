@@ -11,6 +11,15 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "../functions/lib/disbursement-constants.js";
+// The enfranchisement engine is written ONCE, in JavaScript, under
+// functions/lib/, and imported here rather than reimplemented in
+// TypeScript. The conveyancing price book is duplicated across this file
+// and functions/lib/calculate-quote.js, which is why
+// scripts/verify-engine-consistency.js has to exist at all; the
+// enfranchisement family deliberately does not repeat that. The import
+// pattern is already proven by disbursement-constants.js above.
+import { isEnfranchisementType } from "../functions/lib/enfranchisement/types.js";
+import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchisement-quote.js";
 
 type TransactionType =
   | "sale"
@@ -107,6 +116,84 @@ export type BuiltQuoteData = {
   sdltNote?: string;
   totalIncludingSdlt?: number;
   feeBreakdown: string;
+
+  // ── Enfranchisement family only ──────────────────────────────────
+  // Present when matterFamily === "enfranchisement". Every field is
+  // optional so the conveyancing rail is completely unaffected and no
+  // existing consumer needs changing.
+  //
+  // Note that `grandTotal` above keeps its meaning on both families:
+  // our fees plus the disbursements we can fix. The premium, the
+  // landlord's s.60 costs and the client's valuer's fee live in
+  // thirdPartyCosts and are NEVER included in it.
+  matterFamily?: string;
+  transactionLabel?: string;
+  statutoryBasis?: string;
+  priced?: boolean;
+  qualification?: EnfranchisementQualification;
+  marriageValue?: { status: string; reason: string };
+  routeComparison?: {
+    statutoryAvailable: boolean;
+    note: string;
+    rows: { feature: string; statutory: string; informal: string }[];
+  };
+  thirdPartyCosts?: ThirdPartyCost[];
+  indicativeTotalExcludingPremium?: {
+    low: number;
+    high: number;
+    excludesPremium: boolean;
+    note: string;
+  };
+  premium?: { status: string; amount: number | null; valuerRequired: boolean };
+  exclusions?: { label: string; note: string; amount: number | null }[];
+  abortivePolicy?: AbortivePolicy;
+  regimeId?: string;
+  quotedAsOf?: string;
+  warnings?: string[];
+  mayAutoIssue?: boolean;
+  appliedSupplements?: { key: string; label: string; amount: number }[];
+  disclaimerLines?: string[];
+};
+
+export type EnfranchisementQualification = {
+  outcome: "qualifies" | "does_not_qualify" | "needs_review";
+  reasons: {
+    code: string;
+    severity: "bar" | "review" | "note";
+    message: string;
+    statutoryRef: string | null;
+  }[];
+  statutoryRefs: string[];
+  flags: { absentLandlord: boolean; informalRouteAvailable: boolean };
+  regimeId: string;
+};
+
+// A cost the CLIENT pays to SOMEONE ELSE. `withinFirmControl` is always
+// false on these — it is what the renderers key off to present them as
+// estimates outside the firm's control rather than as part of the fee.
+export type ThirdPartyCost = {
+  label: string;
+  status: "estimate" | "tbc" | "not_included";
+  amountLow: number | null;
+  amountHigh: number | null;
+  withinFirmControl: false;
+  payableTo: string;
+  statutoryRef?: string | null;
+  note: string;
+  survivesWithdrawalNote?: string;
+  valuerRequired?: boolean;
+};
+
+export type AbortivePolicy = {
+  type: string;
+  headline: string;
+  summary: string;
+  faultConditions: string[];
+  thirdPartyCostsStillPayable: boolean;
+  thirdPartyDisclosure: string;
+  excludedSupplements: string[];
+  appliesToThisMatter: boolean;
+  disapplicationReason: string | null;
 };
 
 const yes = (value?: string) => value === "yes";
@@ -913,6 +1000,13 @@ function mergeQuotes(
 
 export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   const type = form.type as TransactionType;
+
+  // Enfranchisement matters route to the shared JS engine. Dispatching
+  // here means the public preview, the admin screens and the server all
+  // produce byte-identical output from one implementation.
+  if (isEnfranchisementType(form.type)) {
+    return buildEnfranchisementQuote(form) as BuiltQuoteData;
+  }
 
   if (type === "sale") {
     return buildSaleQuote({

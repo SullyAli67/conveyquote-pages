@@ -38,6 +38,8 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "./disbursement-constants.js";
+import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { buildConfigRailEnfranchisementQuote } from "./enfranchisement/config-rail.js";
 
 const VAT_RATE = 0.2;
 
@@ -169,6 +171,36 @@ export async function calculateReferrerQuote({ db, referrerId, body }) {
   }
 
   const transactionType = String(body.transactionType || "").trim();
+
+  // Enfranchisement matters route to the shared engine. Legal fees still
+  // come 100% from referrer_fee_configs for this referrer — Pattern B
+  // isolation is unchanged. The qualification gate and the third-party
+  // cost block are statutory and therefore central: a referrer cannot
+  // configure who qualifies for a statutory right, nor what the landlord
+  // is entitled to recover under s.60.
+  if (isEnfranchisementType(transactionType)) {
+    const enfConfig = await db
+      .prepare(
+        `SELECT id, label, amount, includes_vat, is_disbursement, sort_order, supplement_key
+           FROM referrer_fee_configs
+          WHERE referrer_id = ?
+            AND transaction_type = ?
+          ORDER BY sort_order, id`
+      )
+      .bind(referrerId, transactionType)
+      .all();
+
+    return buildConfigRailEnfranchisementQuote({
+      feeRows: (enfConfig.results || []).filter(
+        (r) => Number(r.is_disbursement) === 0
+      ),
+      body,
+      transactionType,
+      providerName: referrer.referrer_name,
+      providerLabelKey: "referrerName",
+    });
+  }
+
   if (!SUPPORTED_TRANSACTION_TYPES.has(transactionType)) {
     return {
       ok: false,
