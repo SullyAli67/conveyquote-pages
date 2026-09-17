@@ -307,7 +307,17 @@ function getSdltResult(input: {
     return { sdltNote: "SDLT subject to review" as string };
   }
 
-  if (yes(input.isCompany) || yes(input.sharedOwnership) || yes(input.helpToBuy)) {
+  // Help to Buy is NOT routed to manual review. SDLT on a Help to Buy
+  // equity loan is ordinarily payable on the full purchase price — the
+  // equity loan is not separately chargeable consideration — so the
+  // ordinary calculation applies and the server engine has always
+  // computed it. This gate previously produced a £10,000 gap on a £400k
+  // purchase between the figure shown here and the figure emailed.
+  //
+  // Company and shared ownership purchases DO stay on manual review:
+  // the former can attract the higher corporate rates, and the latter
+  // allows a market-value election and staircasing.
+  if (yes(input.isCompany) || yes(input.sharedOwnership)) {
     return { sdltNote: "SDLT subject to review" as string };
   }
 
@@ -591,31 +601,31 @@ function buildPurchaseQuote(
   }
 
   if (yes(input.newBuild)) {
-    addItem(legalFees, "New build", config.legalFees.newBuildSupplement);
+    addItem(legalFees, "New build supplement", config.legalFees.newBuildSupplement);
   }
 
   if (yes(input.sharedOwnership)) {
     addItem(
       legalFees,
-      "Shared ownership",
+      "Shared ownership supplement",
       config.legalFees.sharedOwnershipSupplement
     );
   }
 
   if (yes(input.helpToBuy)) {
-    addItem(legalFees, "Help to Buy", config.legalFees.helpToBuySupplement);
+    addItem(legalFees, "Help to Buy supplement", config.legalFees.helpToBuySupplement);
   }
 
   if (yes(input.isCompany)) {
     addItem(
       legalFees,
-      "Company buyer",
+      "Buying via company supplement",
       config.legalFees.companyBuyerSupplement
     );
   }
 
   if (yes(input.buyToLet)) {
-    addItem(legalFees, "Buy to let", config.legalFees.buyToLetSupplement);
+    addItem(legalFees, "Buy to let supplement", config.legalFees.buyToLetSupplement);
   }
 
   if (yes(input.lifetimeIsa)) {

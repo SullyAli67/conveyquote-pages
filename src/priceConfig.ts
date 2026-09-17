@@ -11,13 +11,20 @@ export const VAT_RATE = 0.2;
 // fixtures switched a supplement on. Supplement scenarios have now been
 // added there so the two engines cannot drift again.
 //
-// Where the two engines disagreed, the LOWER figure was adopted:
+// Where the two engines disagreed on an amount, the LOWER figure was
+// adopted:
 //   Gifted deposit          £250 -> £95
 //   Lifetime ISA            £100 -> £50
 //   Management company      £175 -> £150   (lowered in calculate-quote.js)
 //   Additional borrowing    £100 -> £75
 //   Owner change, two       £100 -> £75
 //   Owner change, more      £150 -> £100   (lowered in calculate-quote.js)
+//
+// Five further supplements below (new build, shared ownership, Help to
+// Buy, buying via company, buy to let) existed here and were quoted on
+// the website but were never implemented in calculate-quote.js, so they
+// were never actually billed. They are now implemented in both engines
+// at the figures shown here — the omission was a bug, not a price.
 
 // MUST STAY IN SYNC with the other pricing file — see functions/lib/calculate-quote.js.
 // Changing pricing requires editing both files.

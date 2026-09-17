@@ -19,38 +19,41 @@
 // scenario, 1 if any divergence (per-line amount, missing line, or
 // grand-total mismatch beyond a 1p rounding tolerance).
 //
-// ── Outstanding divergences ─────────────────────────────────────────
-// The three divergences originally listed here (purchase leasehold
-// supplement, remortgage TT fee, remortgage_transfer composition) have
-// since been fixed and are covered by the fixtures below.
+// ── Divergence history ───────────────────────────────────────────────
+// This harness exists because the conveyancing price book is implemented
+// twice: functions/lib/calculate-quote.js (authoritative — it prices the
+// quote actually emailed to the client) and src/buildQuoteData.ts (the
+// website preview). Any gap between them means a customer is shown one
+// price and billed another.
 //
-// A supplement-coverage audit then found ELEVEN further divergences that
-// this harness could not see, because every fixture left the optional
-// supplements switched off. Six were reconciled by adopting the LOWER of
-// the two figures. Supplement fixtures have been added so the gap cannot
-// reopen.
+// Three divergences were listed here originally (purchase leasehold
+// supplement, remortgage TT fee, remortgage_transfer composition). All
+// three are fixed.
 //
-// STILL OUTSTANDING — awaiting a pricing/treatment decision, so this
-// harness exits non-zero until they are resolved:
+// A later audit then found TWELVE more that this harness could not see,
+// because not one fixture switched an optional supplement on:
 //
-//   1. Five purchase supplements exist in src/priceConfig.ts and are
-//      entirely absent from functions/lib/calculate-quote.js, so the
-//      website quotes them and the emailed quote does not charge them:
-//        Company buyer      £350      Shared ownership  £250
-//        New build          £200      Help to Buy       £200
-//        Buy to let         £150
-//      Resolving these means either adding them to the JS engine or
-//      removing them from the price book — a commercial decision, not a
-//      code one.
+//   • Six where the engines charged different amounts. Reconciled to the
+//     LOWER figure: gifted deposit £250->£95, Lifetime ISA £100->£50,
+//     additional borrowing £100->£75, owner change (two) £100->£75,
+//     management company £175->£150, owner change (more) £150->£100.
 //
-//   2. SDLT on a Help to Buy purchase. The TS engine routes it to manual
-//      review ("SDLT subject to review"); the JS engine computes it
-//      normally. On a £400k purchase that is a £10,000 difference
-//      between the figure shown on the website and the figure emailed.
-//      Note that SDLT on a Help to Buy equity loan is ordinarily payable
-//      on the full purchase price, which suggests the JS behaviour is
-//      right and the TS gate is over-cautious — but that is a tax
-//      treatment question to confirm before changing either engine.
+//   • Five purchase supplements present in the price book and quoted on
+//     the website but never implemented in the authoritative engine, so
+//     they were quoted and never billed: buying via company £350, shared
+//     ownership £250, new build £200, Help to Buy £200, buy to let £150.
+//     Now implemented in both.
+//
+//   • SDLT on a Help to Buy purchase, which the TS engine routed to
+//     manual review while the JS engine computed it — a £10,000 gap on a
+//     £400k purchase. SDLT on a Help to Buy equity loan is ordinarily
+//     payable on the full purchase price, so the gate was removed and
+//     both engines now compute it. Company and shared ownership
+//     purchases remain on manual review.
+//
+// The supplement fixtures below are the fix for the root cause. ANY new
+// supplement must get a fixture here, or it is untested by construction
+// and the engines are free to drift again.
 
 import * as esbuild from "esbuild";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
