@@ -11,6 +11,7 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "../functions/lib/disbursement-constants.js";
+import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
 type TransactionType =
   | "sale"
@@ -26,6 +27,7 @@ type QuoteFormLike = {
   tenure?: string;
   mortgage?: string;
   ownershipType?: string;
+  postcode?: string;
   firstTimeBuyer?: string;
   additionalProperty?: string;
   ukResidentForSdlt?: string;
@@ -205,11 +207,20 @@ function getSdltResult(input: {
   isCompany?: string;
   sharedOwnership?: string;
   helpToBuy?: string;
+  postcode?: string;
 }) {
   const price = toNumber(input.price);
 
   if (!price) {
     return { sdltNote: "SDLT subject to review" as string };
+  }
+
+  // Jurisdiction first — matches the server engine in
+  // functions/lib/calculate-quote.js. Welsh and Scottish property is
+  // outside SDLT altogether.
+  const jurisdiction = getTaxJurisdiction(input.postcode);
+  if (jurisdiction.regime !== "sdlt") {
+    return { sdltNote: jurisdiction.note as string };
   }
 
   if (yes(input.isCompany) || yes(input.sharedOwnership) || yes(input.helpToBuy)) {
@@ -443,6 +454,7 @@ function buildPurchaseQuote(
     tenure?: string;
     mortgage?: string;
     ownershipType?: string;
+    postcode?: string;
     firstTimeBuyer?: string;
     additionalProperty?: string;
     ukResidentForSdlt?: string;
@@ -594,6 +606,7 @@ function buildPurchaseQuote(
     isCompany: input.isCompany,
     sharedOwnership: input.sharedOwnership,
     helpToBuy: input.helpToBuy,
+    postcode: input.postcode,
   });
 
   return finaliseQuote(
@@ -612,6 +625,7 @@ function buildPurchaseQuoteWithPrice(
     tenure?: string;
     mortgage?: string;
     ownershipType?: string;
+    postcode?: string;
     firstTimeBuyer?: string;
     additionalProperty?: string;
     ukResidentForSdlt?: string;
@@ -634,6 +648,7 @@ function buildPurchaseQuoteWithPrice(
     isCompany: input.isCompany,
     sharedOwnership: input.sharedOwnership,
     helpToBuy: input.helpToBuy,
+    postcode: input.postcode,
   });
 
   const bespoke = getBespokeNote(toNumber(input.price));
@@ -931,6 +946,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       tenure: form.tenure,
       mortgage: form.mortgage,
       ownershipType: form.ownershipType,
+      postcode: form.postcode,
       firstTimeBuyer: form.firstTimeBuyer,
       additionalProperty: form.additionalProperty,
       ukResidentForSdlt: form.ukResidentForSdlt,
@@ -987,6 +1003,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       tenure: form.purchaseTenure,
       mortgage: form.purchaseMortgage,
       ownershipType: form.purchaseOwnershipType,
+      postcode: form.purchasePostcode,
       firstTimeBuyer: form.purchaseFirstTimeBuyer,
       additionalProperty: form.purchaseAdditionalProperty,
       ukResidentForSdlt: form.purchaseUkResidentForSdlt,

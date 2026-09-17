@@ -15,6 +15,7 @@ import {
 import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
+import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
 // ── Toast notification system ─────────────────────────────────────────────
 // Single global context for transient feedback (success/error/info).
@@ -873,6 +874,40 @@ function getSellerCount(numberOfSellers?: string) {
   return 1;
 }
 
+// ── First-time buyer / additional property conflict ──────────────────────
+//
+// A buyer who will still own another dwelling at the end of the day of
+// completion cannot claim first-time buyer relief — HMRC withdraws the
+// relief outright, and the 5% higher-rate surcharge applies on top. So
+// answering "yes" to both questions is a contradiction in tax terms, and
+// one of the two answers must be wrong.
+//
+// It matters far more than it looks. The quote engines resolve it in
+// HMRC's favour by ignoring the relief, which is the correct treatment,
+// but they do so silently. The gap between the two readings is the whole
+// tax bill, not a rounding difference: on a £285,000 purchase it is £0 as
+// a true first-time buyer against £18,500 as an additional property. A
+// quote sent on the wrong reading is wrong by that entire amount.
+//
+// Surfaced in two places: on the public form, so the client resolves it
+// before the enquiry is ever created, and on the admin Quote Review
+// screen, which also covers the enquiries already sitting in the database.
+export const hasFtbConflict = (
+  firstTimeBuyer?: string | null,
+  additionalProperty?: string | null
+) => firstTimeBuyer === "yes" && additionalProperty === "yes";
+
+export const FTB_CONFLICT_HEADLINE =
+  "Please check these two answers";
+
+export const FTB_CONFLICT_EXPLANATION =
+  "You have said you are a first-time buyer and that you will still own " +
+  "another property after completion. Those cannot both be true for tax " +
+  "purposes: first-time buyer relief is not available if you will own " +
+  "another property, and a 5% surcharge applies instead. This changes " +
+  "the Stamp Duty figure substantially, so please correct whichever " +
+  "answer is wrong.";
+
 // Residential SDLT rates from 1 April 2025 (the temporary 23 Sep 2022 –
 // 31 Mar 2025 thresholds no longer apply): 0% to £125k, 2% to £250k,
 // 5% to £925k, 10% to £1.5m, 12% above. MUST STAY IN SYNC with
@@ -1418,6 +1453,11 @@ function App() {
   const [adminLoginError, setAdminLoginError] = useState("");
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Set once the client has submitted with a first-time-buyer / additional
+  // -property conflict showing. The first attempt stops and points at the
+  // warning; a second, deliberate attempt goes through, so a client who
+  // genuinely means both answers is never blocked out of enquiring.
+  const [ftbConflictSeen, setFtbConflictSeen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
 
   // Firm portal state
@@ -4389,6 +4429,29 @@ function App() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Hold the first submit when the two SDLT answers contradict each
+    // other, so the client sees the warning before the enquiry is
+    // created. Submitting again goes through regardless — this is a
+    // prompt to check, not a hard block, and losing an enquiry over it
+    // would cost more than the correction is worth.
+    const conflictOnForm =
+      hasFtbConflict(form.firstTimeBuyer, form.additionalProperty) ||
+      hasFtbConflict(
+        form.purchaseFirstTimeBuyer,
+        form.purchaseAdditionalProperty
+      );
+
+    if (conflictOnForm && !ftbConflictSeen) {
+      setFtbConflictSeen(true);
+      // Whichever leg is conflicting is the one to scroll to — a combined
+      // sale and purchase renders its warning under the purchase leg.
+      const warningEl =
+        document.getElementById("ftb-conflict-warning") ||
+        document.getElementById("ftb-conflict-warning-purchase");
+      warningEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     try {
       const response = await fetch("/api/send-quote", {
         method: "POST",
@@ -4406,6 +4469,7 @@ function App() {
           email: form.email,
         });
         setForm(initialFormState);
+        setFtbConflictSeen(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         alert(
@@ -5833,6 +5897,49 @@ function App() {
   // had an approved quote sent. `quote_sent` (auto-set on send), `accepted`,
   // `rejected`, `instructed`, `archived`, and `on_hold` are out of the queue.
   // Anything else (primarily `new` and `reviewed`) is awaiting admin action.
+  // Checks worth making before an approved quote goes out, derived from
+  // the loaded enquiry rather than from the stored quote — so they apply
+  // to enquiries captured before these checks existed, which is most of
+  // the review queue.
+  const quoteReviewWarnings = useMemo(() => {
+    if (!loadedEnquiry) return [] as string[];
+
+    const combined = loadedEnquiry.transaction_type === "sale_purchase";
+
+    const firstTimeBuyer = combined
+      ? loadedEnquiry.purchase_first_time_buyer
+      : loadedEnquiry.first_time_buyer;
+    const additionalProperty = combined
+      ? loadedEnquiry.purchase_additional_property
+      : loadedEnquiry.additional_property;
+    const postcode = combined
+      ? loadedEnquiry.purchase_postcode
+      : loadedEnquiry.postcode;
+
+    const warnings: string[] = [];
+
+    if (hasFtbConflict(firstTimeBuyer, additionalProperty)) {
+      warnings.push(
+        "First time buyer and additional property are both \u201cyes\u201d. " +
+          "These are mutually exclusive: first-time buyer relief is " +
+          "unavailable on an additional dwelling, so the quote has been " +
+          "priced at the standard rates plus the 5% surcharge and the " +
+          "relief has been ignored. Confirm which answer is correct " +
+          "before sending \u2014 the difference is the whole SDLT figure, " +
+          "not a rounding."
+      );
+    }
+
+    const jurisdiction = getTaxJurisdiction(postcode);
+    if (jurisdiction.regime !== "sdlt") {
+      warnings.push(
+        `${jurisdiction.note} Postcode on file: ${postcode || "none"}.`
+      );
+    }
+
+    return warnings;
+  }, [loadedEnquiry]);
+
   const pendingQuotesSummary = useMemo(() => {
     const TERMINAL = new Set([
       "quote_sent",
@@ -6383,6 +6490,36 @@ function App() {
                         </select>
                       </div>
 
+
+                      {hasFtbConflict(
+                        form.firstTimeBuyer,
+                        form.additionalProperty
+                      ) && (
+                        <div
+                          id="ftb-conflict-warning"
+                          className="field field--full"
+                          style={{
+                            border: "2px solid #f59e0b",
+                            background: "#fffbeb",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            color: "#92400e",
+                          }}
+                        >
+                          <strong>{FTB_CONFLICT_HEADLINE}</strong>
+                          <p style={{ margin: "6px 0 0 0" }}>
+                            {FTB_CONFLICT_EXPLANATION}
+                          </p>
+                          {ftbConflictSeen && (
+                            <p style={{ margin: "6px 0 0 0", fontWeight: 600 }}>
+                              If both answers are right as they stand, submit
+                              again to continue.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="field">
                         <label htmlFor="ukResidentForSdlt">
                           UK resident for SDLT purposes?
@@ -6844,6 +6981,36 @@ function App() {
                           <option value="no">No</option>
                         </select>
                       </div>
+
+
+                      {hasFtbConflict(
+                        form.purchaseFirstTimeBuyer,
+                        form.purchaseAdditionalProperty
+                      ) && (
+                        <div
+                          id="ftb-conflict-warning-purchase"
+                          className="field field--full"
+                          style={{
+                            border: "2px solid #f59e0b",
+                            background: "#fffbeb",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            color: "#92400e",
+                          }}
+                        >
+                          <strong>{FTB_CONFLICT_HEADLINE}</strong>
+                          <p style={{ margin: "6px 0 0 0" }}>
+                            {FTB_CONFLICT_EXPLANATION}
+                          </p>
+                          {ftbConflictSeen && (
+                            <p style={{ margin: "6px 0 0 0", fontWeight: 600 }}>
+                              If both answers are right as they stand, submit
+                              again to continue.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="purchaseUkResidentForSdlt">
@@ -11403,6 +11570,34 @@ function App() {
 
             {adminTab === "quote" && loadedEnquiry && (
               <>
+                {quoteReviewWarnings.length > 0 && (
+                  <div
+                    style={{
+                      border: "2px solid #f59e0b",
+                      background: "#fffbeb",
+                      borderRadius: "18px",
+                      padding: "14px 18px",
+                      marginBottom: "20px",
+                      fontSize: "13px",
+                      color: "#92400e",
+                    }}
+                  >
+                    <strong>
+                      Check before sending
+                      {quoteReviewWarnings.length > 1
+                        ? ` (${quoteReviewWarnings.length} items)`
+                        : ""}
+                    </strong>
+                    <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+                      {quoteReviewWarnings.map((warning, index) => (
+                        <li key={index} style={{ marginBottom: "6px" }}>
+                          {warning}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="admin-stack" style={{ marginBottom: "20px" }}>
                   <SummaryCard title="Loaded Enquiry Snapshot">
                     <SummaryGrid rows={enquirySummaryRows} />
