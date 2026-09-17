@@ -5288,39 +5288,31 @@ function App() {
     async function loadPublicLenders() {
       setLoadingLenders(true);
 
+      // /api/lenders is the public source for the quote-form dropdown. It
+      // already returns exactly the active lenders this needs, so there is
+      // no second attempt against /api/list-panel-lenders: that endpoint is
+      // admin-only now, and a public page must not depend on it. It was
+      // never real resilience either — both read the same table through the
+      // same binding, so anything breaking one breaks the other.
+      //
+      // The old early return on the success path also skipped the finally
+      // that clears this flag, leaving every lender dropdown reading
+      // "Loading lenders..." after the lenders had in fact arrived. One
+      // try/finally covers both outcomes.
       try {
         const publicResponse = await fetch("/api/lenders");
         const publicResult = await publicResponse.json();
 
-        if (publicResult.success && Array.isArray(publicResult.lenders)) {
-          setLenders(
-            publicResult.lenders.map((item: any) => ({
-              id: Number(item.id),
-              name: String(item.name || item.lender_name || ""),
-            }))
-          );
-          return;
-        }
-      } catch (error) {
-        console.error("Public lenders endpoint failed, trying panel lenders.");
-      }
-
-      try {
-        const response = await fetch("/api/list-panel-lenders");
-        const result = await response.json();
-
-        if (result.success && Array.isArray(result.lenders)) {
-          setLenders(
-            result.lenders
-              .filter((item: PanelLender) => Number(item.active) === 1)
-              .map((item: PanelLender) => ({
-                id: Number(item.id),
-                name: String(item.lender_name || ""),
-              }))
-          );
-        } else {
-          setLenders([]);
-        }
+        setLenders(
+          publicResult.success && Array.isArray(publicResult.lenders)
+            ? publicResult.lenders.map(
+                (item: { id: number | string; name?: string }) => ({
+                  id: Number(item.id),
+                  name: String(item.name || ""),
+                })
+              )
+            : []
+        );
       } catch (error) {
         console.error("Failed to load lenders:", error);
         setLenders([]);
