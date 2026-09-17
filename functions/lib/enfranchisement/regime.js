@@ -148,36 +148,45 @@ export function getRegime(asOfDate) {
 }
 
 // Marriage value assessment for a given unexpired term, under the
-// regime in force. Returns a structured result rather than a bare
-// boolean so the quote can explain itself.
+// regime in force.
 //
-//   status "payable"  — under 80 years; marriage value is in the premium
-//   status "approaching" — within the warning band; act before it bites
-//   status "not_applicable" — comfortably above, or abolished
+// ⚠ INTERNAL TRIAGE ONLY — NEVER SHOW THIS TO A CLIENT.
+// Marriage value is a component of the PREMIUM. This engine does not
+// quote the premium: it is excluded as a valuation matter for the
+// client's own surveyor (see buildThirdPartyCosts in
+// ../calculate-enfranchisement-quote.js). Explaining marriage value on a
+// fee quote would be valuation commentary the firm does not hold itself
+// out to give.
+//
+// The signal is retained so a fee earner reviewing an enquiry can see at
+// a glance that a lease is short. The notes below are deliberately
+// written as terse internal statements rather than client prose, so that
+// rendering them to a client would look obviously wrong.
+//
+//   "payable"        — term is 80 years or less; in the premium
+//   "approaching"    — within the warning band above the threshold
+//   "not_applicable" — comfortably above, or abolished
+//   "unknown"        — no term supplied
 export function assessMarriageValue(unexpiredTermYears, regime) {
   const term = Number(unexpiredTermYears);
   const activeRegime = regime || getRegime();
 
+  const SOURCE =
+    "Sch 13 para 4(2A), Leasehold Reform, Housing and Urban Development Act 1993";
+
   if (!activeRegime.marriageValuePayable) {
     return {
       status: "not_applicable",
-      heading: null,
-      reason:
-        "Marriage value has been abolished under the regime currently in force.",
+      note: "Abolished under the regime in force for this quote.",
       statutoryRef: null,
-      reformNote: null,
     };
   }
 
   if (!Number.isFinite(term) || term <= 0) {
     return {
       status: "unknown",
-      heading: null,
-      reason:
-        "We need the unexpired term of your lease before we can tell you whether marriage " +
-        "value forms part of the premium.",
+      note: "No unexpired term supplied — cannot assess.",
       statutoryRef: null,
-      reformNote: null,
     };
   }
 
@@ -185,50 +194,29 @@ export function assessMarriageValue(unexpiredTermYears, regime) {
   if (term <= MARRIAGE_VALUE_THRESHOLD_YEARS) {
     return {
       status: "payable",
-      heading: "Marriage value forms part of your premium",
-      reason:
-        `The unexpired term of your lease is ${term} years. Marriage value is the increase ` +
-        "in the combined value of your interest and your landlord's interest that results " +
-        "from granting the new lease. Under the law currently in force, half of that " +
-        "increase is payable to your landlord as part of the premium. It applies whenever " +
-        `the unexpired term is ${MARRIAGE_VALUE_THRESHOLD_YEARS} years or less at the date ` +
-        "the notice is served, and it is often the largest single element of the premium. " +
-        "It is not a separate charge — it is taken into account in the premium your valuer " +
-        "assesses.",
-      statutoryRef:
-        "Schedule 13, paragraph 4(2A), Leasehold Reform, Housing and Urban Development Act 1993",
-      reformNote:
-        "The Leasehold and Freehold Reform Act 2024 provides for marriage value to be " +
-        "abolished, but those provisions are not yet in force and no date has been set for " +
-        "them. We will talk you through what that means for the timing of your claim.",
+      note:
+        `Unexpired term ${term}y is ${MARRIAGE_VALUE_THRESHOLD_YEARS}y or less, so marriage ` +
+        "value forms part of the premium. Assessed at the date of service, not the date of " +
+        "the quote. Flag for the fee earner; the valuer reports the figure.",
+      statutoryRef: SOURCE,
     };
   }
 
   if (term <= MARRIAGE_VALUE_THRESHOLD_YEARS + MARRIAGE_VALUE_WARNING_BAND_YEARS) {
     return {
       status: "approaching",
-      heading: "Your lease is close to the 80-year threshold",
-      reason:
-        `The unexpired term of your lease is ${term} years. Marriage value does not apply ` +
-        `while the unexpired term exceeds ${MARRIAGE_VALUE_THRESHOLD_YEARS} years, but it ` +
-        `does apply once the term is ${MARRIAGE_VALUE_THRESHOLD_YEARS} years or less — and ` +
-        "that test is applied at the date your notice is served, not today. Marriage value " +
-        "is often the largest single element of the premium, so there is a real benefit in " +
-        "serving notice before your lease reaches that point. A claim takes time to prepare.",
-      statutoryRef:
-        "Schedule 13, paragraph 4(2A), Leasehold Reform, Housing and Urban Development Act 1993",
-      reformNote: null,
+      note:
+        `Unexpired term ${term}y is within ${MARRIAGE_VALUE_WARNING_BAND_YEARS}y of the ` +
+        `${MARRIAGE_VALUE_THRESHOLD_YEARS}y threshold. Assessed at the date of service, so ` +
+        "the term may cross it before notice goes out. Flag for the fee earner.",
+      statutoryRef: SOURCE,
     };
   }
 
   return {
     status: "not_applicable",
-    heading: null,
-    reason:
-      `The unexpired term of your lease exceeds ${MARRIAGE_VALUE_THRESHOLD_YEARS} years, so ` +
-      "marriage value does not form part of the premium.",
+    note: `Unexpired term ${term}y exceeds ${MARRIAGE_VALUE_THRESHOLD_YEARS}y.`,
     statutoryRef: null,
-    reformNote: null,
   };
 }
 

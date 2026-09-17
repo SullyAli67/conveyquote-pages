@@ -538,7 +538,6 @@ const formatEstimateRange = (low, high) => {
 // below eighty years, sees it first.
 const drawEnfranchisementNotices = (renderer, fonts, output) => {
   const qualification = output?.qualification;
-  const marriageValue = output?.marriageValue;
   const notices = [];
 
   if (qualification?.outcome === "needs_review") {
@@ -554,13 +553,9 @@ const drawEnfranchisementNotices = (renderer, fonts, output) => {
     });
   }
 
-  if (marriageValue?.status === "payable" || marriageValue?.status === "approaching") {
-    notices.push({
-      title: marriageValue.heading || "Marriage value",
-      body: marriageValue.reason,
-      footnotes: [marriageValue.statutoryRef, marriageValue.reformNote].filter(Boolean),
-    });
-  }
+  // No marriage value notice. It is part of the premium, and the premium
+  // is excluded from this quote as a valuation matter — see
+  // buildThirdPartyCosts in ../calculate-enfranchisement-quote.js.
 
   if (notices.length === 0) return;
 

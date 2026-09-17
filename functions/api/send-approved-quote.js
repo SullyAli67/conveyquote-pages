@@ -588,32 +588,10 @@ export async function onRequestPost(context) {
           </tr>`;
       }
 
-      const marriageValue = quoteData?.marriageValue;
-      if (marriageValue && (marriageValue.status === "payable" || marriageValue.status === "approaching")) {
-        enfranchisementBlocksHtml += `
-          <tr>
-            <td style="padding:0 28px 24px 28px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#f7f9fc;border:1px solid #d8e0ea;border-left:3px solid #062a63;">
-                <tr>
-                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
-                    <strong style="color:#062a63;">${escapeHtml(marriageValue.heading || "Marriage value")}</strong><br />
-                    ${escapeHtml(marriageValue.reason)}
-                    ${
-                      marriageValue.reformNote
-                        ? `<br /><br />${escapeHtml(marriageValue.reformNote)}`
-                        : ""
-                    }
-                    ${
-                      marriageValue.statutoryRef
-                        ? `<br /><span style="font-size:12px;color:#52606d;">${escapeHtml(marriageValue.statutoryRef)}</span>`
-                        : ""
-                    }
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>`;
-      }
+      // No marriage value block. It is a component of the premium, which
+      // this quote excludes as a valuation matter for the client's own
+      // surveyor — explaining it on a fee quote would be valuation
+      // commentary the firm does not hold itself out to give.
     }
 
     const clientHtml = `

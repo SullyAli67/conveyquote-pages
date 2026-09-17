@@ -586,6 +586,10 @@ export function buildEnfranchisementQuote(input = {}) {
     priced: true,
 
     qualification,
+    // INTERNAL ONLY — never rendered to a client. Used by the admin
+    // notification so a fee earner can see at a glance that a lease is
+    // short. Anything client-facing that reads this is a bug: marriage
+    // value belongs to the premium, which we do not quote.
     marriageValue,
     routeComparison,
 
@@ -650,19 +654,12 @@ function buildUnqualifiedBreakdown(qualification) {
 function buildDisclaimerLines(quote) {
   const lines = [];
 
-  // Stated plainly, using the assessment's own heading. Shouting in
-  // capitals reads as alarmist on a professional document; the point is
-  // made by saying it clearly and first.
-  if (
-    quote.marriageValue.status === "payable" ||
-    quote.marriageValue.status === "approaching"
-  ) {
-    lines.push(`${quote.marriageValue.heading}. ${quote.marriageValue.reason}`);
-    if (quote.marriageValue.reformNote) {
-      lines.push(quote.marriageValue.reformNote);
-    }
-  }
-
+  // Marriage value is deliberately NOT stated here. It is a component of
+  // the PREMIUM, and this engine does not quote the premium — it is
+  // excluded as a valuation matter for the client's surveyor. Explaining
+  // marriage value on a fee quote drifts into valuation commentary the
+  // firm does not hold itself out to give. The assessment is still
+  // computed (see quote.marriageValue) but is internal triage only.
   if (quote.qualification.outcome === QUALIFICATION_OUTCOME.NEEDS_REVIEW) {
     lines.push(
       "This quote is provisional. Some of your answers need to be checked by a " +

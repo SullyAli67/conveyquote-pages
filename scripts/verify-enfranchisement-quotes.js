@@ -251,35 +251,48 @@ const mvStatus = (years) =>
   buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: years })
     .marriageValue.status;
 
-check("72-year term: marriage value applies", mvStatus(72), "payable");
-check("82-year term: approaching the threshold", mvStatus(82), "approaching");
-check("95-year term: not applicable", mvStatus(95), "not_applicable");
-
-// ── Statutory boundary ───────────────────────────────────────────────
-// Sch 13 para 4(2A) makes marriage value nil only where the unexpired
-// term EXCEEDS eighty years. A term of exactly eighty does not exceed
-// eighty, so marriage value applies at 80.00 and stops at 80.01. This
-// was previously wrong (the test was `< 80`), which exempted a lease
-// sitting exactly on the threshold.
+// ── Marriage value is INTERNAL TRIAGE ONLY ───────────────────────────
+// It is a component of the premium, and this engine does not quote the
+// premium — it is excluded as a valuation matter for the client's own
+// surveyor. The assessment is still computed so a fee earner can see at
+// a glance that a lease is short, but it must never reach a client.
+//
+// The threshold logic is still asserted because it drives that internal
+// signal, and because Sch 13 para 4(2A) makes marriage value nil only
+// where the unexpired term EXCEEDS eighty years — a term of exactly
+// eighty does not exceed eighty. This was previously tested as `< 80`,
+// which wrongly exempted a lease sitting on the threshold.
 check("79.99 years: applies", mvStatus(79.99), "payable");
 check("exactly 80 years: applies (does not EXCEED eighty)", mvStatus(80), "payable");
 check("80.01 years: does not apply", mvStatus(80.01), "approaching");
+check("95 years: does not apply", mvStatus(95), "not_applicable");
 
-checkTrue("marriage value is explained, not just named", /increase in the combined value/i.test(statutory.marriageValue.reason));
-checkTrue("marriage value cites its statutory source", /Schedule 13/.test(statutory.marriageValue.statutoryRef));
-checkTrue("marriage value flags the pending abolition", /not yet in force/i.test(statutory.marriageValue.reformNote));
-checkTrue("marriage value is described as part of the premium, not a separate charge", /not a separate charge/i.test(statutory.marriageValue.reason));
-checkTrue("marriage value surfaces in the disclaimers", statutory.disclaimerLines.some((l) => /marriage value/i.test(l)));
-checkTrue("disclaimers do not shout in capitals", !statutory.disclaimerLines.some((l) => /^(IMPORTANT|ACT SOON):/.test(l)));
-
-// The approaching band must explain that the test bites at the date the
-// notice is served, which is the whole reason timing matters.
+const shortLease = buildEnfranchisementQuote({
+  ...cleanClaim,
+  type: "lease_extension_statutory",
+  unexpiredTermYears: 72,
+});
 checkTrue(
-  "approaching warning explains the relevant date",
-  /date your notice is served/i.test(
-    buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", unexpiredTermYears: 82 }).marriageValue.reason
-  )
+  "marriage value never appears in the client-facing disclaimers",
+  !shortLease.disclaimerLines.some((l) => /marriage value/i.test(l))
 );
+checkTrue(
+  "marriage value never appears in the fee breakdown",
+  !/marriage value/i.test(shortLease.feeBreakdown)
+);
+checkTrue(
+  "marriage value never appears in any third-party cost note",
+  !shortLease.thirdPartyCosts.some((c) => /marriage value/i.test(`${c.label} ${c.note}`))
+);
+checkTrue(
+  "marriage value never appears in the exclusions",
+  !shortLease.exclusions.some((e) => /marriage value/i.test(`${e.label} ${e.note}`))
+);
+checkTrue(
+  "the internal signal is still computed for fee-earner triage",
+  shortLease.marriageValue.status === "payable"
+);
+
 check("route comparison offers six points of difference", statutory.routeComparison.rows.length, 6);
 checkTrue("comparison covers ground rent", statutory.routeComparison.rows.some((r) => /ground rent/i.test(r.feature)));
 checkTrue("comparison covers price protection", statutory.routeComparison.rows.some((r) => /price protection/i.test(r.feature)));

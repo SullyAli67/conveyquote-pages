@@ -753,18 +753,11 @@ function EnfranchisementQuoteBlocks({
           </>
         )}
 
-      {(quote.marriageValue?.status === "payable" ||
-        quote.marriageValue?.status === "approaching") &&
-        notice(
-          quote.marriageValue.heading || "Marriage value",
-          <>
-            {quote.marriageValue.reason}
-            {quote.marriageValue.reformNote ? (
-              <div style={{ marginTop: "8px" }}>{quote.marriageValue.reformNote}</div>
-            ) : null}
-          </>,
-          quote.marriageValue.statutoryRef
-        )}
+      {/* No marriage value notice. It is part of the premium, and the
+          premium is excluded from this quote as a valuation matter for
+          the client's own surveyor. quote.marriageValue is computed but
+          is internal triage only — rendering it here would put valuation
+          commentary on a fee quote. */}
 
       {quote.thirdPartyCosts && quote.thirdPartyCosts.length > 0 && (
         <div
@@ -8708,8 +8701,9 @@ function App() {
                                 }
                               />
                               <small>
-                                Below 80 years marriage value is payable and the
-                                premium rises sharply.
+                                Drives the premium and the urgency of serving
+                                notice. The premium itself is not quoted here —
+                                the client&rsquo;s valuer assesses it.
                               </small>
                             </div>
                             <div className="field">

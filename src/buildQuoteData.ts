@@ -131,16 +131,14 @@ export type BuiltQuoteData = {
   statutoryBasis?: string;
   priced?: boolean;
   qualification?: EnfranchisementQualification;
+  // INTERNAL TRIAGE ONLY — never render this to a client. Marriage value
+  // is part of the premium, and the premium is excluded from the quote as
+  // a valuation matter. Present so a fee earner can see a short lease at
+  // a glance. See functions/lib/enfranchisement/regime.js.
   marriageValue?: {
-    // "payable" | "approaching" | "not_applicable" | "unknown".
-    // Marriage value is nil only where the unexpired term EXCEEDS eighty
-    // years (Sch 13 para 4(2A), 1993 Act), so a term of exactly eighty
-    // is "payable" — see functions/lib/enfranchisement/regime.js.
-    status: string;
-    heading: string | null;
-    reason: string;
+    status: "payable" | "approaching" | "not_applicable" | "unknown";
+    note: string;
     statutoryRef: string | null;
-    reformNote: string | null;
   };
   routeComparison?: {
     statutoryAvailable: boolean;
