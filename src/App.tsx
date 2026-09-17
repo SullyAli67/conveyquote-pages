@@ -2017,15 +2017,41 @@ function App() {
     }));
   };
 
+  // Server-side admin sessions expire (functions/lib/auth.js, SESSION_HOURS).
+  // The token in localStorage does not, so without this the UI stays
+  // "unlocked" against a session the database has already dropped: every
+  // guarded endpoint answers 401 and the screen fills with generic
+  // "please try again" errors that no amount of retrying fixes.
+  const handleAdminSessionExpired = () => {
+    setIsAdminUnlocked(false);
+    setAdminToken("");
+    setLoadedEnquiry(null);
+    setLoadedEnquiryMessage("");
+    setDashboardEnquiries([]);
+    setDashboardError("");
+    localStorage.removeItem("cq_admin_token");
+    setAdminLoginError(
+      "Your admin session has expired. Please log in again."
+    );
+  };
+
   // Helper: fetch with admin token automatically attached
-  const adminFetch = (url: string, options: RequestInit = {}) => {
-    return fetch(url, {
+  const adminFetch = async (url: string, options: RequestInit = {}) => {
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...(options.headers || {}),
         Authorization: `Bearer ${adminToken}`,
       },
     });
+
+    // One 401 means the session is gone — bounce to the login form rather
+    // than letting each caller report its own unhelpful failure message.
+    if (response.status === 401) {
+      handleAdminSessionExpired();
+    }
+
+    return response;
   };
 
   const loadDashboardData = async () => {
@@ -2063,7 +2089,37 @@ function App() {
           lenders: panelLendersResult.error,
           memberships: membershipsResult.error,
         });
-        setDashboardError("Couldn't refresh — please try again.");
+
+        // A 401 on any of the four means the session is gone; adminFetch has
+        // already sent the admin back to the login form with an explanation.
+        const sessionExpired = [
+          enquiriesResponse,
+          firmsResponse,
+          panelLendersResponse,
+          membershipsResponse,
+        ].some((r) => r.status === 401);
+
+        if (!sessionExpired) {
+          // Only part of the dashboard usually fails, so name which part
+          // rather than reporting a blanket refresh failure.
+          const failures = [
+            ["enquiries", enquiriesResult],
+            ["panel firms", firmsResult],
+            ["lenders", panelLendersResult],
+            ["panel memberships", membershipsResult],
+          ]
+            .filter(([, res]) => !(res as { success?: boolean }).success)
+            .map(
+              ([label, res]) =>
+                `${label} (${
+                  (res as { error?: string }).error || "unknown error"
+                })`
+            );
+
+          setDashboardError(
+            `Couldn't refresh ${failures.join(", ")} — please try again.`
+          );
+        }
       }
 
       setDashboardEnquiries(
@@ -5052,7 +5108,19 @@ function App() {
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
         console.error("Load enquiry returned failure:", result.error);
-        setLoadedEnquiryMessage("Couldn't load enquiry — please try again.");
+        // 401 is already handled by adminFetch, which drops the admin back
+        // to the login form — showing a second message there would only
+        // confuse. Everything else reports the server's own reason so a
+        // real fault is diagnosable without opening the browser console.
+        if (response.status !== 401) {
+          setLoadedEnquiryMessage(
+            response.status === 404
+              ? `No enquiry found for reference ${reference}.`
+              : `Couldn't load enquiry: ${
+                  result.error || "unknown error"
+                } — please try again.`
+          );
+        }
       }
     } catch (error) {
       console.error("Load enquiry error:", error);
@@ -5110,11 +5178,27 @@ function App() {
   // Runs once on mount. Restores admin, referrer, and firm sessions after refresh.
   useEffect(() => {
     try {
-      // Admin session
+      // Admin session. Unlock optimistically so a valid session does not
+      // flash the login form, then confirm the token against the server —
+      // localStorage keeps the token long after the sessions row expires,
+      // and an unverified restore leaves the dashboard visible but unable
+      // to load or action anything.
       const savedAdminToken = localStorage.getItem("cq_admin_token");
       if (savedAdminToken) {
         setAdminToken(savedAdminToken);
         setIsAdminUnlocked(true);
+
+        fetch("/api/verify-admin-session", {
+          headers: { Authorization: `Bearer ${savedAdminToken}` },
+        })
+          .then((r) => {
+            if (!r.ok) handleAdminSessionExpired();
+          })
+          .catch(() => {
+            // Network error — leave the session alone rather than logging
+            // the admin out over a dropped connection. adminFetch still
+            // catches a genuine 401 on the next request.
+          });
       }
 
       // Referrer session
