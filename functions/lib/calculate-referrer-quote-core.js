@@ -350,6 +350,13 @@ export async function calculateReferrerQuote({ db, referrerId, body }) {
       ukResidentForSdlt: sdltFlags.ukResident === false ? "no" : "yes",
       isCompany: supplements.companyBuyer ? "yes" : "no",
       sharedOwnership: supplements.sharedOwnership ? "yes" : "no",
+      // The referrer and firm rails do not capture a property postcode
+      // today, so this is normally empty and the jurisdiction check is a
+      // no-op. It is wired through regardless, so that the devolved-tax
+      // guard applies automatically the moment those forms start
+      // collecting one — rather than these two rails silently quoting
+      // English SDLT on Welsh and Scottish property forever.
+      postcode: body.postcode,
     });
     if (typeof sdltResult.sdltAmount === "number") {
       sdlt = round2(sdltResult.sdltAmount);

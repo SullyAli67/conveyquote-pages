@@ -15,6 +15,7 @@ import {
 import "./App.css";
 import logo from "./assets/logo.png";
 import { buildQuoteData } from "./buildQuoteData";
+import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
 // ── Toast notification system ─────────────────────────────────────────────
 // Single global context for transient feedback (success/error/info).
@@ -873,6 +874,40 @@ function getSellerCount(numberOfSellers?: string) {
   return 1;
 }
 
+// ── First-time buyer / additional property conflict ──────────────────────
+//
+// A buyer who will still own another dwelling at the end of the day of
+// completion cannot claim first-time buyer relief — HMRC withdraws the
+// relief outright, and the 5% higher-rate surcharge applies on top. So
+// answering "yes" to both questions is a contradiction in tax terms, and
+// one of the two answers must be wrong.
+//
+// It matters far more than it looks. The quote engines resolve it in
+// HMRC's favour by ignoring the relief, which is the correct treatment,
+// but they do so silently. The gap between the two readings is the whole
+// tax bill, not a rounding difference: on a £285,000 purchase it is £0 as
+// a true first-time buyer against £18,500 as an additional property. A
+// quote sent on the wrong reading is wrong by that entire amount.
+//
+// Surfaced in two places: on the public form, so the client resolves it
+// before the enquiry is ever created, and on the admin Quote Review
+// screen, which also covers the enquiries already sitting in the database.
+export const hasFtbConflict = (
+  firstTimeBuyer?: string | null,
+  additionalProperty?: string | null
+) => firstTimeBuyer === "yes" && additionalProperty === "yes";
+
+export const FTB_CONFLICT_HEADLINE =
+  "Please check these two answers";
+
+export const FTB_CONFLICT_EXPLANATION =
+  "You have said you are a first-time buyer and that you will still own " +
+  "another property after completion. Those cannot both be true for tax " +
+  "purposes: first-time buyer relief is not available if you will own " +
+  "another property, and a 5% surcharge applies instead. This changes " +
+  "the Stamp Duty figure substantially, so please correct whichever " +
+  "answer is wrong.";
+
 // Residential SDLT rates from 1 April 2025 (the temporary 23 Sep 2022 –
 // 31 Mar 2025 thresholds no longer apply): 0% to £125k, 2% to £250k,
 // 5% to £925k, 10% to £1.5m, 12% above. MUST STAY IN SYNC with
@@ -1418,6 +1453,11 @@ function App() {
   const [adminLoginError, setAdminLoginError] = useState("");
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Set once the client has submitted with a first-time-buyer / additional
+  // -property conflict showing. The first attempt stops and points at the
+  // warning; a second, deliberate attempt goes through, so a client who
+  // genuinely means both answers is never blocked out of enquiring.
+  const [ftbConflictSeen, setFtbConflictSeen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
 
   // Firm portal state
@@ -2017,15 +2057,41 @@ function App() {
     }));
   };
 
+  // Server-side admin sessions expire (functions/lib/auth.js, SESSION_HOURS).
+  // The token in localStorage does not, so without this the UI stays
+  // "unlocked" against a session the database has already dropped: every
+  // guarded endpoint answers 401 and the screen fills with generic
+  // "please try again" errors that no amount of retrying fixes.
+  const handleAdminSessionExpired = () => {
+    setIsAdminUnlocked(false);
+    setAdminToken("");
+    setLoadedEnquiry(null);
+    setLoadedEnquiryMessage("");
+    setDashboardEnquiries([]);
+    setDashboardError("");
+    localStorage.removeItem("cq_admin_token");
+    setAdminLoginError(
+      "Your admin session has expired. Please log in again."
+    );
+  };
+
   // Helper: fetch with admin token automatically attached
-  const adminFetch = (url: string, options: RequestInit = {}) => {
-    return fetch(url, {
+  const adminFetch = async (url: string, options: RequestInit = {}) => {
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...(options.headers || {}),
         Authorization: `Bearer ${adminToken}`,
       },
     });
+
+    // One 401 means the session is gone — bounce to the login form rather
+    // than letting each caller report its own unhelpful failure message.
+    if (response.status === 401) {
+      handleAdminSessionExpired();
+    }
+
+    return response;
   };
 
   const loadDashboardData = async () => {
@@ -2063,7 +2129,37 @@ function App() {
           lenders: panelLendersResult.error,
           memberships: membershipsResult.error,
         });
-        setDashboardError("Couldn't refresh — please try again.");
+
+        // A 401 on any of the four means the session is gone; adminFetch has
+        // already sent the admin back to the login form with an explanation.
+        const sessionExpired = [
+          enquiriesResponse,
+          firmsResponse,
+          panelLendersResponse,
+          membershipsResponse,
+        ].some((r) => r.status === 401);
+
+        if (!sessionExpired) {
+          // Only part of the dashboard usually fails, so name which part
+          // rather than reporting a blanket refresh failure.
+          const failures = [
+            ["enquiries", enquiriesResult],
+            ["panel firms", firmsResult],
+            ["lenders", panelLendersResult],
+            ["panel memberships", membershipsResult],
+          ]
+            .filter(([, res]) => !(res as { success?: boolean }).success)
+            .map(
+              ([label, res]) =>
+                `${label} (${
+                  (res as { error?: string }).error || "unknown error"
+                })`
+            );
+
+          setDashboardError(
+            `Couldn't refresh ${failures.join(", ")} — please try again.`
+          );
+        }
       }
 
       setDashboardEnquiries(
@@ -4333,6 +4429,29 @@ function App() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Hold the first submit when the two SDLT answers contradict each
+    // other, so the client sees the warning before the enquiry is
+    // created. Submitting again goes through regardless — this is a
+    // prompt to check, not a hard block, and losing an enquiry over it
+    // would cost more than the correction is worth.
+    const conflictOnForm =
+      hasFtbConflict(form.firstTimeBuyer, form.additionalProperty) ||
+      hasFtbConflict(
+        form.purchaseFirstTimeBuyer,
+        form.purchaseAdditionalProperty
+      );
+
+    if (conflictOnForm && !ftbConflictSeen) {
+      setFtbConflictSeen(true);
+      // Whichever leg is conflicting is the one to scroll to — a combined
+      // sale and purchase renders its warning under the purchase leg.
+      const warningEl =
+        document.getElementById("ftb-conflict-warning") ||
+        document.getElementById("ftb-conflict-warning-purchase");
+      warningEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     try {
       const response = await fetch("/api/send-quote", {
         method: "POST",
@@ -4350,6 +4469,7 @@ function App() {
           email: form.email,
         });
         setForm(initialFormState);
+        setFtbConflictSeen(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         alert(
@@ -5052,7 +5172,19 @@ function App() {
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
       } else {
         console.error("Load enquiry returned failure:", result.error);
-        setLoadedEnquiryMessage("Couldn't load enquiry — please try again.");
+        // 401 is already handled by adminFetch, which drops the admin back
+        // to the login form — showing a second message there would only
+        // confuse. Everything else reports the server's own reason so a
+        // real fault is diagnosable without opening the browser console.
+        if (response.status !== 401) {
+          setLoadedEnquiryMessage(
+            response.status === 404
+              ? `No enquiry found for reference ${reference}.`
+              : `Couldn't load enquiry: ${
+                  result.error || "unknown error"
+                } — please try again.`
+          );
+        }
       }
     } catch (error) {
       console.error("Load enquiry error:", error);
@@ -5110,11 +5242,27 @@ function App() {
   // Runs once on mount. Restores admin, referrer, and firm sessions after refresh.
   useEffect(() => {
     try {
-      // Admin session
+      // Admin session. Unlock optimistically so a valid session does not
+      // flash the login form, then confirm the token against the server —
+      // localStorage keeps the token long after the sessions row expires,
+      // and an unverified restore leaves the dashboard visible but unable
+      // to load or action anything.
       const savedAdminToken = localStorage.getItem("cq_admin_token");
       if (savedAdminToken) {
         setAdminToken(savedAdminToken);
         setIsAdminUnlocked(true);
+
+        fetch("/api/verify-admin-session", {
+          headers: { Authorization: `Bearer ${savedAdminToken}` },
+        })
+          .then((r) => {
+            if (!r.ok) handleAdminSessionExpired();
+          })
+          .catch(() => {
+            // Network error — leave the session alone rather than logging
+            // the admin out over a dropped connection. adminFetch still
+            // catches a genuine 401 on the next request.
+          });
       }
 
       // Referrer session
@@ -5204,39 +5352,31 @@ function App() {
     async function loadPublicLenders() {
       setLoadingLenders(true);
 
+      // /api/lenders is the public source for the quote-form dropdown. It
+      // already returns exactly the active lenders this needs, so there is
+      // no second attempt against /api/list-panel-lenders: that endpoint is
+      // admin-only now, and a public page must not depend on it. It was
+      // never real resilience either — both read the same table through the
+      // same binding, so anything breaking one breaks the other.
+      //
+      // The old early return on the success path also skipped the finally
+      // that clears this flag, leaving every lender dropdown reading
+      // "Loading lenders..." after the lenders had in fact arrived. One
+      // try/finally covers both outcomes.
       try {
         const publicResponse = await fetch("/api/lenders");
         const publicResult = await publicResponse.json();
 
-        if (publicResult.success && Array.isArray(publicResult.lenders)) {
-          setLenders(
-            publicResult.lenders.map((item: any) => ({
-              id: Number(item.id),
-              name: String(item.name || item.lender_name || ""),
-            }))
-          );
-          return;
-        }
-      } catch (error) {
-        console.error("Public lenders endpoint failed, trying panel lenders.");
-      }
-
-      try {
-        const response = await fetch("/api/list-panel-lenders");
-        const result = await response.json();
-
-        if (result.success && Array.isArray(result.lenders)) {
-          setLenders(
-            result.lenders
-              .filter((item: PanelLender) => Number(item.active) === 1)
-              .map((item: PanelLender) => ({
-                id: Number(item.id),
-                name: String(item.lender_name || ""),
-              }))
-          );
-        } else {
-          setLenders([]);
-        }
+        setLenders(
+          publicResult.success && Array.isArray(publicResult.lenders)
+            ? publicResult.lenders.map(
+                (item: { id: number | string; name?: string }) => ({
+                  id: Number(item.id),
+                  name: String(item.name || ""),
+                })
+              )
+            : []
+        );
       } catch (error) {
         console.error("Failed to load lenders:", error);
         setLenders([]);
@@ -5757,6 +5897,49 @@ function App() {
   // had an approved quote sent. `quote_sent` (auto-set on send), `accepted`,
   // `rejected`, `instructed`, `archived`, and `on_hold` are out of the queue.
   // Anything else (primarily `new` and `reviewed`) is awaiting admin action.
+  // Checks worth making before an approved quote goes out, derived from
+  // the loaded enquiry rather than from the stored quote — so they apply
+  // to enquiries captured before these checks existed, which is most of
+  // the review queue.
+  const quoteReviewWarnings = useMemo(() => {
+    if (!loadedEnquiry) return [] as string[];
+
+    const combined = loadedEnquiry.transaction_type === "sale_purchase";
+
+    const firstTimeBuyer = combined
+      ? loadedEnquiry.purchase_first_time_buyer
+      : loadedEnquiry.first_time_buyer;
+    const additionalProperty = combined
+      ? loadedEnquiry.purchase_additional_property
+      : loadedEnquiry.additional_property;
+    const postcode = combined
+      ? loadedEnquiry.purchase_postcode
+      : loadedEnquiry.postcode;
+
+    const warnings: string[] = [];
+
+    if (hasFtbConflict(firstTimeBuyer, additionalProperty)) {
+      warnings.push(
+        "First time buyer and additional property are both \u201cyes\u201d. " +
+          "These are mutually exclusive: first-time buyer relief is " +
+          "unavailable on an additional dwelling, so the quote has been " +
+          "priced at the standard rates plus the 5% surcharge and the " +
+          "relief has been ignored. Confirm which answer is correct " +
+          "before sending \u2014 the difference is the whole SDLT figure, " +
+          "not a rounding."
+      );
+    }
+
+    const jurisdiction = getTaxJurisdiction(postcode);
+    if (jurisdiction.regime !== "sdlt") {
+      warnings.push(
+        `${jurisdiction.note} Postcode on file: ${postcode || "none"}.`
+      );
+    }
+
+    return warnings;
+  }, [loadedEnquiry]);
+
   const pendingQuotesSummary = useMemo(() => {
     const TERMINAL = new Set([
       "quote_sent",
@@ -6307,6 +6490,36 @@ function App() {
                         </select>
                       </div>
 
+
+                      {hasFtbConflict(
+                        form.firstTimeBuyer,
+                        form.additionalProperty
+                      ) && (
+                        <div
+                          id="ftb-conflict-warning"
+                          className="field field--full"
+                          style={{
+                            border: "2px solid #f59e0b",
+                            background: "#fffbeb",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            color: "#92400e",
+                          }}
+                        >
+                          <strong>{FTB_CONFLICT_HEADLINE}</strong>
+                          <p style={{ margin: "6px 0 0 0" }}>
+                            {FTB_CONFLICT_EXPLANATION}
+                          </p>
+                          {ftbConflictSeen && (
+                            <p style={{ margin: "6px 0 0 0", fontWeight: 600 }}>
+                              If both answers are right as they stand, submit
+                              again to continue.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="field">
                         <label htmlFor="ukResidentForSdlt">
                           UK resident for SDLT purposes?
@@ -6768,6 +6981,36 @@ function App() {
                           <option value="no">No</option>
                         </select>
                       </div>
+
+
+                      {hasFtbConflict(
+                        form.purchaseFirstTimeBuyer,
+                        form.purchaseAdditionalProperty
+                      ) && (
+                        <div
+                          id="ftb-conflict-warning-purchase"
+                          className="field field--full"
+                          style={{
+                            border: "2px solid #f59e0b",
+                            background: "#fffbeb",
+                            borderRadius: "18px",
+                            padding: "12px 16px",
+                            fontSize: "13px",
+                            color: "#92400e",
+                          }}
+                        >
+                          <strong>{FTB_CONFLICT_HEADLINE}</strong>
+                          <p style={{ margin: "6px 0 0 0" }}>
+                            {FTB_CONFLICT_EXPLANATION}
+                          </p>
+                          {ftbConflictSeen && (
+                            <p style={{ margin: "6px 0 0 0", fontWeight: 600 }}>
+                              If both answers are right as they stand, submit
+                              again to continue.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="purchaseUkResidentForSdlt">
@@ -11327,6 +11570,34 @@ function App() {
 
             {adminTab === "quote" && loadedEnquiry && (
               <>
+                {quoteReviewWarnings.length > 0 && (
+                  <div
+                    style={{
+                      border: "2px solid #f59e0b",
+                      background: "#fffbeb",
+                      borderRadius: "18px",
+                      padding: "14px 18px",
+                      marginBottom: "20px",
+                      fontSize: "13px",
+                      color: "#92400e",
+                    }}
+                  >
+                    <strong>
+                      Check before sending
+                      {quoteReviewWarnings.length > 1
+                        ? ` (${quoteReviewWarnings.length} items)`
+                        : ""}
+                    </strong>
+                    <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+                      {quoteReviewWarnings.map((warning, index) => (
+                        <li key={index} style={{ marginBottom: "6px" }}>
+                          {warning}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="admin-stack" style={{ marginBottom: "20px" }}>
                   <SummaryCard title="Loaded Enquiry Snapshot">
                     <SummaryGrid rows={enquirySummaryRows} />
