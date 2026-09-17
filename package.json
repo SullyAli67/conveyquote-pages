@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "verify-engines": "node scripts/verify-engine-consistency.js",
+    "verify-inbound-email": "node scripts/verify-inbound-email.js",
     "generate-guides": "node scripts/generate-guides.cjs"
   },
   "dependencies": {
