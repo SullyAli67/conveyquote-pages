@@ -1,4 +1,8 @@
 import { buildQuoteData } from "../lib/calculate-quote.js";
+import {
+  getEnfranchisementLabel,
+  isEnfranchisementType,
+} from "../lib/enfranchisement/types.js";
 
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -75,6 +79,11 @@ const sectionTable = (title, rows) => `
 `;
 
 const getTransactionLabel = (type) => {
+  // Enfranchisement labels live in functions/lib/enfranchisement/types.js
+  // so they are defined exactly once across every rail.
+  const enfranchisementLabel = getEnfranchisementLabel(type);
+  if (enfranchisementLabel) return enfranchisementLabel;
+
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
   if (type === "sale_purchase") return "Sale and Purchase";
@@ -241,7 +250,20 @@ export async function onRequestPost(context) {
     let priceValue;
     let lenderLabel;
 
-    if (type === "sale_purchase") {
+    if (isEnfranchisementType(type)) {
+      // A lease extension has no consideration figure. What the admin
+      // needs to triage it is the unexpired term (which drives the
+      // premium and the urgency) and whether a human has to look at the
+      // qualification answers before the quote can go out.
+      priceLabel = "Unexpired term";
+      priceValue = body.unexpiredTermYears
+        ? `${body.unexpiredTermYears} years`
+        : "Not provided";
+      lenderLabel =
+        String(body.landlordIdentifiable || "").toLowerCase() === "no"
+          ? "Landlord cannot be traced — vesting order"
+          : "Landlord identified";
+    } else if (type === "sale_purchase") {
       priceLabel = "Property price";
       priceValue = `Sale ${formatMoney(salePrice)} | Purchase ${formatMoney(purchasePrice)}`;
       lenderLabel = purchaseMortgage === "mortgage" ? safe(purchaseLender) : "Cash";
@@ -276,6 +298,35 @@ export async function onRequestPost(context) {
       row("Lender", lenderLabel),
       row("System-generated total", formatMoney(quote.grandTotal)),
     ];
+
+    // Enfranchisement matters carry a qualification outcome that decides
+    // whether the quote may be issued at all, so it goes at the top of
+    // the internal email rather than being buried in the admin screen.
+    if (isEnfranchisementType(type)) {
+      const outcome = quote.qualification?.outcome || "unknown";
+      const outcomeLabel =
+        outcome === "qualifies"
+          ? "Qualifies — may be issued"
+          : outcome === "needs_review"
+          ? "NEEDS REVIEW — do not auto-issue"
+          : "DOES NOT QUALIFY — no price given";
+      summaryRows.splice(3, 0, row("Qualification", outcomeLabel));
+
+      if (quote.marriageValue?.status === "payable") {
+        summaryRows.splice(4, 0, row("Marriage value", "PAYABLE (term under 80 years)"));
+      } else if (quote.marriageValue?.status === "approaching") {
+        summaryRows.splice(4, 0, row("Marriage value", "Approaching the 80-year threshold"));
+      }
+
+      const blockingReasons = (quote.qualification?.reasons || []).filter(
+        (r) => r.severity === "bar" || r.severity === "review"
+      );
+      if (blockingReasons.length > 0) {
+        summaryRows.push(
+          row("Points to check", blockingReasons.map((r) => r.message).join(" | "))
+        );
+      }
+    }
 
     const internalHtml = `
       <html>

@@ -1,5 +1,9 @@
 import { buildUnsubUrl } from "../lib/unsub.js";
 import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
+import {
+  getEnfranchisementLabel,
+  isEnfranchisementType,
+} from "../lib/enfranchisement/types.js";
 
 export async function onRequestPost(context) {
   const jsonResponse = (payload, status = 200) =>
@@ -46,7 +50,8 @@ export async function onRequestPost(context) {
     }
 
     const prettyType =
-      type === "purchase"
+      getEnfranchisementLabel(type) ||
+      (type === "purchase"
         ? "Purchase"
         : type === "sale"
         ? "Sale"
@@ -58,7 +63,7 @@ export async function onRequestPost(context) {
         ? "Remortgage & Transfer of Equity"
         : type === "transfer"
         ? "Transfer of Equity"
-        : "Conveyancing Matter";
+        : "Conveyancing Matter");
 
     const safe = (value) =>
       value === null || value === undefined ? "" : String(value);
@@ -419,6 +424,25 @@ export async function onRequestPost(context) {
         row("Purchase summary", escapeHtml(purchasePart || "Not provided")),
         row("Tenure summary", escapeHtml(tenure || "Not provided")),
       ]);
+    } else if (isEnfranchisementType(type)) {
+      // A lease extension has no consideration figure to report. The
+      // unexpired term is what matters — it drives both the premium and
+      // the urgency of serving notice.
+      // quote_json is built as { ...body, ...quote }, so the raw form
+      // answers travel alongside the computed quote and unexpiredTermYears
+      // is present here. There is no `enquiry` binding in this scope.
+      const termYears = safe(quoteData?.unexpiredTermYears);
+      transactionSummaryHtml = sectionTable("Matter Summary", [
+        row("Type", escapeHtml(prettyType)),
+        row(
+          "Statutory basis",
+          escapeHtml(quoteData?.statutoryBasis || "Not provided")
+        ),
+        row(
+          "Unexpired term of lease",
+          termYears ? `${escapeHtml(termYears)} years` : "Not provided"
+        ),
+      ]);
     } else if (type === "remortgage_transfer") {
       transactionSummaryHtml = sectionTable("Transaction Summary", [
         row("Type", escapeHtml(prettyType)),
@@ -434,6 +458,152 @@ export async function onRequestPost(context) {
           `£${escapeHtml(displayPrice || "0.00")}`
         ),
       ]);
+    }
+
+    // ── Enfranchisement-only email blocks ─────────────────────────
+    //
+    // On a lease extension the largest sums involved are NOT our fees.
+    // These blocks are rendered after the fee table, styled distinctly,
+    // and state plainly that the amounts are estimates outside our
+    // control. An email that showed only the fee total would leave a
+    // client believing a £1,440 quote was the cost of their claim.
+    let enfranchisementBlocksHtml = "";
+    if (isEnfranchisementType(type)) {
+      const formatEstimate = (low, high) => {
+        if (low == null && high == null) return "A valuation is required";
+        if (low === high) return `£${Number(low).toFixed(2)} (estimate)`;
+        return `£${Number(low).toFixed(2)} – £${Number(high).toFixed(2)} (estimate)`;
+      };
+
+      const thirdPartyCosts = Array.isArray(quoteData?.thirdPartyCosts)
+        ? quoteData.thirdPartyCosts
+        : [];
+
+      if (thirdPartyCosts.length > 0) {
+        const costRows = thirdPartyCosts
+          .map(
+            (cost) => `
+              <tr>
+                <td style="padding:10px 12px;border:1px solid #e2c275;background:#fffaf0;vertical-align:top;">
+                  <strong>${escapeHtml(cost.label)}</strong>
+                  <div style="font-size:12px;color:#7a4b00;margin-top:4px;line-height:1.6;">
+                    ${escapeHtml(cost.note || "")}
+                    ${
+                      cost.statutoryRef
+                        ? `<br /><em>${escapeHtml(cost.statutoryRef)}</em>`
+                        : ""
+                    }
+                    ${
+                      cost.survivesWithdrawalNote
+                        ? `<br /><strong>${escapeHtml(cost.survivesWithdrawalNote)}</strong>`
+                        : ""
+                    }
+                  </div>
+                </td>
+                <td style="padding:10px 12px;border:1px solid #e2c275;background:#fffaf0;text-align:right;white-space:nowrap;vertical-align:top;">
+                  ${escapeHtml(formatEstimate(cost.amountLow, cost.amountHigh))}
+                </td>
+              </tr>`
+          )
+          .join("");
+
+        const indicative = quoteData?.indicativeTotalExcludingPremium;
+        const indicativeRow = indicative
+          ? `
+              <tr>
+                <td style="padding:12px;border:1px solid #e2c275;background:#fdf1d6;font-weight:bold;color:#7a4b00;">
+                  Indicative total, EXCLUDING the premium
+                </td>
+                <td style="padding:12px;border:1px solid #e2c275;background:#fdf1d6;text-align:right;font-weight:bold;color:#7a4b00;white-space:nowrap;">
+                  £${Number(indicative.low).toFixed(2)} – £${Number(indicative.high).toFixed(2)}
+                </td>
+              </tr>`
+          : "";
+
+        enfranchisementBlocksHtml += `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <h3 style="margin:24px 0 6px 0;color:#7a4b00;">Not included — payable by you to others</h3>
+              <p style="margin:0 0 12px 0;font-size:13px;line-height:1.7;color:#7a4b00;">
+                <strong>The amounts below are not our fees. We do not set them, we do not
+                control them and we do not receive them. The figures shown are estimates
+                only and the actual amounts may be higher or lower.</strong>
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;font-size:14px;">
+                ${costRows}
+                ${indicativeRow}
+              </table>
+            </td>
+          </tr>`;
+      }
+
+      const policy = quoteData?.abortivePolicy;
+      if (policy) {
+        const conditions = (policy.faultConditions || [])
+          .map((cond) => `<li style="margin-bottom:4px;">${escapeHtml(cond)}</li>`)
+          .join("");
+        enfranchisementBlocksHtml += `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#eef6ff;border:1px solid #c9dcef;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#24446b;">
+                    <strong>If the matter does not complete</strong><br />
+                    ${
+                      policy.appliesToThisMatter
+                        ? `${escapeHtml(policy.summary)}
+                           <br /><br />Our fee does become payable if:
+                           <ul style="margin:6px 0 0 0;padding-left:20px;">${conditions}</ul>`
+                        : escapeHtml(policy.disapplicationReason || "")
+                    }
+                    <br /><br />
+                    <strong style="color:#8a2f22;">${escapeHtml(policy.thirdPartyDisclosure)}</strong>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+      }
+
+      const exclusions = Array.isArray(quoteData?.exclusions)
+        ? quoteData.exclusions
+        : [];
+      if (exclusions.length > 0) {
+        const exclusionItems = exclusions
+          .map(
+            (item) =>
+              `<li style="margin-bottom:6px;"><strong>${escapeHtml(item.label)}</strong>${
+                item.note ? `<br /><span style="font-size:13px;color:#52606d;">${escapeHtml(item.note)}</span>` : ""
+              }</li>`
+          )
+          .join("");
+        enfranchisementBlocksHtml += `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <h3 style="margin:0 0 8px 0;color:#24446b;">Also not included in this fee</h3>
+              <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#24446b;">
+                ${exclusionItems}
+              </ul>
+            </td>
+          </tr>`;
+      }
+
+      const marriageValue = quoteData?.marriageValue;
+      if (marriageValue && (marriageValue.status === "payable" || marriageValue.status === "approaching")) {
+        enfranchisementBlocksHtml += `
+          <tr>
+            <td style="padding:0 28px 24px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#fdecea;border:1px solid #d9857a;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;line-height:1.7;color:#8a2f22;">
+                    <strong>${marriageValue.status === "payable" ? "Marriage value is payable" : "Act soon"}</strong><br />
+                    ${escapeHtml(marriageValue.reason)}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+      }
     }
 
     const clientHtml = `
@@ -527,6 +697,7 @@ export async function onRequestPost(context) {
                         ${totalEstimatedHtml}
                         ${sdltReviewHtml}
                         ${fallbackBreakdownHtml}
+                        ${enfranchisementBlocksHtml}
 
                         <tr>
                           <td style="padding:0 28px 24px 28px;">

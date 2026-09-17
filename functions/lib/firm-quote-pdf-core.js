@@ -15,6 +15,10 @@
 // unchanged in behaviour — it just delegates to this module now.
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import {
+  getEnfranchisementLabel,
+  isEnfranchisementType,
+} from "./enfranchisement/types.js";
 
 // ── Brand constants ──────────────────────────────────────────────────
 const NAVY = rgb(0x06 / 255, 0x2a / 255, 0x63 / 255);
@@ -22,6 +26,10 @@ const TEAL = rgb(0x0a / 255, 0xa6 / 255, 0xb5 / 255);
 const WHITE = rgb(1, 1, 1);
 const BLACK = rgb(0, 0, 0);
 const MUTED = rgb(0.42, 0.45, 0.5);
+// Used for the blocks a client must not skim past: third-party costs
+// they are liable for but we do not control, and the no-completion-no-fee
+// carve-outs.
+const ALERT = rgb(0.70, 0.18, 0.12);
 
 // A4 in points (1/72 inch).
 const PAGE_WIDTH = 595.28;
@@ -32,7 +40,7 @@ const FOOTER_RESERVE = 60;
 const CONTENT_TOP = PAGE_HEIGHT - HEADER_BAND_HEIGHT - 30;
 const CONTENT_BOTTOM = FOOTER_RESERVE;
 
-const TRANSACTION_LABELS = {
+const CONVEYANCING_TRANSACTION_LABELS = {
   purchase: "Purchase",
   sale: "Sale",
   remortgage: "Remortgage",
@@ -40,6 +48,13 @@ const TRANSACTION_LABELS = {
   sale_purchase: "Sale and purchase",
   remortgage_transfer: "Remortgage and transfer of equity",
 };
+
+// Enfranchisement labels are NOT duplicated here — they come from
+// ./enfranchisement/types.js, which every rail shares.
+const getTransactionLabel = (transactionType) =>
+  getEnfranchisementLabel(transactionType) ||
+  CONVEYANCING_TRANSACTION_LABELS[transactionType] ||
+  String(transactionType || "");
 
 const DISCLAIMER =
   "This quote is an estimate based on the information provided and is " +
@@ -251,6 +266,24 @@ const curateTransactionDetails = (transactionType, inputs) => {
       if (tenureLabel) details.push(["Tenure", tenureLabel]);
       addTransferRefinementRows(details, i);
       break;
+    case "lease_extension_statutory":
+    case "lease_extension_informal": {
+      // A lease extension is not driven by a consideration figure, so
+      // the rows that matter are the ones that drive the claim: the
+      // unexpired term (which governs the premium and the urgency) and
+      // whether the landlord can be found.
+      if (i.unexpiredTermYears)
+        details.push(["Unexpired term", `${i.unexpiredTermYears} years`]);
+      if (i.originalLeaseTermYears)
+        details.push(["Original lease term", `${i.originalLeaseTermYears} years`]);
+      if (i.groundRent)
+        details.push(["Current ground rent", formatPriceLarge(i.groundRent)]);
+      if (i.landlordIdentifiable === "no" || i.landlordIdentifiable === false) {
+        details.push(["Landlord", "Cannot be traced - vesting order required"]);
+      }
+      if (i.premium) details.push(["Premium (per valuer)", formatPriceLarge(i.premium)]);
+      break;
+    }
     default:
       if (i.price) details.push(["Amount", formatPriceLarge(i.price)]);
       if (tenureLabel) details.push(["Tenure", tenureLabel]);
@@ -393,8 +426,7 @@ const drawTransactionBlock = (renderer, fonts, transactionType, inputs) => {
   );
   renderer.advance(18);
 
-  const typeLabel =
-    TRANSACTION_LABELS[transactionType] || String(transactionType || "");
+  const typeLabel = getTransactionLabel(transactionType);
   drawLabelValueRow(renderer, fonts, "Transaction type", typeLabel);
 
   const details = curateTransactionDetails(transactionType, inputs);
@@ -429,12 +461,12 @@ const drawBreakdownSection = (renderer, fonts, title, rows, options = {}) => {
     });
     drawRightAlignedText(
       renderer.get().page,
-      formatMoney(row.amount),
+      row.overrideText || formatMoney(row.amount),
       rightX,
       ny,
       fonts.regular,
       10,
-      BLACK
+      row.overrideText ? MUTED : BLACK
     );
     renderer.advance(lineHeight);
   }
@@ -460,6 +492,276 @@ const drawBreakdownSection = (renderer, fonts, title, rows, options = {}) => {
   }
 
   renderer.advance(8);
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(14);
+};
+
+// ── Enfranchisement-only sections ────────────────────────────────────
+//
+// These exist because an enfranchisement quote has to communicate three
+// things a conveyancing quote never does: that the client may not
+// qualify, that the largest sums involved are payable to other people
+// and are outside the firm's control, and that a no-completion-no-fee
+// promise does not extend to those other people's costs.
+
+const drawWrappedParagraph = (renderer, fonts, text, opts = {}) => {
+  const size = opts.size || 9;
+  const font = opts.bold ? fonts.bold : fonts.regular;
+  const color = opts.color || BLACK;
+  const indent = opts.indent || 0;
+  const usableWidth = PAGE_WIDTH - 2 * MARGIN_X - indent;
+  const lines = wrapText(String(text || ""), font, size, usableWidth);
+  const lineHeight = size + 3;
+  for (const line of lines) {
+    if (renderer.get().y - lineHeight < CONTENT_BOTTOM) renderer.newPage();
+    drawText(renderer.get().page, line, MARGIN_X + indent, renderer.get().y, {
+      font,
+      size,
+      color,
+    });
+    renderer.advance(lineHeight);
+  }
+};
+
+const formatEstimateRange = (low, high) => {
+  if (low == null && high == null) return "A valuation is required";
+  if (low === high) return `${formatMoney(low)} (estimate)`;
+  return `${formatMoney(low)} - ${formatMoney(high)} (estimate)`;
+};
+
+// Qualification and marriage-value warnings. Rendered before any money
+// so a client who does not qualify, or whose lease is about to drop
+// below eighty years, sees it first.
+const drawEnfranchisementNotices = (renderer, fonts, output) => {
+  const qualification = output?.qualification;
+  const marriageValue = output?.marriageValue;
+  const notices = [];
+
+  if (qualification?.outcome === "needs_review") {
+    notices.push({
+      title: "This quote is provisional",
+      body:
+        "Some of the answers given need to be checked by a solicitor before this " +
+        "quote can be confirmed. " +
+        qualification.reasons
+          .filter((r) => r.severity === "review")
+          .map((r) => r.message)
+          .join(" "),
+    });
+  }
+
+  if (marriageValue?.status === "payable") {
+    notices.push({ title: "Marriage value is payable", body: marriageValue.reason });
+  } else if (marriageValue?.status === "approaching") {
+    notices.push({ title: "Act soon", body: marriageValue.reason });
+  }
+
+  if (notices.length === 0) return;
+
+  for (const notice of notices) {
+    renderer.ensureRoom(50);
+    drawText(renderer.get().page, notice.title.toUpperCase(), MARGIN_X, renderer.get().y, {
+      font: fonts.bold,
+      size: 10,
+      color: ALERT,
+    });
+    renderer.advance(14);
+    drawWrappedParagraph(renderer, fonts, notice.body, { size: 9, color: BLACK });
+    renderer.advance(8);
+  }
+
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(14);
+};
+
+// The block that keeps the quote honest. Everything here is payable by
+// the client to somebody else. It is rendered AFTER our grand total and
+// visually separated, so the two can never be read as one figure.
+const drawThirdPartyCostsSection = (renderer, fonts, output) => {
+  const costs = output?.thirdPartyCosts || [];
+  if (costs.length === 0) return;
+
+  renderer.ensureRoom(90);
+  drawSectionTitle(
+    renderer.get().page,
+    fonts,
+    "Not included - payable by you to others",
+    renderer.get().y
+  );
+  renderer.advance(18);
+
+  drawWrappedParagraph(
+    renderer,
+    fonts,
+    "The amounts below are NOT our fees. We do not set them, we do not control them " +
+      "and we do not receive them. The figures shown are estimates only and the actual " +
+      "amounts may be higher or lower.",
+    { size: 9, bold: true, color: ALERT }
+  );
+  renderer.advance(8);
+
+  const rightX = PAGE_WIDTH - MARGIN_X;
+  const lineHeight = 15;
+
+  for (const cost of costs) {
+    if (renderer.get().y - lineHeight * 2 < CONTENT_BOTTOM) renderer.newPage();
+    const ny = renderer.get().y;
+    drawText(renderer.get().page, cost.label, MARGIN_X, ny, {
+      font: fonts.bold,
+      size: 10,
+      color: NAVY,
+    });
+    drawRightAlignedText(
+      renderer.get().page,
+      formatEstimateRange(cost.amountLow, cost.amountHigh),
+      rightX,
+      ny,
+      fonts.bold,
+      10,
+      NAVY
+    );
+    renderer.advance(lineHeight);
+
+    if (cost.note) {
+      drawWrappedParagraph(renderer, fonts, cost.note, {
+        size: 8.5,
+        color: MUTED,
+        indent: 10,
+      });
+    }
+    if (cost.statutoryRef) {
+      drawWrappedParagraph(renderer, fonts, cost.statutoryRef, {
+        size: 8.5,
+        color: MUTED,
+        indent: 10,
+      });
+    }
+    if (cost.survivesWithdrawalNote) {
+      drawWrappedParagraph(renderer, fonts, cost.survivesWithdrawalNote, {
+        size: 8.5,
+        color: ALERT,
+        indent: 10,
+      });
+    }
+    renderer.advance(6);
+  }
+
+  const indicative = output?.indicativeTotalExcludingPremium;
+  if (indicative) {
+    if (renderer.get().y - 30 < CONTENT_BOTTOM) renderer.newPage();
+    renderer.advance(4);
+    const ny = renderer.get().y;
+    drawText(
+      renderer.get().page,
+      "Indicative total, EXCLUDING the premium",
+      MARGIN_X,
+      ny,
+      { font: fonts.bold, size: 10, color: NAVY }
+    );
+    drawRightAlignedText(
+      renderer.get().page,
+      `${formatMoney(indicative.low)} - ${formatMoney(indicative.high)}`,
+      rightX,
+      ny,
+      fonts.bold,
+      10,
+      NAVY
+    );
+    renderer.advance(lineHeight);
+    drawWrappedParagraph(renderer, fonts, indicative.note, {
+      size: 8.5,
+      color: MUTED,
+      indent: 10,
+    });
+  }
+
+  renderer.advance(8);
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(14);
+};
+
+const drawAbortivePolicySection = (renderer, fonts, output) => {
+  const policy = output?.abortivePolicy;
+  if (!policy) return;
+
+  renderer.ensureRoom(70);
+  drawSectionTitle(
+    renderer.get().page,
+    fonts,
+    "If the matter does not complete",
+    renderer.get().y
+  );
+  renderer.advance(18);
+
+  if (policy.appliesToThisMatter) {
+    drawWrappedParagraph(renderer, fonts, policy.summary, {
+      size: 9.5,
+      bold: true,
+      color: NAVY,
+    });
+    renderer.advance(4);
+    drawWrappedParagraph(renderer, fonts, "Our fee does become payable if:", {
+      size: 9,
+      color: BLACK,
+    });
+    for (const condition of policy.faultConditions || []) {
+      drawWrappedParagraph(renderer, fonts, `\u2022  ${condition}`, {
+        size: 9,
+        color: BLACK,
+        indent: 10,
+      });
+    }
+  } else {
+    drawWrappedParagraph(renderer, fonts, policy.disapplicationReason || "", {
+      size: 9,
+      color: ALERT,
+    });
+  }
+
+  renderer.advance(6);
+  // The carve-out that matters most: our promise cannot reach other
+  // people's costs, and s.60(3) liability survives withdrawal.
+  drawWrappedParagraph(renderer, fonts, policy.thirdPartyDisclosure, {
+    size: 9,
+    bold: true,
+    color: ALERT,
+  });
+
+  renderer.advance(8);
+  drawTealDivider(renderer.get().page, renderer.get().y);
+  renderer.advance(14);
+};
+
+const drawExclusionsSection = (renderer, fonts, output) => {
+  const exclusions = output?.exclusions || [];
+  if (exclusions.length === 0) return;
+
+  renderer.ensureRoom(60);
+  drawSectionTitle(
+    renderer.get().page,
+    fonts,
+    "Also not included in this fee",
+    renderer.get().y
+  );
+  renderer.advance(18);
+
+  for (const exclusion of exclusions) {
+    drawWrappedParagraph(renderer, fonts, exclusion.label, {
+      size: 9.5,
+      bold: true,
+      color: NAVY,
+    });
+    if (exclusion.note) {
+      drawWrappedParagraph(renderer, fonts, exclusion.note, {
+        size: 8.5,
+        color: MUTED,
+        indent: 10,
+      });
+    }
+    renderer.advance(5);
+  }
+
+  renderer.advance(6);
   drawTealDivider(renderer.get().page, renderer.get().y);
   renderer.advance(14);
 };
@@ -590,6 +892,13 @@ export async function buildQuotePdf({
 
   drawTransactionBlock(renderer, fonts, transactionType, inputs);
 
+  const isEnfranchisement = isEnfranchisementType(transactionType);
+
+  // Qualification and marriage-value warnings come before any figures.
+  if (isEnfranchisement) {
+    drawEnfranchisementNotices(renderer, fonts, output);
+  }
+
   const legalFeeRows = (output?.legalFees || []).map((it) => ({
     label: it.label,
     amount: it.amount,
@@ -602,9 +911,13 @@ export async function buildQuotePdf({
     });
   }
 
+  // A disbursement flagged "tbc" (the Land Registry fee on a lease
+  // extension, which cannot be calculated until the premium is agreed)
+  // must render as "To be confirmed", never as £0.00.
   const disbursementRows = (output?.disbursements || []).map((it) => ({
     label: it.label,
     amount: it.amount,
+    overrideText: it.status === "tbc" ? "To be confirmed" : null,
   }));
   if (disbursementRows.length > 0) {
     drawBreakdownSection(renderer, fonts, "Disbursements", disbursementRows, {
@@ -631,6 +944,16 @@ export async function buildQuotePdf({
   }
 
   drawGrandTotal(renderer, fonts, Number(output?.grandTotal) || 0);
+
+  // Everything below the grand total is money the client owes to
+  // someone other than us. Rendering it after, and under its own
+  // headings, is what stops the two being read as a single figure.
+  if (isEnfranchisement) {
+    renderer.advance(10);
+    drawThirdPartyCostsSection(renderer, fonts, output);
+    drawAbortivePolicySection(renderer, fonts, output);
+    drawExclusionsSection(renderer, fonts, output);
+  }
 
   drawDisclaimerOnEveryPage(renderer, fonts);
   drawPageFooters(renderer, fonts);

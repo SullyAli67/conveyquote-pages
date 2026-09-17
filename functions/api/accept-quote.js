@@ -1,3 +1,5 @@
+import { getEnfranchisementLabel } from "../lib/enfranchisement/types.js";
+
 const htmlResponse = (html, status = 200) =>
   new Response(html, {
     status,
@@ -19,6 +21,11 @@ const escapeHtml = (value) =>
     .replace(/'/g, "&#39;");
 
 const getTransactionLabel = (type) => {
+  // Enfranchisement labels come from the one shared module rather than
+  // being restated here — see functions/lib/enfranchisement/types.js.
+  const enfranchisementLabel = getEnfranchisementLabel(type);
+  if (enfranchisementLabel) return enfranchisementLabel;
+
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
   if (type === "sale_purchase") return "Sale and Purchase";

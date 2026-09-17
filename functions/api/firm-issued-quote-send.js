@@ -45,18 +45,30 @@ import {
   buildFilename,
   loadFirmBranding,
 } from "../lib/firm-quote-pdf-core.js";
+import { getEnfranchisementLabel } from "../lib/enfranchisement/types.js";
 
 const RESEND_FROM_ADDRESS = "quotes@conveyquote.uk";
 const RESEND_FROM_FALLBACK_NAME = "ConveyQuote";
 const RECENT_SEND_WINDOW_MS = 10 * 60 * 1000;
 
-const TRANSACTION_DESCRIPTION = {
+const CONVEYANCING_TRANSACTION_DESCRIPTION = {
   purchase: "purchase",
   sale: "sale",
   remortgage: "remortgage",
   transfer: "transfer of equity",
   sale_purchase: "sale and purchase",
   remortgage_transfer: "remortgage and transfer of equity",
+};
+
+// Used mid-sentence ("your ..."), so the shared label is lower-cased.
+// Enfranchisement wording is not restated here — see
+// functions/lib/enfranchisement/types.js.
+const getTransactionDescription = (transactionType) => {
+  const enfranchisementLabel = getEnfranchisementLabel(transactionType);
+  if (enfranchisementLabel) return enfranchisementLabel.toLowerCase();
+  return (
+    CONVEYANCING_TRANSACTION_DESCRIPTION[transactionType] || "conveyancing matter"
+  );
 };
 
 const escapeHtml = (v) =>
@@ -308,7 +320,7 @@ export async function onRequestPost(context) {
 
     // ── Build email body ─────────────────────────────────────────────
     const transactionLabel =
-      TRANSACTION_DESCRIPTION[transactionType] || "conveyancing matter";
+      getTransactionDescription(transactionType);
     const priceCopy = formatPriceForCopy(inputs?.price);
 
     let logoDataUri = "";
