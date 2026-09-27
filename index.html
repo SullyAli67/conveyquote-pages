@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Homepage only: fetch the hero still (matching the <picture> in XrayHero.tsx) and heading font before the app loads.
+      if (location.pathname === "/") (function () {
+        var s = "/images/redesign-2026/terrace-still-", w = [480, 800, 1200];
+        var hints = [
+          { href: s + "tall-800.webp", imagesrcset: w.map(function (n) { return s + "tall-" + n + ".webp " + n + "w"; }).join(", "), imagesizes: "40vh", media: "(max-aspect-ratio: 4/5)", as: "image", type: "image/webp", fetchpriority: "high" },
+          { href: s + "wide-800.webp", imagesrcset: w.map(function (n) { return s + "wide-" + n + ".webp " + n + "w"; }).join(", "), imagesizes: "59vh", media: "not all and (max-aspect-ratio: 4/5)", as: "image", type: "image/webp", fetchpriority: "high" },
+          { href: "/fonts/manrope-latin-800-normal.woff2", as: "font", type: "font/woff2", crossorigin: "" }
+        ];
+        hints.forEach(function (h) { var l = document.createElement("link"); l.rel = "preload"; for (var k in h) l.setAttribute(k, h[k]); document.head.appendChild(l); });
+      })();
+    </script>
     <meta name="theme-color" content="#062a63" />
     <meta name="robots" content="index,follow" />
     <meta name="google-site-verification" content="PSNIHEiQbV8ni2t7d5n2XZ8PE5xjzgBPxktHhmxJ7Co" />
@@ -11,10 +23,6 @@
     <meta name="description" content="Compare fixed-fee conveyancing quotes from SRA-regulated solicitors in England and Wales. Itemised pricing, reviewed before issue. Get your free quote today." />
 
     <link rel="canonical" href="https://conveyquote.uk/" />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
 
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />

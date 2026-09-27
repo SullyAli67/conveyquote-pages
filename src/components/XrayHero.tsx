@@ -1,22 +1,37 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import logo from "../assets/logo.png";
+import logoMark240 from "../assets/brand/logo-mark-240.png";
+import logoMark480 from "../assets/brand/logo-mark-480.png";
 import { drawContours } from "../hero/contours.js";
 import { fitScale, heroSafeRect, scaleAbout, shiftInto } from "../hero/fit.js";
 import "../home2026.css";
 
+// From 768px the first five live in the header (as the button and visible links); the menu keeps the logins.
 const NAV_LINKS = [
-  { href: "/", label: "Get a Quote" },
-  { href: "/leasehold/", label: "Leasehold" },
-  { href: "/sdlt-calculator/", label: "SDLT Calculator" },
-  { href: "/about/", label: "About Us" },
-  { href: "/conveyancing-fees/", label: "Fees Guide" },
-  { href: "/firm-login/", label: "Firm Login" },
-  { href: "/referrer-login/", label: "Referrer Login" },
+  { href: "/", label: "Get a Quote", headerFromTablet: true },
+  { href: "/leasehold/", label: "Leasehold", headerFromTablet: true },
+  { href: "/sdlt-calculator/", label: "SDLT Calculator", headerFromTablet: true },
+  { href: "/about/", label: "About Us", headerFromTablet: true },
+  { href: "/conveyancing-fees/", label: "Fees Guide", headerFromTablet: true },
+  { href: "/firm-login/", label: "Firm Login", headerFromTablet: false },
+  { href: "/referrer-login/", label: "Referrer Login", headerFromTablet: false },
 ];
+const HEADER_LINKS = ["/leasehold/", "/sdlt-calculator/", "/conveyancing-fees/", "/about/"].map(
+  (href) => NAV_LINKS.find((link) => link.href === href)!
+);
 
-const STILL = "/images/redesign-2026/victorian-terrace-still";
-// Opaque area of the still inside its transparent margin, as fractions of the image.
-const STILL_CONTENT = { left: 60 / 1972, right: 1912 / 1972, top: 60 / 2402, bottom: 2342 / 2402 };
+const STILL = "/images/redesign-2026/terrace-still";
+const PORTRAIT_QUERY = "(max-aspect-ratio: 4/5)";
+// Stills are the scene's first frame per camera framing; hull is the house outline xrayScene.js also fits, so both move together.
+const STILL_HULL = {
+  wide: { left: 0.0319, top: 0.0123, right: 0.9829, bottom: 0.9925 },
+  tall: { left: 0.0489, top: 0.0194, right: 0.9748, bottom: 0.9805 },
+};
+const srcset = (framing: string) =>
+  [480, 800, 1200].map((w) => `${STILL}-${framing}-${w}.webp ${w}w`).join(", ");
+const STILL_SOURCES = {
+  tall: { srcSet: srcset("tall"), sizes: "40vh", png: `${STILL}-tall-800.png`, width: 800, height: 1046 },
+  wide: { srcSet: srcset("wide"), sizes: "59vh", png: `${STILL}-wide-800.png`, width: 800, height: 1130 },
+};
 
 type NavigatorHints = Navigator & {
   connection?: { saveData?: boolean };
@@ -75,12 +90,14 @@ export default function XrayHero({ summary }: { summary: string }) {
       const W = hero.clientWidth, H = hero.clientHeight;
       const w0 = img.offsetWidth, h0 = img.offsetHeight;
       if (!W || !H || !w0 || !h0) return;
-      const cx0 = img.offsetLeft, top0 = img.offsetTop, cy0 = top0 + h0 / 2;
+      const left0 = img.offsetLeft, top0 = img.offsetTop;
+      const cx0 = left0 + w0 / 2, cy0 = top0 + h0 / 2;
+      const hull = STILL_HULL[window.matchMedia(PORTRAIT_QUERY).matches ? "tall" : "wide"];
       const content = {
-        left: cx0 - w0 / 2 + STILL_CONTENT.left * w0,
-        right: cx0 - w0 / 2 + STILL_CONTENT.right * w0,
-        top: top0 + STILL_CONTENT.top * h0,
-        bottom: top0 + STILL_CONTENT.bottom * h0,
+        left: left0 + hull.left * w0,
+        right: left0 + hull.right * w0,
+        top: top0 + hull.top * h0,
+        bottom: top0 + hull.bottom * h0,
       };
       const safe = heroSafeRect(hero, headerRef.current, copyRef.current, cardRef.current);
       const s = fitScale(content, safe);
@@ -168,20 +185,25 @@ export default function XrayHero({ summary }: { summary: string }) {
     <section ref={heroRef} className={`xh${live ? " is-live" : ""}`} aria-labelledby="xh-heading">
       <canvas ref={contoursRef} className="xh-layer" aria-hidden="true" />
       <picture className="xh-still">
-        <source
-          type="image/webp"
-          srcSet={`${STILL}-480.webp 480w, ${STILL}-800.webp 800w, ${STILL}-1200.webp 1200w`}
-          sizes="(max-aspect-ratio: 4/5) 43vh, 70vh"
-        />
-        <img ref={stillRef} src={`${STILL}-800.png`} width={800} height={974} alt="" decoding="async" />
+        <source media={PORTRAIT_QUERY} type="image/webp" srcSet={STILL_SOURCES.tall.srcSet} sizes={STILL_SOURCES.tall.sizes} width={STILL_SOURCES.tall.width} height={STILL_SOURCES.tall.height} />
+        <source type="image/webp" srcSet={STILL_SOURCES.wide.srcSet} sizes={STILL_SOURCES.wide.sizes} />
+        <source media={PORTRAIT_QUERY} type="image/png" srcSet={STILL_SOURCES.tall.png} width={STILL_SOURCES.tall.width} height={STILL_SOURCES.tall.height} />
+        <img ref={stillRef} src={STILL_SOURCES.wide.png} width={STILL_SOURCES.wide.width} height={STILL_SOURCES.wide.height} alt="" {...{ fetchpriority: "high" }} />
       </picture>
       <canvas ref={glRef} className="xh-layer xh-gl" aria-hidden="true" />
 
       <header ref={headerRef} className="xh-header">
         <a href="/" className="xh-logo">
-          <img src={logo} alt="ConveyQuote UK" width={1024} height={1024} />
+          <img src={logoMark480} srcSet={`${logoMark240} 240w, ${logoMark480} 480w`} sizes="112px" alt="ConveyQuote UK" width={480} height={240} />
         </a>
         <nav className="xh-nav" aria-label="Main">
+          <ul className="xh-links">
+            {HEADER_LINKS.map((link) => (
+              <li key={link.href}>
+                <a href={link.href}>{link.label}</a>
+              </li>
+            ))}
+          </ul>
           <a className="xh-btn" href="#quote" onClick={scrollToQuote}>
             Get my quote <span aria-hidden="true">&rarr;</span>
           </a>
@@ -199,7 +221,7 @@ export default function XrayHero({ summary }: { summary: string }) {
           <div ref={menuRef} id="xh-menu-panel" className="xh-menu-panel" hidden={!menuOpen}>
             <ul>
               {NAV_LINKS.map((link) => (
-                <li key={link.href}>
+                <li key={link.href} className={link.headerFromTablet ? "xh-menu-narrow" : undefined}>
                   <a href={link.href} aria-current={link.href === "/" ? "page" : undefined}>
                     {link.label}
                   </a>
