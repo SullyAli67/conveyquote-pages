@@ -1721,7 +1721,27 @@ function confirmDiscardIfDirty(): boolean {
 
 function App() {
   const { pushToast } = useToast();
-  const [form, setForm] = useState<QuoteForm>(initialFormState);
+  const [form, setForm] = useState<QuoteForm>(() => {
+    // Deep link support: /?type=<transaction type> preselects the
+    // transaction type. Used by the Leasehold landing page so a
+    // leaseholder lands on the right form rather than having to find
+    // their matter in the dropdown. Only known types are honoured, so a
+    // junk query string cannot put the form into an invalid state.
+    const KNOWN_TYPES = [
+      "purchase", "sale", "sale_purchase", "remortgage", "transfer",
+      "remortgage_transfer", "lease_extension_statutory",
+      "lease_extension_informal",
+    ];
+    try {
+      const requested = new URLSearchParams(window.location.search).get("type");
+      if (requested && KNOWN_TYPES.includes(requested)) {
+        return { ...initialFormState, type: requested };
+      }
+    } catch {
+      // Query string unavailable — fall through to the default.
+    }
+    return initialFormState;
+  });
   const [submissionResult, setSubmissionResult] = useState<
     { reference: string; email: string } | null
   >(null);
@@ -2365,6 +2385,7 @@ function App() {
   const isTermsPage = currentPath === "/terms" || currentPath === "/terms/";
   const isPrivacyPage = currentPath === "/privacy" || currentPath === "/privacy/";
   const isSdltPage = currentPath === "/sdlt-calculator" || currentPath === "/sdlt-calculator/";
+  const isLeaseholdPage = currentPath === "/leasehold" || currentPath === "/leasehold/";
   const isFeesArticlePage = currentPath === "/conveyancing-fees" || currentPath === "/conveyancing-fees/";
   const isFeesPage = isFeesArticlePage;
   const currentUrl = new URL(window.location.href);
@@ -6446,6 +6467,7 @@ function App() {
           </a>
           <div className="site-nav__links">
             <a href="/" className={isHomePage ? "active" : ""}>Get a Quote</a>
+            <a href="/leasehold/" className={isLeaseholdPage ? "active" : ""}>Leasehold</a>
             <a href="/sdlt-calculator/" className={isSdltPage ? "active" : ""}>SDLT Calculator</a>
             <a href="/about/" className={isAboutPage ? "active" : ""}>About Us</a>
             <a href="/conveyancing-fees/" className={isFeesPage ? "active" : ""}>Fees Guide</a>
@@ -6464,10 +6486,10 @@ function App() {
 
           <div className="hero__text">
             <span className="eyebrow">
-              {isAdminPage ? "Internal Admin" : isAboutPage ? "About Us" : isSdltPage ? "SDLT Calculator" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Conveyancing Fees Guide" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Instant Conveyancing Quotes"}
+              {isAdminPage ? "Internal Admin" : isAboutPage ? "About Us" : isSdltPage ? "SDLT Calculator" : isLeaseholdPage ? "Leasehold Services" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Conveyancing Fees Guide" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Instant Conveyancing Quotes"}
             </span>
             <h1>
-              {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
+              {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isLeaseholdPage ? "Lease extensions, enfranchisement and staircasing" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
             </h1>
             {isHomePage && (
               <p className="hero__summary">
@@ -6524,6 +6546,13 @@ function App() {
       )}
 
       <main className="container" style={{ paddingTop: "28px" }}>
+        {/* The generic quote form sits beneath the content on the other
+            public pages. It is deliberately NOT shown on /leasehold: that
+            page exists to help a leaseholder find the right service, and
+            a generic transaction-type form above the content buries it.
+            The page carries its own calls to action instead, including a
+            deep link that opens this form already set to a lease
+            extension. */}
         {(isHomePage || isSdltPage || isFeesPage || isAboutPage) && (
           <>
             {submissionResult ? (
@@ -14221,6 +14250,137 @@ function App() {
           <p>Essentially Law Limited is registered with the Information Commissioner's Office (ICO). Registration number: <strong>CSN9542473</strong>. Our full privacy policy is available <a href="/privacy/">here</a>.</p>
           <h2>Contact us</h2>
           <p>Email: <a href="mailto:info@conveyquote.uk">info@conveyquote.uk</a></p>
+        </div>
+      )}
+
+      {/* ── Leasehold services ── */}
+      {isLeaseholdPage && (
+        <div className="public-page">
+          <h1>Leasehold services</h1>
+          <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+            England &amp; Wales · For leaseholders of flats and shared owners
+          </p>
+
+          <div className="disclaimer-box">
+            ConveyQuote is an introduction service. This page is information
+            only and is not legal advice. Whether you qualify for a statutory
+            right depends on the terms of your lease, which a solicitor will
+            need to read.
+          </div>
+
+          <p>
+            If you own a flat on a lease, or a share of one, you have rights
+            that most people never hear about until their lender or their buyer
+            raises them. The three below are the ones that come up most often.
+          </p>
+
+          <h2>Extending your lease</h2>
+          <p>
+            Under section 42 of the Leasehold Reform, Housing and Urban
+            Development Act 1993, the leaseholder of a flat has a statutory
+            right to a new lease. Your landlord cannot refuse. Under the rules
+            currently in force that means the unexpired term plus a further 90
+            years, at a peppercorn (nil) ground rent, and if the price cannot be
+            agreed the First-tier Tribunal decides it.
+          </p>
+          <p>
+            You can also negotiate an extension informally with your freeholder,
+            outside the Act. That route is quicker and sometimes cheaper, but
+            there is no statutory formula, no tribunal to fall back on, and the
+            freeholder may want to keep a ground rent or introduce new terms.
+            We will quote for either and explain the difference before you
+            decide.
+          </p>
+          <p style={{ marginTop: "16px" }}>
+            <a className="primary-button" href="/?type=lease_extension_statutory" style={{ display: "inline-block", textDecoration: "none" }}>
+              Get a lease extension quote
+            </a>
+          </p>
+          <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginTop: "10px" }}>
+            Our quote covers our fees and the disbursements we can fix. It does
+            not include the premium payable to your landlord, which is a
+            valuation question for a surveyor, or your landlord&rsquo;s own
+            costs under section 60 of the 1993 Act. Both are set out separately
+            on the quote as estimates outside our control.
+          </p>
+
+          <h2>Buying the freehold together (collective enfranchisement)</h2>
+          <p>
+            Where enough leaseholders in a building act together, section 13 of
+            the same Act gives them the right to buy the freehold. Broadly, the
+            building must contain at least two flats, at least two-thirds must
+            be held by qualifying tenants, no more than 25% of the floor area
+            may be non-residential, and the participants must make up at least
+            half the flats in the building.
+          </p>
+          <p>
+            Costs are shared between the participants, so the more flats take
+            part, the less each one pays. The claim runs to a statutory
+            timetable and usually involves setting up a company to hold the
+            freehold on everyone&rsquo;s behalf.
+          </p>
+          <p>
+            <strong>We quote for these individually.</strong> The price depends
+            on how many flats are taking part and how the building is set up, so
+            there is no instant figure. Tell us about your building and we will
+            come back to you.
+          </p>
+          <p style={{ marginTop: "12px" }}>
+            <a className="muted-button" href="/book-call" style={{ display: "inline-block", textDecoration: "none" }}>
+              Ask about enfranchisement
+            </a>
+          </p>
+
+          <h2>Staircasing your shared ownership home</h2>
+          <p>
+            Staircasing means buying additional shares in a home you part-own,
+            usually from a housing association, until you own more of it &mdash;
+            and in most cases eventually all of it. Each purchase is a separate
+            legal transaction: the share is valued, a memorandum of staircasing
+            is completed, your lender&rsquo;s consent is obtained where there is
+            a mortgage, and the change is registered.
+          </p>
+          <p>
+            Once you reach 100% you generally become eligible for a statutory
+            lease extension in the ordinary way, which is why the two often come
+            up together.
+          </p>
+          <p>
+            <strong>We quote for these individually.</strong> The work depends on
+            your provider&rsquo;s requirements and the share you are buying, so
+            tell us your situation and we will send you a fixed quote.
+          </p>
+          <p style={{ marginTop: "12px" }}>
+            <a className="muted-button" href="/book-call" style={{ display: "inline-block", textDecoration: "none" }}>
+              Ask about staircasing
+            </a>
+          </p>
+
+          <h2>Selling or remortgaging a leasehold flat</h2>
+          <p>
+            If you are selling, buying or remortgaging rather than exercising a
+            statutory right, use the ordinary quote form and select leasehold as
+            the tenure. Leasehold matters carry a supplement because of the
+            additional work involved in reviewing the lease, obtaining a
+            management pack and dealing with the freeholder or managing agent.
+          </p>
+          <p style={{ marginTop: "12px" }}>
+            <a className="primary-button" href="/" style={{ display: "inline-block", textDecoration: "none" }}>
+              Get a conveyancing quote
+            </a>
+          </p>
+
+          <h2>A note on leasehold reform</h2>
+          <p>
+            The Leasehold and Freehold Reform Act 2024 will change how lease
+            extensions and freehold purchases are valued, including abolishing
+            marriage value and extending the standard term to 990 years. The
+            two-year ownership requirement was removed with effect from 31
+            January 2025, but the valuation provisions are not yet in force and
+            no commencement date has been set. Claims made today are therefore
+            still assessed under the existing rules. We will tell you where
+            things stand when you instruct us.
+          </p>
         </div>
       )}
 
