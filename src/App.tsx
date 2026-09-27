@@ -13,7 +13,10 @@ import {
   type ReactNode,
 } from "react";
 import "./App.css";
-import logo from "./assets/logo.png";
+import logoSquare256 from "./assets/brand/logo-square-256.png";
+import logoSquare512 from "./assets/brand/logo-square-512.png";
+import XrayHero from "./components/XrayHero";
+import { ClosingCta, CostBreakdown, RevealEnquiryConfirmation, TransactionSelector, WhyConveyQuote } from "./components/HomeSections";
 import { buildQuoteData } from "./buildQuoteData";
 import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
@@ -6889,12 +6892,29 @@ function App() {
   const isHomePage = isPublicPage && (currentPath === "/" || currentPath === "");
 
   return (
-    <div className="page">
+    <div className={isHomePage ? "page page--home" : "page"}>
+      {isHomePage && (
+        <>
+          <XrayHero summary="Enter your property details once and get a clear, itemised conveyancing quote reviewed by qualified legal professionals. No hidden fees. No obligation." />
+          <section className="cq-strip" aria-label="Key facts">
+            <ul>
+              <li>SRA-regulated firms only</li>
+              <li>Fully itemised quotes</li>
+              <li>No obligation</li>
+              <li>Quote within one working day</li>
+              <li>England &amp; Wales</li>
+            </ul>
+          </section>
+        </>
+      )}
+
+      {!isHomePage && (
+      <>
       {/* ── Top nav ── */}
       <nav className="site-nav">
         <div className="site-nav__inner">
           <a href="/">
-            <img src={logo} alt="ConveyQuote UK" className="site-nav__logo" />
+            <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="36px" alt="ConveyQuote UK" className="site-nav__logo" />
           </a>
           <div className="site-nav__links">
             <a href="/" className={isHomePage ? "active" : ""}>Get a Quote</a>
@@ -6912,7 +6932,7 @@ function App() {
       <header className="hero">
         <div className="hero__inner">
           <div className="hero__brand">
-            <img src={logo} alt="ConveyQuote UK" className="hero__logo" />
+            <img src={logoSquare512} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="280px" alt="ConveyQuote UK" className="hero__logo" />
           </div>
 
           <div className="hero__text">
@@ -6922,61 +6942,48 @@ function App() {
             <h1>
               {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isLeaseholdPage ? "Lease extensions, enfranchisement and staircasing" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
             </h1>
-            {isHomePage && (
-              <p className="hero__summary">
-                Enter your property details once and get a clear, itemised conveyancing quote reviewed by qualified legal professionals. No hidden fees. No obligation.
-              </p>
-            )}
-            {isHomePage && (
-              <div className="hero__points">
-                <span>✓ Transparent pricing</span>
-                <span>✓ SRA-regulated firms</span>
-                <span>✓ No obligation</span>
-                <span>✓ Fast &amp; simple</span>
-              </div>
-            )}
           </div>
         </div>
       </header>
+      </>
+      )}
 
-      {/* ── How it works strip (homepage only) ── */}
       {isHomePage && (
         <>
-          <div className="how-strip">
-            <div className="how-strip__inner">
-              <div className="how-step">
-                <div className="how-step__num">1</div>
-                <div className="how-step__text">
-                  <strong>Enter your details</strong>
-                  <span>Tell us about your sale, purchase, remortgage or transfer of equity.</span>
-                </div>
-              </div>
-              <div className="how-step">
-                <div className="how-step__num">2</div>
-                <div className="how-step__text">
-                  <strong>Receive your quote</strong>
-                  <span>We match you with an SRA-regulated firm and send a clear, itemised quote.</span>
-                </div>
-              </div>
-              <div className="how-step">
-                <div className="how-step__num">3</div>
-                <div className="how-step__text">
-                  <strong>Instruct with confidence</strong>
-                  <span>Accept your quote online and the firm handles the rest.</span>
-                </div>
-              </div>
+          <TransactionSelector
+            value={form.type}
+            onSelect={(type) => setForm((prev) => ({ ...prev, type }))}
+          />
+
+          <section className="cq-block cq-block--flush" aria-labelledby="cq-how-heading">
+            <div className="cq-wrap">
+              <p className="cq-eyebrow">How it works</p>
+              <h2 id="cq-how-heading" className="cq-h2">Three steps. No guesswork.</h2>
+              <ol className="cq-steps">
+                <li>
+                  <span className="cq-steps__num" aria-hidden="true">01</span>
+                  <h3>Enter your details</h3>
+                  <p>Tell us about your sale, purchase, remortgage or transfer of equity.</p>
+                </li>
+                <li>
+                  <span className="cq-steps__num" aria-hidden="true">02</span>
+                  <h3>Receive your quote</h3>
+                  <p>We match you with an SRA-regulated firm and send a clear, itemised quote.</p>
+                </li>
+                <li>
+                  <span className="cq-steps__num" aria-hidden="true">03</span>
+                  <h3>Instruct with confidence</h3>
+                  <p>Accept your quote online and the firm handles the rest.</p>
+                </li>
+              </ol>
             </div>
-          </div>
-          <div className="trust-bar">
-            <span>🏛 SRA-regulated firms only</span>
-            <span>📋 Fully itemised quotes</span>
-            <span>🔒 ICO registered · CSN9542473</span>
-            <span>🇬🇧 England &amp; Wales</span>
-          </div>
+          </section>
+
+          <CostBreakdown />
         </>
       )}
 
-      <main className="container" style={{ paddingTop: "28px" }}>
+      <main className="container" style={isHomePage ? undefined : { paddingTop: "28px" }}>
         {/* The generic quote form sits beneath the content on the other
             public pages. It is deliberately NOT shown on /leasehold: that
             page exists to help a leaseholder find the right service, and
@@ -6987,7 +6994,7 @@ function App() {
         {(isHomePage || isSdltPage || isFeesPage || isAboutPage) && (
           <>
             {submissionResult ? (
-              <section className="card card--form success-card">
+              <section id="quote" className="card card--form success-card" tabIndex={-1}>
                 <div className="status-badge">
                   <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path
@@ -7059,7 +7066,7 @@ function App() {
                 </button>
               </section>
             ) : (
-            <section className="card card--form">
+            <section id="quote" className="card card--form">
               <div className="section-heading">
                 <div>
                   <h2>{cityFromUrl ? `Get a Quote for your ${cityFromUrl} property` : "Get a Quote"}</h2>
@@ -8938,6 +8945,7 @@ function App() {
             </section>
             )}
 
+            {!isHomePage && (
             <section className="info-grid">
               <article className="card">
                 <h3>How it works</h3>
@@ -8960,6 +8968,7 @@ function App() {
                 </p>
               </article>
             </section>
+            )}
           </>
         )}
 
@@ -14287,12 +14296,9 @@ function App() {
             )}
           </section>
         )}
+        {isHomePage && <WhyConveyQuote />}
         {isHomePage && (
-          <section
-            className="card"
-            style={{ marginTop: "28px" }}
-            aria-labelledby="home-faq-heading"
-          >
+          <section className="cq-faq" aria-labelledby="home-faq-heading">
             <div className="section-heading">
               <div>
                 <h2 id="home-faq-heading">Conveyancing questions, answered</h2>
@@ -14302,59 +14308,110 @@ function App() {
                 </p>
               </div>
             </div>
-            <div>
-              <h3>How much does conveyancing cost in the UK?</h3>
-              <p>
-                For a straightforward residential purchase in England and Wales,
-                expect total conveyancing costs of roughly £1,500 to £2,500.
-                That is made up of the solicitor's legal fee — typically £900 to
-                £1,500 plus VAT — and disbursements, which are third-party costs
-                such as searches and Land Registry fees. Selling usually costs
-                less, around £900 to £1,500 in total, and leasehold properties
-                cost more because extra legal work is involved. A reviewed,
-                itemised quote shows your exact figure before you commit to
-                anything.
-              </p>
-              <h3>How long does conveyancing take?</h3>
-              <p>
-                Most transactions complete within ten to fourteen weeks of an
-                offer being accepted, and around twelve weeks is a realistic
-                average. Leasehold purchases, long chains and new-build
-                developer deadlines can extend this, while a simple freehold
-                sale with no chain can be quicker. A proactive solicitor who
-                chases the other side regularly is the biggest single factor in
-                keeping things moving.
-              </p>
-              <h3>What is included in a conveyancing quote?</h3>
-              <p>
-                A proper conveyancing quote itemises three things: the legal
-                fee for the solicitor's work (plus VAT), the disbursements —
-                third-party costs such as local authority searches, Land
-                Registry fees and bank transfer charges — and a Stamp Duty
-                estimate where it applies. ConveyQuote quotes are fixed and
-                reviewed by our team before they are issued, so nothing is
-                added later without explanation.
-              </p>
-              <h3>Do I need a solicitor to buy a house?</h3>
-              <p>
-                If you are buying with a mortgage, yes in practice — your
-                lender will require a solicitor or licensed conveyancer to act
-                for them before releasing funds. Cash buyers can legally do
-                their own conveyancing, but it is risky: searches, contracts
-                and Land Registry registration carry real legal consequences if
-                they are mishandled. In practice nearly all buyers instruct a
-                regulated professional.
-              </p>
-              <h3>What is the difference between freehold and leasehold conveyancing?</h3>
-              <p>
-                Freehold means you own the building and the land it stands on
-                outright. Leasehold means you own the property for the length
-                of a lease and usually pay ground rent and service charges to a
-                freeholder. Leasehold conveyancing involves extra work —
-                reviewing the lease, the management pack and the service charge
-                accounts — so it typically costs more and takes a few weeks
-                longer.
-              </p>
+            <div className="cq-faq__list">
+              <details>
+                <summary>How much does conveyancing cost in the UK?</summary>
+                <p>
+                  For a straightforward residential purchase in England and Wales,
+                  expect total conveyancing costs of roughly £1,500 to £2,500.
+                  That is made up of the solicitor's legal fee — typically £900 to
+                  £1,500 plus VAT — and disbursements, which are third-party costs
+                  such as searches and Land Registry fees. Selling usually costs
+                  less, around £900 to £1,500 in total, and leasehold properties
+                  cost more because extra legal work is involved. A reviewed,
+                  itemised quote shows your exact figure before you commit to
+                  anything.
+                </p>
+              </details>
+              <details>
+                <summary>How long does conveyancing take?</summary>
+                <p>
+                  Most transactions complete within ten to fourteen weeks of an
+                  offer being accepted, and around twelve weeks is a realistic
+                  average. Leasehold purchases, long chains and new-build
+                  developer deadlines can extend this, while a simple freehold
+                  sale with no chain can be quicker. A proactive solicitor who
+                  chases the other side regularly is the biggest single factor in
+                  keeping things moving.
+                </p>
+              </details>
+              <details>
+                <summary>What is included in a conveyancing quote?</summary>
+                <p>
+                  A proper conveyancing quote itemises three things: the legal
+                  fee for the solicitor's work (plus VAT), the disbursements —
+                  third-party costs such as local authority searches, Land
+                  Registry fees and bank transfer charges — and a Stamp Duty
+                  estimate where it applies. ConveyQuote quotes are fixed and
+                  reviewed by our team before they are issued, so nothing is
+                  added later without explanation.
+                </p>
+              </details>
+              <details>
+                <summary>Do I need a solicitor to buy a house?</summary>
+                <p>
+                  If you are buying with a mortgage, yes in practice — your
+                  lender will require a solicitor or licensed conveyancer to act
+                  for them before releasing funds. Cash buyers can legally do
+                  their own conveyancing, but it is risky: searches, contracts
+                  and Land Registry registration carry real legal consequences if
+                  they are mishandled. In practice nearly all buyers instruct a
+                  regulated professional.
+                </p>
+              </details>
+              <details>
+                <summary>What is the difference between freehold and leasehold conveyancing?</summary>
+                <p>
+                  Freehold means you own the building and the land it stands on
+                  outright. Leasehold means you own the property for the length
+                  of a lease and usually pay ground rent and service charges to a
+                  freeholder. Leasehold conveyancing involves extra work —
+                  reviewing the lease, the management pack and the service charge
+                  accounts — so it typically costs more and takes a few weeks
+                  longer.
+                </p>
+              </details>
+            </div>
+          </section>
+        )}
+        {isHomePage && (
+          <section className="cq-reviews" aria-labelledby="home-reviews-heading">
+            <div className="section-heading">
+              <div>
+                <h2 id="home-reviews-heading">Real customers, real moves</h2>
+                <p>What people tell us after using their quote.</p>
+              </div>
+            </div>
+            <div className="cq-reviews__grid">
+              <figure>
+                <blockquote>
+                  <p>
+                    "I had no idea where to start with conveyancing costs.
+                    ConveyQuote gave me instant, transparent quotes from vetted
+                    solicitors without any of the usual back-and-forth. I found a
+                    firm within my budget in minutes and the whole process felt so
+                    much less daunting. Genuinely wish I'd found this sooner."
+                  </p>
+                </blockquote>
+                <figcaption>
+                  — Sarah M., First-Time Buyer – Manchester
+                </figcaption>
+              </figure>
+              <figure>
+                <blockquote>
+                  <p>
+                    "We were selling and buying simultaneously so we needed a firm
+                    that could handle both sides efficiently. ConveyQuote matched
+                    us with a local solicitor who specialised in chain
+                    transactions. The quote was clear, no hidden extras, and the
+                    firm they referred us to was excellent. Would use again
+                    without hesitation."
+                  </p>
+                </blockquote>
+                <figcaption>
+                  — James &amp; Priya T., Home Movers – Birmingham
+                </figcaption>
+              </figure>
             </div>
           </section>
         )}
@@ -14385,7 +14442,7 @@ function App() {
           </section>
         )}
         {isHomePage && (
-          <section className="card" style={{ marginTop: "28px" }}>
+          <section className="cq-callout">
             <div className="section-heading">
               <div>
                 <h2>Are you an estate agent or broker?</h2>
@@ -14401,75 +14458,10 @@ function App() {
             </div>
           </section>
         )}
-        {isHomePage && (
-          <section
-            className="card"
-            style={{ marginTop: "28px" }}
-            aria-labelledby="home-reviews-heading"
-          >
-            <div className="section-heading">
-              <div>
-                <h2 id="home-reviews-heading">Real customers, real moves</h2>
-                <p>What people tell us after using their quote.</p>
-              </div>
-            </div>
-            <div
-              style={{
-                borderLeft: "4px solid var(--teal)",
-                background: "var(--bg)",
-                borderRadius: "0 12px 12px 0",
-                padding: "16px 20px",
-                marginBottom: "14px",
-              }}
-            >
-              <p style={{ fontStyle: "italic", margin: 0 }}>
-                "I had no idea where to start with conveyancing costs.
-                ConveyQuote gave me instant, transparent quotes from vetted
-                solicitors without any of the usual back-and-forth. I found a
-                firm within my budget in minutes and the whole process felt so
-                much less daunting. Genuinely wish I'd found this sooner."
-              </p>
-              <p
-                style={{
-                  fontWeight: 700,
-                  color: "var(--navy)",
-                  fontSize: "14px",
-                  margin: "10px 0 0",
-                }}
-              >
-                — Sarah M., First-Time Buyer – Manchester
-              </p>
-            </div>
-            <div
-              style={{
-                borderLeft: "4px solid var(--teal)",
-                background: "var(--bg)",
-                borderRadius: "0 12px 12px 0",
-                padding: "16px 20px",
-              }}
-            >
-              <p style={{ fontStyle: "italic", margin: 0 }}>
-                "We were selling and buying simultaneously so we needed a firm
-                that could handle both sides efficiently. ConveyQuote matched
-                us with a local solicitor who specialised in chain
-                transactions. The quote was clear, no hidden extras, and the
-                firm they referred us to was excellent. Would use again
-                without hesitation."
-              </p>
-              <p
-                style={{
-                  fontWeight: 700,
-                  color: "var(--navy)",
-                  fontSize: "14px",
-                  margin: "10px 0 0",
-                }}
-              >
-                — James &amp; Priya T., Home Movers – Birmingham
-              </p>
-            </div>
-          </section>
-        )}
       </main>
+
+      {isHomePage && <ClosingCta />}
+      {isHomePage && <RevealEnquiryConfirmation active={!!submissionResult} />}
 
       {/* ── Referrer Login ── */}
       {isReferrerLoginPage && !referrerSession && (
@@ -15387,13 +15379,13 @@ function App() {
         <div className="site-footer__inner">
           <div className="site-footer__grid">
             <div>
-              <img src={logo} alt="ConveyQuote UK" className="site-footer__logo" />
+              <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="44px" alt="ConveyQuote UK" className="site-footer__logo" />
               <p>ConveyQuote is a trading name of Essentially Law Limited (Company No. 14625839), registered in England and Wales.</p>
               <p>We are not a firm of solicitors and do not provide legal advice. We operate an introduction service connecting clients with SRA-regulated conveyancing firms.</p>
               <p>A referral fee may be received if you proceed with an instructed firm. This does not affect the cost of your legal services.</p>
             </div>
             <div>
-              <h4>Services</h4>
+              <h3>Services</h3>
               <div className="site-footer__links">
                 <a href="/">Get a Quote</a>
                 <a href="/conveyancing-quotes">Conveyancing Quotes Explained</a>
@@ -15408,7 +15400,7 @@ function App() {
               </div>
             </div>
             <div>
-              <h4>Legal</h4>
+              <h3>Legal</h3>
               <div className="site-footer__links">
                 <a href="/about/">About Us</a>
                 <a href="/terms/">Terms &amp; Conditions</a>

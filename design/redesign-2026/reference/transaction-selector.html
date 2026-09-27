@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ConveyQuote — transaction selector icons</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#F3FAFC; --card:#FFFFFF; --ink:#10243A; --muted:#4a6178; --border:rgba(16,36,58,.1); --teal:#00A7B5; --tint:#E3F6F8; --navy:#073B70; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#062A52; --card:#0B3564; --ink:#F3FAFC; --muted:#a9c3d6; --border:rgba(243,250,252,.12); --teal:#20D5D0; --tint:#0D4378; --navy:#F3FAFC; } }
+:root[data-theme="dark"] { --bg:#062A52; --card:#0B3564; --ink:#F3FAFC; --muted:#a9c3d6; --border:rgba(243,250,252,.12); --teal:#20D5D0; --tint:#0D4378; --navy:#F3FAFC; }
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,"Segoe UI",Arial,sans-serif; }
+main { max-width:1160px; margin:0 auto; padding:56px 24px 72px; }
+.eyebrow { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--teal); margin:0 0 10px; font-weight:500; }
+h1 { font-family:Manrope,Inter,sans-serif; font-weight:700; font-size:clamp(28px,4vw,44px); line-height:1.1; margin:0 0 36px; letter-spacing:-.02em; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:20px; }
+.card { font:inherit; color:inherit; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:20px; padding:18px 20px 24px; cursor:pointer; display:flex; flex-direction:column; transition:transform .25s ease, border-color .25s ease, background .25s ease; }
+.card:hover { transform:translateY(-4px); border-color:var(--teal); }
+.card:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
+.card[aria-pressed="true"] .icon { --card:var(--tint); } .card[aria-pressed="true"] { border:2px solid var(--teal); background:var(--tint); padding:17px 19px 23px; }
+.icon { display:block; color:var(--navy); margin:4px 0 22px; transition:transform .3s ease; } .card img { width:100%; height:auto; max-width:100%; display:block; margin:0 0 12px; transition:transform .35s ease; }
+.card:hover .icon { transform:translateY(-2px) scale(1.05); } .card:hover img { transform:scale(1.04); }
+.title { font-family:Manrope,Inter,sans-serif; font-weight:700; font-size:20px; margin:0 0 4px; }
+.sub { font-size:14.5px; color:var(--muted); }
+.cta { margin-top:32px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.cta button { font:inherit; font-weight:500; font-size:16px; border:none; border-radius:14px; padding:16px 28px; background:var(--teal); color:#062A52; cursor:pointer; opacity:.45; transition:opacity .2s; }
+.cta button.ready { opacity:1; }
+.cta span { font-size:13px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+@media (prefers-reduced-motion: reduce) { .card, .icon { display:block; color:var(--navy); margin:4px 0 22px; transition:transform .3s ease; } .card img { transition:none; } .card:hover, .card:hover .icon { transform:translateY(-2px) scale(1.05); } .card:hover img { transform:none; } }
+</style></head>
+<body><main>
+  <p class="eyebrow">Get your quote</p>
+  <h1>What are you doing with your property?</h1>
+  <div class="grid" id="grid">
+    <button class="card" type="button" aria-pressed="false">
+      <span class="icon"><svg viewBox="0 0 64 64" width="96" height="96" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 30 L28 12 L50 30"/><path d="M11 26 V52 H45 V26"/><path d="M24 52 V40 H32 V52"/><rect x="15.5" y="32" width="6" height="6" rx="0.5"/>
+  <g><circle cx="45" cy="42" r="7.5" stroke="var(--card)" stroke-width="7"/><path d="M50.5 47.5 L61 58" stroke="var(--card)" stroke-width="7"/>
+  <circle cx="45" cy="42" r="7.5" fill="var(--teal)" stroke="var(--teal)" stroke-width="2"/>
+  <circle cx="43.6" cy="40.6" r="2.3" fill="var(--card)" stroke="none"/>
+  <path d="M50.3 47.3 L61 58 M56.2 53.2 L52.8 56.6 M59.6 56.6 L56.8 59.4" stroke="var(--teal)" stroke-width="3.4"/></g></svg></span>
+      <span class="title">Buying</span>
+      <span class="sub">I’m purchasing a property</span>
+    </button>
+    <button class="card" type="button" aria-pressed="false">
+      <span class="icon"><svg viewBox="0 0 64 64" width="96" height="96" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 30 L28 12 L50 30"/><path d="M11 26 V52 H45 V26"/><path d="M24 52 V40 H32 V52"/><rect x="15.5" y="32" width="6" height="6" rx="0.5"/>
+  <path d="M55 30 V57" stroke="var(--card)" stroke-width="7"/><rect x="45" y="19" width="18" height="12" rx="1.5" stroke="var(--card)" stroke-width="7"/>
+  <path d="M55 31 V57" stroke="var(--teal)" stroke-width="3"/>
+  <rect x="45" y="19" width="18" height="12" rx="1.5" fill="var(--teal)" stroke="var(--teal)"/>
+  <text x="54" y="27.6" text-anchor="middle" font-size="6.2" font-weight="700" fill="var(--card)" stroke="none" font-family="Inter,Arial,sans-serif" letter-spacing="0.3">SOLD</text></svg></span>
+      <span class="title">Selling</span>
+      <span class="sub">I’m selling a property</span>
+    </button>
+    <button class="card" type="button" aria-pressed="false">
+      <span class="icon"><svg viewBox="0 0 64 64" width="96" height="96" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M3 38 L14 29 L25 38"/><path d="M6.5 35 V53 H21.5 V35"/><path d="M11.5 53 V46 H16.5 V53"/>
+  <path d="M39 38 L50 29 L61 38"/><path d="M42.5 35 V53 H57.5 V35"/><path d="M47.5 53 V46 H52.5 V53"/>
+  <path d="M16 22 Q32 6 47 20" stroke="var(--teal)" stroke-width="3.2" fill="none"/>
+  <path d="M40.5 19.5 L47.5 20.5 L47 13.5" stroke="var(--teal)" stroke-width="3.2" fill="none"/></svg></span>
+      <span class="title">Buying and selling</span>
+      <span class="sub">I’m moving home</span>
+    </button>
+    <button class="card" type="button" aria-pressed="false">
+      <span class="icon"><svg viewBox="0 0 64 64" width="96" height="96" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 30 L28 12 L50 30"/><path d="M11 26 V52 H45 V26"/><path d="M24 52 V40 H32 V52"/><rect x="15.5" y="32" width="6" height="6" rx="0.5"/>
+  <circle cx="48" cy="45" r="10.5" stroke="var(--card)" stroke-width="7"/>
+  <circle cx="48" cy="45" r="10.5" fill="var(--teal)" stroke="var(--teal)"/>
+  <path d="M43.8 49.6 L52.2 40.4" stroke="var(--card)" stroke-width="2.4"/>
+  <circle cx="44.3" cy="41.3" r="1.9" fill="var(--card)" stroke="none"/>
+  <circle cx="51.7" cy="48.7" r="1.9" fill="var(--card)" stroke="none"/></svg></span>
+      <span class="title">Remortgaging</span>
+      <span class="sub">I’m changing my mortgage</span>
+    </button>
+  </div>
+  <div class="cta"><button type="button" id="go">Get my quote &rarr;</button><span>SRA regulated &middot; Itemised &middot; No obligation</span></div>
+</main>
+<script>
+var cards = document.querySelectorAll('.card'), go = document.getElementById('go');
+cards.forEach(function (c) {
+  c.addEventListener('click', function () {
+    cards.forEach(function (o) { o.setAttribute('aria-pressed', o === c ? 'true' : 'false'); });
+    go.classList.add('ready');
+  });
+});
+</script>
+</body></html>
