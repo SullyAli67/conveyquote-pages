@@ -1,0 +1,403 @@
+/* ── 2026 homepage: X-ray hero ── */
+.xh {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  min-height: 620px;
+  overflow: hidden;
+  container-type: size;
+  background: var(--cq-ice);
+  color: var(--cq-ink);
+  font-family: var(--cq-font-body);
+}
+
+.xh-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.xh-gl {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.xh.is-live .xh-gl {
+  opacity: 1;
+}
+
+/* Default framing approximates the live camera; XrayHero then fits it clear of the text, as layout() does for the scene */
+.xh-still img {
+  position: absolute;
+  width: auto;
+  height: 85.5vh;
+  height: 85.5cqh;
+  top: 16vh;
+  top: 16cqh;
+  left: calc(50% + 3.3vh);
+  left: calc(50% + 3.3cqh);
+  transform: translateX(-50%) var(--xh-still, scale(1));
+  max-width: none;
+  transition: opacity 0.4s ease;
+}
+
+@media (max-aspect-ratio: 4/5) {
+  .xh-still img {
+    height: 51.9vh;
+    top: 25.1vh;
+    left: 50%;
+  }
+}
+
+@container (max-aspect-ratio: 4/5) {
+  .xh-still img {
+    height: 51.9cqh;
+    top: 25.1cqh;
+    left: 50%;
+  }
+}
+
+.xh.is-live .xh-still img {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+
+.xh-header {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 24px);
+  padding: 0 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.xh-logo,
+.xh-nav {
+  pointer-events: auto;
+}
+
+/* Sizes the existing 1024px logo by its artwork (758 x 379 at 126,317). Multiply hides its off-white (252) margin once brightened to 255; no overflow clip, as Chrome isolates the blend inside one */
+.xh-logo {
+  display: block;
+  flex: none;
+  height: clamp(40px, 3.8vw, 56px);
+  aspect-ratio: 758 / 379;
+}
+
+.xh-logo img {
+  display: block;
+  width: 135.0923%;
+  max-width: none;
+  height: auto;
+  margin-left: -16.6227%;
+  margin-top: -41.8206%;
+  mix-blend-mode: multiply;
+  filter: brightness(1.015);
+  pointer-events: none;
+}
+
+.xh-nav {
+  position: relative;
+  display: flex;
+  gap: 10px;
+}
+
+.xh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: clamp(48px, 4.4vw, 64px);
+  padding: 0 22px;
+  border: none;
+  border-radius: 12px;
+  background: var(--cq-teal);
+  color: var(--cq-midnight);
+  font: 700 clamp(15px, 1.3vw, 19px) var(--cq-font-display);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.xh-btn:hover {
+  background: var(--cq-teal-bright);
+}
+
+.xh-menu {
+  width: clamp(48px, 4.4vw, 64px);
+  height: clamp(48px, 4.4vw, 64px);
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--cq-midnight);
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.xh-menu i {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--cq-midnight);
+  box-shadow: 6px -7px 0 var(--cq-midnight);
+}
+
+.xh-menu[aria-expanded="true"] {
+  background: var(--cq-white);
+}
+
+.xh-logo:focus-visible,
+.xh-btn:focus-visible,
+.xh-menu:focus-visible {
+  outline: 3px solid var(--cq-navy);
+  outline-offset: 3px;
+}
+
+.xh-menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 10;
+  min-width: 240px;
+  padding: 8px;
+  background: var(--cq-white);
+  border: 1.5px solid var(--cq-hairline);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(6, 42, 82, 0.12);
+}
+
+.xh-menu-panel[hidden] {
+  display: none;
+}
+
+.xh-menu-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.xh-menu-panel a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: var(--cq-navy);
+  font: 600 16px var(--cq-font-body);
+  text-decoration: none;
+}
+
+.xh-menu-panel a:hover {
+  background: var(--cq-ice);
+}
+
+.xh-menu-panel a[aria-current="page"] {
+  background: #e3f6f8;
+}
+
+.xh-menu-panel a:focus-visible {
+  outline: 3px solid var(--cq-navy);
+  outline-offset: -3px;
+}
+
+.xh-copy {
+  position: absolute;
+  left: 28px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  max-width: 44%;
+  pointer-events: none;
+}
+
+.xh-copy h1 {
+  margin: 0 0 18px;
+  font-family: var(--cq-font-display);
+  font-weight: 800;
+  font-size: clamp(44px, 6.4vw, 112px);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: var(--cq-navy);
+}
+
+/* Brand teal (#00A7B5) is 2.8:1 on ice, below the 3:1 AA minimum for large text; this shade is 3.5:1 */
+.xh-accent {
+  color: var(--cq-teal-text);
+}
+
+.xh-copy p {
+  margin: 0;
+  max-width: 430px;
+  font-size: clamp(15px, 1.2vw, 18px);
+  line-height: 1.5;
+  color: var(--cq-muted);
+}
+
+.xh-card {
+  position: absolute;
+  right: 28px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  width: 210px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--cq-midnight);
+  border-radius: 6px;
+  background: rgba(243, 250, 252, 0.7);
+  pointer-events: none;
+}
+
+.xh-card__title {
+  margin: 0 0 10px;
+  font: 700 11px var(--cq-font-body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cq-midnight);
+}
+
+.xh-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.xh-card li {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-top: 1px solid rgba(6, 42, 82, 0.15);
+  font: 500 13px var(--cq-font-body);
+  color: var(--cq-ink);
+}
+
+.xh-card li span {
+  color: var(--cq-teal-text);
+  font-weight: 600;
+}
+
+.xh-lens {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cq-teal);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.xh-lens::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 10px);
+  white-space: nowrap;
+  font: 600 11px var(--cq-font-body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cq-teal);
+}
+
+.xh-dot {
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cq-midnight);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+
+@media (pointer: fine) {
+  .xh.is-live {
+    cursor: none;
+  }
+
+  .xh.is-live .xh-dot {
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .xh-copy {
+    right: 28px;
+    max-width: none;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  }
+
+  .xh-card,
+  .xh.is-live .xh-dot {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .xh-header {
+    padding: 0 20px;
+    gap: 10px;
+  }
+
+  .xh-copy {
+    left: 20px;
+    right: 20px;
+  }
+
+  .xh-btn {
+    padding: 0 16px;
+  }
+}
+
+/* ── Trust strip ── */
+.cq-strip {
+  background: var(--cq-white);
+  border-top: 1px solid var(--cq-hairline);
+  border-bottom: 1px solid var(--cq-hairline);
+}
+
+.cq-strip ul {
+  list-style: none;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px 28px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 32px;
+}
+
+.cq-strip li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 12.5px var(--cq-font-body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cq-midnight);
+}
+
+.cq-strip li::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cq-teal);
+}
+
+#quote {
+  scroll-margin-top: 24px;
+}

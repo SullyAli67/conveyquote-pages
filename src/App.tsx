@@ -14,6 +14,7 @@ import {
 } from "react";
 import "./App.css";
 import logo from "./assets/logo.png";
+import XrayHero from "./components/XrayHero";
 import { buildQuoteData } from "./buildQuoteData";
 import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
@@ -6890,6 +6891,25 @@ function App() {
 
   return (
     <div className="page">
+      {isHomePage && (
+        <>
+          <XrayHero summary="Enter your property details once and get a clear, itemised conveyancing quote reviewed by qualified legal professionals. No hidden fees. No obligation." />
+          <div className="cq-strip">
+            <ul>
+              <li>Transparent pricing</li>
+              <li>SRA-regulated firms only</li>
+              <li>Fully itemised quotes</li>
+              <li>No obligation</li>
+              <li>Fast &amp; simple</li>
+              <li>ICO registered · CSN9542473</li>
+              <li>England &amp; Wales</li>
+            </ul>
+          </div>
+        </>
+      )}
+
+      {!isHomePage && (
+      <>
       {/* ── Top nav ── */}
       <nav className="site-nav">
         <div className="site-nav__inner">
@@ -6922,22 +6942,11 @@ function App() {
             <h1>
               {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isLeaseholdPage ? "Lease extensions, enfranchisement and staircasing" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
             </h1>
-            {isHomePage && (
-              <p className="hero__summary">
-                Enter your property details once and get a clear, itemised conveyancing quote reviewed by qualified legal professionals. No hidden fees. No obligation.
-              </p>
-            )}
-            {isHomePage && (
-              <div className="hero__points">
-                <span>✓ Transparent pricing</span>
-                <span>✓ SRA-regulated firms</span>
-                <span>✓ No obligation</span>
-                <span>✓ Fast &amp; simple</span>
-              </div>
-            )}
           </div>
         </div>
       </header>
+      </>
+      )}
 
       {/* ── How it works strip (homepage only) ── */}
       {isHomePage && (
@@ -6967,12 +6976,6 @@ function App() {
               </div>
             </div>
           </div>
-          <div className="trust-bar">
-            <span>🏛 SRA-regulated firms only</span>
-            <span>📋 Fully itemised quotes</span>
-            <span>🔒 ICO registered · CSN9542473</span>
-            <span>🇬🇧 England &amp; Wales</span>
-          </div>
         </>
       )}
 
@@ -6987,7 +6990,7 @@ function App() {
         {(isHomePage || isSdltPage || isFeesPage || isAboutPage) && (
           <>
             {submissionResult ? (
-              <section className="card card--form success-card">
+              <section id="quote" className="card card--form success-card">
                 <div className="status-badge">
                   <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path
@@ -7059,7 +7062,7 @@ function App() {
                 </button>
               </section>
             ) : (
-            <section className="card card--form">
+            <section id="quote" className="card card--form">
               <div className="section-heading">
                 <div>
                   <h2>{cityFromUrl ? `Get a Quote for your ${cityFromUrl} property` : "Get a Quote"}</h2>

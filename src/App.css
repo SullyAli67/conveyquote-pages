@@ -9,6 +9,20 @@
   --white: #ffffff;
   --shadow: 0 14px 40px rgba(6, 42, 99, 0.08);
   --radius: 18px;
+
+  --cq-midnight: #062a52;
+  --cq-navy: #073b70;
+  --cq-teal: #00a7b5;
+  --cq-teal-text: #008c99;
+  --cq-teal-bright: #20d5d0;
+  --cq-ice: #f3fafc;
+  --cq-white: #ffffff;
+  --cq-ink: #10243a;
+  --cq-muted: #4a6178;
+  --cq-gold: #e7b85c;
+  --cq-hairline: rgba(6, 42, 82, 0.12);
+  --cq-font-display: Manrope, Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cq-font-body: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 * {
