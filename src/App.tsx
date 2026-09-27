@@ -15167,7 +15167,7 @@ function App() {
             decide.
           </p>
           <p style={{ marginTop: "16px" }}>
-            <a className="primary-button" href="/?type=lease_extension_statutory" style={{ display: "inline-block", textDecoration: "none" }}>
+            <a className="primary-button" href="/?type=lease_extension_statutory" style={{ textDecoration: "none" }}>
               Get a lease extension quote
             </a>
           </p>
@@ -15201,7 +15201,7 @@ function App() {
             of it.
           </p>
           <p style={{ marginTop: "16px" }}>
-            <a className="primary-button" href="/?type=collective_enfranchisement" style={{ display: "inline-block", textDecoration: "none" }}>
+            <a className="primary-button" href="/?type=collective_enfranchisement" style={{ textDecoration: "none" }}>
               Get an enfranchisement quote
             </a>
           </p>
@@ -15236,7 +15236,7 @@ function App() {
             lease.
           </p>
           <p style={{ marginTop: "16px" }}>
-            <a className="primary-button" href="/?type=staircasing" style={{ display: "inline-block", textDecoration: "none" }}>
+            <a className="primary-button" href="/?type=staircasing" style={{ textDecoration: "none" }}>
               Get a staircasing quote
             </a>
           </p>
@@ -15255,7 +15255,7 @@ function App() {
             management pack and dealing with the freeholder or managing agent.
           </p>
           <p style={{ marginTop: "12px" }}>
-            <a className="primary-button" href="/" style={{ display: "inline-block", textDecoration: "none" }}>
+            <a className="primary-button" href="/" style={{ textDecoration: "none" }}>
               Get a conveyancing quote
             </a>
           </p>
