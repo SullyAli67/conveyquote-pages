@@ -15451,8 +15451,6 @@ export default AppWithProviders;
 // Referrers CANNOT edit quotes. Pricing is set centrally by priceConfig/calculate-quote.
 // Firms may adjust the quote for this specific matter once they have reviewed it.
 
-type QuoteLineItem = { label: string; amount: number; note?: string };
-
 type StoredQuote = {
   legalFees?: QuoteLineItem[];
   disbursements?: QuoteLineItem[];
