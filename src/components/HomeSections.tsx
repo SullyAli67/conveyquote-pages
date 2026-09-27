@@ -142,7 +142,7 @@ export function CostBreakdown() {
     <section className="cq-block cq-dark" aria-labelledby="cq-cost-heading">
       <div className="cq-wrap cq-split">
         <div>
-          <p className="cq-eyebrow">Complete transparency</p>
+          <p className="cq-eyebrow">Transparent pricing</p>
           <h2 id="cq-cost-heading" className="cq-h2">
             Every cost,
             <br />
@@ -178,13 +178,12 @@ export function CostBreakdown() {
   );
 }
 
-// "Transparent pricing" and "Fast & simple" moved here from the trust strip.
+// "Transparent pricing" moved here from the trust strip.
 const WHY_POINTS = [
   { title: "Itemised, not bundled", body: "The legal fee, VAT and every third-party cost are shown separately, so you can compare like with like." },
   { title: "SRA-regulated firms", body: "We match you with a conveyancing firm regulated by the Solicitors Regulation Authority. We introduce you; the firm carries out the legal work." },
-  { title: "No obligation", body: "Take your time with your quote. You can accept it, ask questions or decline, with no obligation at any stage." },
-  { title: "Transparent pricing", body: "Every quote is reviewed by our team before it is issued, and nothing is added later without explanation." },
-  { title: "Fast & simple", body: "Enter your property details once and receive your itemised quote by email within one working day." },
+  { title: "No obligation", body: "Take your time with your quote. You can accept it, ask questions or decline, with no obligation until you choose to instruct a firm." },
+  { title: "Transparent pricing", body: "Every quote is reviewed by our team before it is issued." },
 ];
 
 export function WhyConveyQuote() {

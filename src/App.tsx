@@ -6901,7 +6901,7 @@ function App() {
               <li>SRA-regulated firms only</li>
               <li>Fully itemised quotes</li>
               <li>No obligation</li>
-              <li>ICO registered · CSN9542473</li>
+              <li>Quote within one working day</li>
               <li>England &amp; Wales</li>
             </ul>
           </section>
@@ -8945,6 +8945,7 @@ function App() {
             </section>
             )}
 
+            {!isHomePage && (
             <section className="info-grid">
               <article className="card">
                 <h3>How it works</h3>
@@ -8967,6 +8968,7 @@ function App() {
                 </p>
               </article>
             </section>
+            )}
           </>
         )}
 
@@ -15383,7 +15385,7 @@ function App() {
               <p>A referral fee may be received if you proceed with an instructed firm. This does not affect the cost of your legal services.</p>
             </div>
             <div>
-              <h4>Services</h4>
+              <h3>Services</h3>
               <div className="site-footer__links">
                 <a href="/">Get a Quote</a>
                 <a href="/conveyancing-quotes">Conveyancing Quotes Explained</a>
@@ -15398,7 +15400,7 @@ function App() {
               </div>
             </div>
             <div>
-              <h4>Legal</h4>
+              <h3>Legal</h3>
               <div className="site-footer__links">
                 <a href="/about/">About Us</a>
                 <a href="/terms/">Terms &amp; Conditions</a>

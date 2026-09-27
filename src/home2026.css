@@ -824,36 +824,10 @@
   outline-offset: 4px;
 }
 
-/* Existing "How it works" / "About ConveyQuote" cards beneath the form */
-.page--home main.container > .info-grid {
-  margin-top: 24px;
-  gap: 18px;
-}
-
-.page--home .info-grid .card {
-  padding: 26px;
-  border: 1.5px solid var(--cq-hairline);
-  border-radius: 20px;
-  box-shadow: none;
-}
-
-.page--home .info-grid .card h3 {
-  font: 800 21px/1.15 var(--cq-font-display);
-  letter-spacing: -0.02em;
-  color: var(--cq-navy);
-}
-
-.page--home .info-grid .card p,
-.page--home .info-grid .card li {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--cq-muted);
-}
-
-/* Why ConveyQuote: three points above two */
+/* Why ConveyQuote */
 .cq-why__grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
   margin: 44px 0 0;
   padding: 0;
@@ -861,15 +835,10 @@
 }
 
 .cq-why__grid li {
-  grid-column: span 2;
   padding: 26px;
   border: 1.5px solid var(--cq-hairline);
   border-radius: 20px;
   background: var(--cq-white);
-}
-
-.cq-why__grid li:nth-child(n + 4) {
-  grid-column: span 3;
 }
 
 .cq-why__grid h3 {
@@ -1106,7 +1075,7 @@
   font-size: 14px;
 }
 
-.page--home .site-footer h4 {
+.page--home .site-footer h3 {
   font: 700 13px var(--cq-font-display);
   letter-spacing: 0.12em;
   color: var(--cq-white);
@@ -1157,15 +1126,6 @@
   .cq-why__grid {
     grid-template-columns: 1fr 1fr;
   }
-
-  .cq-why__grid li,
-  .cq-why__grid li:nth-child(n + 4) {
-    grid-column: span 1;
-  }
-
-  .cq-why__grid li:last-child {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 600px) {
@@ -1212,7 +1172,4 @@
     padding: 20px 18px 18px;
   }
 
-  .page--home .info-grid {
-    grid-template-columns: 1fr;
-  }
 }
