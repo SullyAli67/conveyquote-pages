@@ -50,12 +50,18 @@ const GL_ATTRIBUTES: WebGLContextAttributes = {
   failIfMajorPerformanceCaveat: false,
 };
 
+const INTERACTIONS = ["pointermove", "pointerdown", "touchstart", "keydown", "wheel", "scroll"] as const;
+
+function prefersStillHero(): boolean {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+  const nav = navigator as NavigatorHints;
+  if (nav.connection?.saveData) return true;
+  return typeof nav.deviceMemory === "number" && nav.deviceMemory < 4;
+}
+
 // Returns the hero canvas's WebGL context when the live scene should run, or null to keep the still.
 function liveHeroContext(canvas: HTMLCanvasElement): WebGLRenderingContext | null {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
-  const nav = navigator as NavigatorHints;
-  if (nav.connection?.saveData) return null;
-  if (typeof nav.deviceMemory === "number" && nav.deviceMemory < 4) return null;
+  if (prefersStillHero()) return null;
   try {
     return (canvas.getContext("webgl2", GL_ATTRIBUTES) || canvas.getContext("webgl", GL_ATTRIBUTES)) as WebGLRenderingContext | null;
   } catch {
@@ -158,15 +164,16 @@ export default function XrayHero({ summary }: { summary: string }) {
         .catch((err) => console.warn("X-ray hero unavailable:", err));
     };
     const schedule = () => {
+      INTERACTIONS.forEach((type) => window.removeEventListener(type, schedule));
       if (typeof window.requestIdleCallback === "function") idleId = window.requestIdleCallback(start, { timeout: 2000 });
       else timeoutId = window.setTimeout(start, 200);
     };
-    if (document.readyState === "complete") schedule();
-    else window.addEventListener("load", schedule, { once: true });
+    // Waits for the visitor's first interaction so the scene's start-up never blocks the page before they engage.
+    if (!prefersStillHero()) INTERACTIONS.forEach((type) => window.addEventListener(type, schedule, { passive: true }));
 
     return () => {
       cancelled = true;
-      window.removeEventListener("load", schedule);
+      INTERACTIONS.forEach((type) => window.removeEventListener(type, schedule));
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
       dispose?.();
