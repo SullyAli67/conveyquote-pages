@@ -37,6 +37,7 @@ import {
   STAIRCASING_VALUATION_FEE,
   ABORTIVE_POLICY,
 } from "./shared-ownership/price-book.js";
+import { DECLINED_SCOPE } from "./enfranchisement/price-book.js";
 
 const VAT_RATE = 0.2;
 const THIRD_PARTY_STATUS = { ESTIMATE: "estimate", TBC: "tbc", NOT_INCLUDED: "not_included" };
@@ -194,6 +195,20 @@ function buildThirdPartyCosts({ sharePrice }) {
 
 function buildExclusions(sdlt) {
   const exclusions = [
+    {
+      label: DECLINED_SCOPE.tribunal.label,
+      note:
+        "We do not undertake tribunal work. If a dispute with your provider reaches that " +
+        "point we will tell you promptly and refer you to a specialist.",
+      amount: null,
+      outOfScope: true,
+    },
+    {
+      label: DECLINED_SCOPE.court.label,
+      note: DECLINED_SCOPE.court.note,
+      amount: null,
+      outOfScope: true,
+    },
     {
       label: "Extending your lease",
       note:
@@ -438,7 +453,9 @@ export function buildStaircasingQuote(input = {}) {
     indicativeTotalExcludingPremium,
     premium: { status: sharePrice != null ? "supplied" : "not_included", amount: sharePrice ?? null, valuerRequired: true },
     exclusions,
-    abortivePolicy: { ...ABORTIVE_POLICY, appliesToThisMatter: true, disapplicationReason: null },
+    // Not a no-completion-no-fee matter — see the note on ABORTIVE_POLICY
+    // in ./shared-ownership/price-book.js.
+    abortivePolicy: { ...ABORTIVE_POLICY, appliesToThisMatter: false, disapplicationReason: null },
     appliedSupplements,
 
     regimeId: null,
@@ -528,10 +545,12 @@ function buildBreakdown(quote) {
   );
 
   lines.push("");
-  lines.push("IF THE MATTER DOES NOT COMPLETE");
+  lines.push(quote.abortivePolicy.headline.toUpperCase());
   lines.push(quote.abortivePolicy.summary);
-  lines.push("Our fee does become payable if:");
-  quote.abortivePolicy.faultConditions.forEach((c) => lines.push(`  • ${c}`));
+  if (quote.abortivePolicy.faultConditions.length > 0) {
+    lines.push("Our fee does become payable if:");
+    quote.abortivePolicy.faultConditions.forEach((c) => lines.push(`  • ${c}`));
+  }
   lines.push(quote.abortivePolicy.thirdPartyDisclosure);
 
   lines.push("");

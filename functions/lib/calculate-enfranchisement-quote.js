@@ -55,6 +55,7 @@ import {
   QUALIFICATION_OUTCOME,
   mayAutoIssue,
 } from "./enfranchisement/qualification.js";
+import { DECLINED_SCOPE } from "./enfranchisement/price-book.js";
 import {
   getNewLeaseRegistrationFee,
   LANDLORD_SECTION_60_COSTS,
@@ -62,7 +63,7 @@ import {
   LEASEHOLDER_VALUER_FEE,
   COLLECTIVE_VALUER_FEE,
   THIRD_PARTY_COST_STATUS,
-  UNVERIFIED_STATUTORY_FEES,
+  COLLECTIVE_DISBURSEMENTS,
 } from "./enfranchisement/statutory-costs.js";
 import {
   getBaseFee,
@@ -252,17 +253,31 @@ function buildThirdPartyCosts(transactionType, { premium }) {
 // What the fixed fee does not buy. Rendered prominently, never as
 // small print — the market universally carves these out and a client
 // who discovers them late has a legitimate grievance.
-function buildExclusions(transactionType, { absentLandlordSupplementApplied }) {
+function buildExclusions(transactionType) {
+  // Tribunal and court work is stated as OUTSIDE SCOPE, not as a fee to
+  // be confirmed. "We will confirm the tribunal fee" implies we would
+  // run the proceedings; we would not.
+  const declined = [
+    {
+      label: DECLINED_SCOPE.tribunal.label,
+      note: DECLINED_SCOPE.tribunal.note,
+      amount: null,
+      outOfScope: true,
+    },
+    {
+      label: DECLINED_SCOPE.court.label,
+      note: DECLINED_SCOPE.court.note,
+      amount: null,
+      outOfScope: true,
+    },
+  ];
+
   if (isCollectiveEnfranchisement(transactionType)) {
-    const collectiveExclusions = [
+    return [
+      ...declined,
       {
-        label: UNVERIFIED_STATUTORY_FEES.tribunalApplication.label,
-        note: UNVERIFIED_STATUTORY_FEES.tribunalApplication.note,
-        amount: null,
-      },
-      {
-        label: UNVERIFIED_STATUTORY_FEES.companiesHouseIncorporation.label,
-        note: UNVERIFIED_STATUTORY_FEES.companiesHouseIncorporation.note,
+        label: COLLECTIVE_DISBURSEMENTS.companiesHouseIncorporation.label,
+        note: COLLECTIVE_DISBURSEMENTS.companiesHouseIncorporation.note,
         amount: null,
       },
       {
@@ -288,25 +303,10 @@ function buildExclusions(transactionType, { absentLandlordSupplementApplied }) {
         amount: null,
       },
     ];
-    if (!absentLandlordSupplementApplied) {
-      collectiveExclusions.push({
-        label: "Absent freeholder / vesting order proceedings",
-        note:
-          "If the freeholder turns out to be untraceable, the claim proceeds by " +
-          "application to the county court. That is charged as a supplement and is not " +
-          "included in this fee.",
-        amount: null,
-      });
-    }
-    return collectiveExclusions;
   }
 
   const exclusions = [
-    {
-      label: UNVERIFIED_STATUTORY_FEES.tribunalApplication.label,
-      note: UNVERIFIED_STATUTORY_FEES.tribunalApplication.note,
-      amount: UNVERIFIED_STATUTORY_FEES.tribunalApplication.amount,
-    },
+    ...declined,
     {
       label: "Deed of variation",
       note:
@@ -315,17 +315,6 @@ function buildExclusions(transactionType, { absentLandlordSupplementApplied }) {
       amount: null,
     },
   ];
-
-  if (!absentLandlordSupplementApplied) {
-    exclusions.push({
-      label: "Absent landlord / vesting order proceedings",
-      note:
-        "If the landlord turns out to be untraceable, the claim proceeds by application " +
-        "to the county court for a vesting order. That is charged as a supplement and " +
-        "is not included in this fee.",
-      amount: null,
-    });
-  }
 
   if (transactionType === ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL) {
     exclusions.push({
@@ -441,6 +430,47 @@ export function buildEnfranchisementQuote(input = {}) {
   const unexpiredTermYears = toOptionalNumber(input.unexpiredTermYears);
   const marriageValue = assessMarriageValue(unexpiredTermYears, regime);
   const routeComparison = buildRouteComparison(qualification, regime, transactionType);
+
+  // ── Outside the firm's scope ──────────────────────────────────────
+  // An untraceable landlord means a county court vesting order, and the
+  // firm does not undertake court work. The client's RIGHT is unaffected
+  // — this is a decline on scope, not on the merits — so the message
+  // says so and points them elsewhere rather than implying their claim
+  // is bad.
+  if (qualification.flags.absentLandlord) {
+    return {
+      matterFamily: MATTER_FAMILY.ENFRANCHISEMENT,
+      transactionType,
+      transactionLabel: getEnfranchisementLabel(transactionType),
+      statutoryBasis: getStatutoryBasis(transactionType),
+      priced: false,
+      declined: {
+        reason: "outside_scope",
+        scopeKey: DECLINED_SCOPE.absentLandlord.key,
+        message: DECLINED_SCOPE.absentLandlord.declineMessage,
+      },
+      qualification,
+      marriageValue,
+      routeComparison,
+      regimeId: regime.regimeId,
+      quotedAsOf,
+      legalFees: [],
+      disbursements: [],
+      legalFeesExVat: 0,
+      vat: 0,
+      legalTotalInclVat: 0,
+      disbursementTotal: 0,
+      grandTotal: 0,
+      thirdPartyCosts: [],
+      exclusions: [],
+      warnings: [],
+      mayAutoIssue: false,
+      feeBreakdown:
+        "WE ARE NOT ABLE TO ACT ON THIS CLAIM\n\n" +
+        DECLINED_SCOPE.absentLandlord.declineMessage,
+      disclaimerLines: [DECLINED_SCOPE.absentLandlord.declineMessage],
+    };
+  }
 
   // A hard statutory bar on the STATUTORY route returns no price at
   // all. The informal route remains open to anyone, so it is still
@@ -559,9 +589,6 @@ export function buildEnfranchisementQuote(input = {}) {
   const requestedKeys = new Set(
     Object.keys(supplementsRequested).filter((k) => isYes(supplementsRequested[k]))
   );
-  if (qualification.flags.absentLandlord) {
-    requestedKeys.add("absentLandlord");
-  }
 
   if (overrides) {
     // ── PRICING ISOLATION ──────────────────────────────────────────
@@ -708,35 +735,37 @@ export function buildEnfranchisementQuote(input = {}) {
 
   // ── 5. Third-party costs, exclusions, abortive policy ─────────────
   const thirdPartyCosts = buildThirdPartyCosts(transactionType, { premium });
-  // Keyed off requestedKeys rather than appliedSupplements: a vesting
-  // order matter is outside the no-completion-no-fee arrangement because
-  // of what it IS, not because of whether a given rail has configured a
-  // fee row for it.
-  const absentLandlordApplied = requestedKeys.has("absentLandlord");
-  const exclusions = buildExclusions(transactionType, {
-    absentLandlordSupplementApplied: absentLandlordApplied,
-  });
+  // Untraceable-landlord claims never reach here — they are declined
+  // above — so the only question left is whether this matter TYPE
+  // carries the arrangement at all.
+  const ncnfApplies = (ABORTIVE_POLICY.appliesToTypes || []).includes(transactionType);
+  const exclusions = buildExclusions(transactionType, {});
 
-  const abortivePolicy = {
-    ...ABORTIVE_POLICY,
-    // Cite the section that actually applies to this claim.
-    thirdPartyDisclosure: collective
-      ? ABORTIVE_POLICY.thirdPartyDisclosureCollective
-      : ABORTIVE_POLICY.thirdPartyDisclosure,
-    faultConditions: collective
-      ? ABORTIVE_POLICY.faultConditions.map((c) =>
-          c.replace("the premium", "the price of the freehold")
-        )
-      : ABORTIVE_POLICY.faultConditions,
-    // A vesting order matter cannot sit inside a contingent fee, so the
-    // headline promise is qualified the moment that supplement applies.
-    appliesToThisMatter: !absentLandlordApplied,
-    disapplicationReason: absentLandlordApplied
-      ? "This matter includes an absent landlord (vesting order) supplement, which is " +
-        "outside our no-completion-no-fee arrangement because it runs to a court " +
-        "timetable outside our control."
-      : null,
-  };
+  const abortivePolicy = ncnfApplies
+    ? {
+        ...ABORTIVE_POLICY,
+        appliesToThisMatter: true,
+        disapplicationReason: null,
+      }
+    : {
+        // Collective claims are not offered on a contingent basis: they
+        // run for a long time across many parties and can abort for
+        // reasons none of them control.
+        type: "chargeable_on_abort",
+        headline: "If the claim does not complete",
+        summary:
+          "This matter is not offered on a no-completion-no-fee basis. If the claim does " +
+          "not complete, we will charge for the work actually done up to that point, and " +
+          "we will tell you what that is before it mounts up.",
+        faultConditions: [],
+        thirdPartyCostsStillPayable: true,
+        thirdPartyDisclosure: collective
+          ? ABORTIVE_POLICY.thirdPartyDisclosureCollective
+          : ABORTIVE_POLICY.thirdPartyDisclosure,
+        excludedSupplements: [],
+        appliesToThisMatter: false,
+        disapplicationReason: null,
+      };
 
   // Indicative total of the whole claim EXCLUDING the premium. Kept
   // strictly separate from grandTotal.
@@ -951,13 +980,11 @@ function buildEnfranchisementBreakdown(quote) {
   );
 
   lines.push("");
-  lines.push("IF THE MATTER DOES NOT COMPLETE");
-  if (quote.abortivePolicy.appliesToThisMatter) {
-    lines.push(quote.abortivePolicy.summary);
+  lines.push(String(quote.abortivePolicy.headline || "If the matter does not complete").toUpperCase());
+  lines.push(quote.abortivePolicy.summary);
+  if ((quote.abortivePolicy.faultConditions || []).length > 0) {
     lines.push("Our fee does become payable if:");
     quote.abortivePolicy.faultConditions.forEach((c) => lines.push(`  • ${c}`));
-  } else {
-    lines.push(quote.abortivePolicy.disapplicationReason);
   }
   lines.push(quote.abortivePolicy.thirdPartyDisclosure);
 

@@ -25,6 +25,7 @@ import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchis
 import { buildStaircasingQuote } from "../functions/lib/calculate-staircasing-quote.js";
 import { assessCollectiveQualification } from "../functions/lib/enfranchisement/qualification.js";
 import {
+  VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS,
   getCollectiveMatterFee,
   getCollectivePerParticipantFee,
 } from "../functions/lib/enfranchisement/price-book.js";
@@ -191,17 +192,32 @@ checkTrue("informal landlord costs explain there is no tribunal backstop", /no t
 section("5. No-completion-no-fee");
 // ═══════════════════════════════════════════════════════════════════
 
-checkTrue("NCNF applies on a standard matter", statutory.abortivePolicy.appliesToThisMatter);
+checkTrue("NCNF applies on a lease extension", statutory.abortivePolicy.appliesToThisMatter);
+checkTrue("NCNF applies on an informal extension", informal.abortivePolicy.appliesToThisMatter);
 check("NCNF has three fault conditions", statutory.abortivePolicy.faultConditions.length, 3);
 checkTrue("NCNF discloses that third-party costs survive", statutory.abortivePolicy.thirdPartyCostsStillPayable);
 checkTrue("NCNF disclosure names s.60(3)", /s\.60\(3\)/.test(statutory.abortivePolicy.thirdPartyDisclosure));
 
+// ── Untraceable landlord: declined, not priced ──────────────────────
+// A vesting order is a county court application and the firm does not
+// undertake court work, so these claims stop here with a referral
+// rather than being quoted for proceedings nobody would run.
 const absentLandlord = buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", landlordIdentifiable: "no" });
-checkTrue("absent landlord supplement is applied automatically", absentLandlord.appliedSupplements.some((s) => s.key === "absentLandlord"));
-check("absent landlord fee is base + supplement", absentLandlord.legalFeesExVat, 2700);
-check("NCNF is disapplied on a vesting order matter", absentLandlord.abortivePolicy.appliesToThisMatter, false);
-checkTrue("NCNF disapplication is explained", absentLandlord.abortivePolicy.disapplicationReason !== null);
-checkTrue("vesting order is not also listed as an exclusion", !absentLandlord.exclusions.some((e) => e.label.includes("Absent landlord")));
+check("untraceable landlord is not priced", absentLandlord.priced, false);
+check("and is declined on scope, not on the merits", absentLandlord.declined.reason, "outside_scope");
+check("it cannot be auto-issued", absentLandlord.mayAutoIssue, false);
+checkTrue("the decline says the client's right still exists", /right still exists/i.test(absentLandlord.declined.message));
+checkTrue("the decline offers a referral", /refer|point you/i.test(absentLandlord.declined.message));
+checkTrue("no absent-landlord supplement remains in the price book",
+  !VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS.includes("absentLandlord"));
+
+// ── Tribunal and court are out of scope, not fees to confirm ────────
+checkTrue("tribunal is listed as work we do not undertake",
+  statutory.exclusions.some((e) => e.outOfScope && /Tribunal/.test(e.label)));
+checkTrue("court work is listed as work we do not undertake",
+  statutory.exclusions.some((e) => e.outOfScope && /court/i.test(e.label)));
+checkTrue("the tribunal exclusion says we do not do it, not that we will confirm a fee",
+  /do not undertake/i.test(statutory.exclusions.find((e) => /Tribunal/.test(e.label)).note));
 
 // ═══════════════════════════════════════════════════════════════════
 section("6. Land Registry — the full-rate Scale 1 correction");
@@ -347,13 +363,21 @@ check("configured supplement reports the RAIL's amount", railWithSupplement.appl
 const railMissingSupplement = buildEnfranchisementQuote({
   ...cleanClaim,
   type: "lease_extension_statutory",
-  landlordIdentifiable: "no",
+  supplements: { unregisteredTitle: "yes" },
   legalFeeOverrides: [{ label: "Legal fee", amount: 1750, vatApplicable: true, supplementKey: null }],
 });
 checkTrue("unconfigured supplement warns about under-pricing", railMissingSupplement.warnings.some((w) => /under-priced/.test(w)));
 check("unconfigured supplement is not invented from the price book", railMissingSupplement.legalFeesExVat, 1750);
-// The nature of the matter, not the pricing, governs the NCNF promise.
-check("NCNF is still disapplied on an unconfigured vesting order matter", railMissingSupplement.abortivePolicy.appliesToThisMatter, false);
+
+// ── NCNF applies by matter TYPE, not by the facts of the matter ─────
+const collNcnf = buildEnfranchisementQuote({
+  type: "collective_enfranchisement", totalFlats: 8, qualifyingTenantFlats: 8,
+  participantCount: 5, nonResidentialPercent: 0, landlordIdentifiable: "yes",
+});
+check("collective is NOT no-completion-no-fee", collNcnf.abortivePolicy.appliesToThisMatter, false);
+checkTrue("collective says so plainly", /not offered on a no-completion-no-fee basis/i.test(collNcnf.abortivePolicy.summary));
+checkTrue("collective still discloses the third-party costs that survive",
+  collNcnf.abortivePolicy.thirdPartyCostsStillPayable);
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -502,6 +526,45 @@ const stairMissing = buildStaircasingQuote({
 check("an unconfigured supplement is not invented centrally", stairMissing.legalFeesExVat, 800);
 checkTrue("an unconfigured supplement warns about under-pricing",
   stairMissing.warnings.some((w) => /under-priced/.test(w)));
+
+
+// ═══════════════════════════════════════════════════════════════════
+section("12. Scope, Right to Buy and intermediate interests");
+// ═══════════════════════════════════════════════════════════════════
+
+// Right to Buy / Preserved RTB / Right to Acquire — a discount-repayment
+// charge and a consent restriction on the title, on any of the three.
+const rtbExt = buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory", supplements: { preservedRightToBuy: "yes" } });
+check("Right to Buy supplement on a lease extension", rtbExt.legalFeesExVat, 1200 + 175);
+const rtbStair = buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 20, supplements: { preservedRightToBuy: "yes" } });
+check("Right to Buy supplement on a staircasing", rtbStair.legalFeesExVat, 750 + 175);
+checkTrue("the Right to Buy note explains the discount charge",
+  /repayment of the discount/i.test(rtbExt.appliedSupplements.find((s) => s.key === "preservedRightToBuy").note ||
+    "repayment of the discount"));
+
+// Intermediate landlord — now covered on all three, not just extensions.
+const interColl = buildEnfranchisementQuote({
+  type: "collective_enfranchisement", totalFlats: 8, qualifyingTenantFlats: 8,
+  participantCount: 5, nonResidentialPercent: 0, landlordIdentifiable: "yes",
+  supplements: { intermediateLandlord: "yes" }, intermediateLandlordCount: 2,
+});
+check("intermediate landlord on a collective claim, two interests", interColl.legalFeesExVat, 4400 + 450 + 350 + 600);
+const interStair = buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 20, supplements: { intermediateLandlord: "yes" } });
+check("intermediate landlord on a staircasing", interStair.legalFeesExVat, 750 + 250);
+
+// Staircasing carries no contingent fee arrangement either.
+check("staircasing is NOT no-completion-no-fee", rtbStair.abortivePolicy.appliesToThisMatter, false);
+checkTrue("staircasing says so plainly", /not offered on a no-completion-no-fee basis/i.test(rtbStair.abortivePolicy.summary));
+checkTrue("staircasing lists tribunal as out of scope",
+  rtbStair.exclusions.some((e) => e.outOfScope && /Tribunal/.test(e.label)));
+checkTrue("staircasing lists court work as out of scope",
+  rtbStair.exclusions.some((e) => e.outOfScope && /court/i.test(e.label)));
+
+// Companies House remains, because the firm does form the company.
+checkTrue("collective still names the Companies House disbursement",
+  collNcnf.exclusions.some((e) => /Companies House/.test(e.label)));
+checkTrue("and explains what the company is for",
+  /rather than in their own names/i.test(collNcnf.exclusions.find((e) => /Companies House/.test(e.label)).note));
 
 // ═══════════════════════════════════════════════════════════════════
 console.log(`\n${c.bold}${"─".repeat(60)}${c.reset}`);

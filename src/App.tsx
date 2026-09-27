@@ -426,6 +426,7 @@ type QuoteForm = {
   unregisteredTitle: string;
   intermediateLandlord: string;
   missingLeaseDocuments: string;
+  preservedRightToBuy: string;
 
   // ── Collective enfranchisement (s.13) ──────────────────────────────
   // These describe the BUILDING and the GROUP, not one lease, which is
@@ -1069,6 +1070,7 @@ const initialFormState: QuoteForm = {
   unregisteredTitle: "",
   intermediateLandlord: "",
   missingLeaseDocuments: "",
+  preservedRightToBuy: "",
 
   // Collective enfranchisement. Blank, not "no" — an unanswered
   // question must produce "needs review", not a false pass.
@@ -2042,6 +2044,7 @@ function App() {
       intermediateLandlord: boolean;
       missingLeaseDocuments: boolean;
       lenderConsentComplex: boolean;
+      preservedRightToBuy: boolean;
       mortgageOnStaircasing: boolean;
       finalStaircasing: boolean;
       leaseVariationRequired: boolean;
@@ -2109,6 +2112,7 @@ function App() {
       intermediateLandlord: false,
       missingLeaseDocuments: false,
       lenderConsentComplex: false,
+      preservedRightToBuy: false,
       mortgageOnStaircasing: false,
       finalStaircasing: false,
       leaseVariationRequired: false,
@@ -2260,15 +2264,17 @@ function App() {
     { key: "rightToBuy", label: "Right to Buy supplement", family: "conveyancing" },
     { key: "additionalProperty", label: "Additional property supplement", family: "conveyancing" },
 
-    { key: "absentLandlord", label: "Absent landlord supplement (vesting order)", family: "enfranchisement" },
     { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "enfranchisement" },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "enfranchisement" },
     { key: "missingLeaseDocuments", label: "Missing or defective lease documentation supplement", family: "enfranchisement" },
+    { key: "preservedRightToBuy", label: "Right to Buy / Preserved Right to Buy supplement", family: "enfranchisement" },
     { key: "lenderConsentComplex", label: "Complex lender consent supplement", family: "enfranchisement" },
 
     { key: "mortgageOnStaircasing", label: "Mortgage supplement", family: "shared_ownership" },
     { key: "finalStaircasing", label: "Final staircasing to 100% supplement", family: "shared_ownership" },
     { key: "leaseVariationRequired", label: "Lease variation supplement", family: "shared_ownership" },
+    { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "shared_ownership" },
+    { key: "preservedRightToBuy", label: "Right to Buy / Preserved Right to Buy supplement", family: "shared_ownership" },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "shared_ownership" },
   ];
 
@@ -3954,7 +3960,6 @@ function App() {
       // triggered by the qualification gate rather than a checkbox.
       lease_extension_statutory: [
         { label: "Legal fee", amount: 1200, includes_vat: true, is_disbursement: false },
-        { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false },
         { label: "Intermediate landlord supplement", amount: 300, includes_vat: true, is_disbursement: false },
         { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
         { label: "Missing or defective lease documentation supplement", amount: 250, includes_vat: true, is_disbursement: false },
@@ -3967,13 +3972,13 @@ function App() {
         { label: "Legal fee (per participant)", amount: 850, includes_vat: true, is_disbursement: false },
         { label: "Participation agreement", amount: 450, includes_vat: true, is_disbursement: false },
         { label: "Nominee purchaser company — formation and advice", amount: 350, includes_vat: true, is_disbursement: false },
-        { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false },
       ],
       staircasing: [
         { label: "Legal fee", amount: 750, includes_vat: true, is_disbursement: false },
         { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false },
         { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false },
         { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false },
+        { label: "Right to Buy / Preserved Right to Buy supplement", amount: 175, includes_vat: true, is_disbursement: false },
         { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
       ],
       lease_extension_informal: [
@@ -6913,6 +6918,20 @@ function App() {
                         </select>
                       </div>
                       <div className="field">
+                        <label htmlFor="intermediateLandlord">Is there a head lease?</label>
+                        <select id="intermediateLandlord" name="intermediateLandlord" value={form.intermediateLandlord} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                        <small>
+                          An intervening leasehold interest between the flats and
+                          the freeholder. Notice has to be served on every relevant
+                          landlord.
+                        </small>
+                      </div>
+
+                      <div className="field">
                         <label htmlFor="unregisteredTitle">Is the freehold title unregistered?</label>
                         <select id="unregisteredTitle" name="unregisteredTitle" value={form.unregisteredTitle} onChange={handleChange}>
                           <option value="">Not sure</option>
@@ -6999,6 +7018,26 @@ function App() {
                           steps you may take, or stop short of 100%.
                         </small>
                       </div>
+                      <div className="field">
+                        <label htmlFor="preservedRightToBuy">
+                          Was the home bought under Right to Buy?
+                        </label>
+                        <select id="preservedRightToBuy" name="preservedRightToBuy" value={form.preservedRightToBuy} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes — Right to Buy, Preserved Right to Buy or Right to Acquire</option>
+                        </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="intermediateLandlord">Is there a head lease?</label>
+                        <select id="intermediateLandlord" name="intermediateLandlord" value={form.intermediateLandlord} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+
                       <div className="field">
                         <label htmlFor="unregisteredTitle">Is the title unregistered?</label>
                         <select id="unregisteredTitle" name="unregisteredTitle" value={form.unregisteredTitle} onChange={handleChange}>
@@ -7246,6 +7285,27 @@ function App() {
                           <option value="no">No</option>
                           <option value="yes">Yes</option>
                         </select>
+                      </div>
+
+                      <div className="field">
+                        <label htmlFor="preservedRightToBuy">
+                          Was the flat bought under Right to Buy?
+                        </label>
+                        <select
+                          id="preservedRightToBuy"
+                          name="preservedRightToBuy"
+                          value={form.preservedRightToBuy}
+                          onChange={handleChange}
+                        >
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes — Right to Buy, Preserved Right to Buy or Right to Acquire</option>
+                        </select>
+                        <small>
+                          These usually leave a charge on the title securing
+                          repayment of the discount, and a restriction requiring
+                          the former landlord&rsquo;s consent.
+                        </small>
                       </div>
 
                       <div className="field">
@@ -9305,9 +9365,10 @@ function App() {
                               <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", marginTop: "6px" }}>
                                 {([
                                   ["unregisteredTitle", "Unregistered title"],
-                                  ["intermediateLandlord", "Intermediate landlord"],
                                   ["missingLeaseDocuments", "Missing / defective lease"],
                                   ["lenderConsentComplex", "Complex lender consent"],
+                                  ["preservedRightToBuy", "Right to Buy / Preserved RTB"],
+                                  ["intermediateLandlord", "Intermediate landlord"],
                                 ] as [keyof FirmIssueQuoteForm["enfranchisementSupplements"], string][]).map(
                                   ([key, label]) => (
                                     <label key={key} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px" }}>

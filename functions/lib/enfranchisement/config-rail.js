@@ -78,9 +78,10 @@ export function buildConfigRailEnfranchisementQuote({
   // mortgage or a final step to 100% on a staircasing. Those are derived
   // here too, so a rail cannot silently omit a supplement the matter
   // plainly attracts.
-  const gate = staircasing ? null : assessQualification(body || {}, body?.quotedAsOf);
+  // Untraceable-landlord claims are declined by the engine rather than
+  // priced, so nothing is derived from the enfranchisement gate here any
+  // more. Staircasing still derives two supplements from the facts.
   const derived = new Set();
-  if (gate?.flags?.absentLandlord) derived.add("absentLandlord");
   if (staircasing) {
     const yes = (v) => v === true || String(v ?? "").toLowerCase() === "yes";
     if (yes(body?.hasMortgage)) derived.add("mortgageOnStaircasing");
@@ -194,6 +195,8 @@ export function getDefaultEnfranchisementFeeItems(transactionType) {
       { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false, supplement_key: "mortgageOnStaircasing" },
       { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false, supplement_key: "finalStaircasing" },
       { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false, supplement_key: "leaseVariationRequired" },
+      { label: "Intermediate landlord supplement", amount: 250, includes_vat: true, is_disbursement: false, supplement_key: "intermediateLandlord" },
+      { label: "Right to Buy / Preserved Right to Buy supplement", amount: 175, includes_vat: true, is_disbursement: false, supplement_key: "preservedRightToBuy" },
       { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: "unregisteredTitle" },
     ];
   }
@@ -206,7 +209,7 @@ export function getDefaultEnfranchisementFeeItems(transactionType) {
       { label: "Legal fee (per participant)", amount: 850, includes_vat: true, is_disbursement: false, supplement_key: null },
       { label: "Participation agreement", amount: 450, includes_vat: true, is_disbursement: false, supplement_key: null },
       { label: "Nominee purchaser company — formation and advice", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: null },
-      { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false, supplement_key: "absentLandlord" },
+      { label: "Intermediate landlord supplement", amount: 300, includes_vat: true, is_disbursement: false, supplement_key: "intermediateLandlord" },
       { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: "unregisteredTitle" },
     ];
   }

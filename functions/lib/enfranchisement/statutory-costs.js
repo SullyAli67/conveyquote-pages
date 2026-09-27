@@ -183,53 +183,26 @@ export const LEASEHOLDER_VALUER_FEE = {
     "directly. This fee is payable whether or not the claim completes.",
 };
 
-// ── Fees we deliberately do NOT assert a figure for ─────────────────
+// ── Disbursements payable to third parties ──────────────────────────
 //
-// Each of these is a real cost, but quoting a number we have not
-// verified against the current fee order would be worse than saying
-// "we will confirm". Set `amount` and flip `verified` to true once the
-// figure has been checked; the engine renders the amount automatically
-// once it is present.
-
-export const UNVERIFIED_STATUTORY_FEES = {
-  tribunalApplication: {
-    label: "First-tier Tribunal (Property Chamber) fees",
-    amount: null,
-    verified: false,
-    withinFirmControl: false,
-    note:
-      "If the premium cannot be agreed, either party may apply to the First-tier " +
-      "Tribunal to determine it. Tribunal fees and our costs of the tribunal " +
-      "proceedings are not included in the quoted fee and will be confirmed separately.",
-  },
-  countyCourtVestingOrder: {
-    label: "County court fee — vesting order application",
-    amount: null,
-    verified: false,
-    withinFirmControl: false,
-    note:
-      "Where the landlord cannot be traced, an application to the county court for a " +
-      "vesting order is required. The court fee will be confirmed when the application " +
-      "is made.",
-  },
+// Tribunal, county court and tracing agent fees used to sit here as
+// figures to be confirmed. They have been removed: the firm does not
+// undertake tribunal or court work, so presenting those as costs we
+// would confirm later misdescribed the service. They are now stated as
+// work outside scope — see DECLINED_SCOPE in ./price-book.js.
+//
+// What remains is the one disbursement the firm genuinely does incur on
+// a collective claim.
+export const COLLECTIVE_DISBURSEMENTS = {
   companiesHouseIncorporation: {
     label: "Companies House — incorporation of the nominee purchaser",
     amount: null,
     verified: false,
     withinFirmControl: false,
     note:
-      "Most collective claims use a company to hold the freehold. The Companies House " +
-      "incorporation fee is a fixed statutory charge and will be confirmed when the " +
-      "company is formed.",
-  },
-  tracingAgent: {
-    label: "Tracing agent's fee",
-    amount: null,
-    verified: false,
-    withinFirmControl: false,
-    note:
-      "Where the landlord cannot be traced, evidence of a diligent search is required " +
-      "before the court will make a vesting order. A tracing agent is normally " +
-      "instructed and their fee is confirmed at the time.",
+      "The participants normally buy the freehold through a company rather than in their " +
+      "own names, so that the building's ownership survives people selling or dying. We " +
+      "form that company. The Companies House incorporation fee is a fixed statutory " +
+      "charge and will be confirmed when the company is formed.",
   },
 };

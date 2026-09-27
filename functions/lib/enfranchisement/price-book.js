@@ -17,6 +17,10 @@
 
 import { ENFRANCHISEMENT_TYPES } from "./types.js";
 
+// Fee figures in this file are APPROVED. The Land Registry bands in
+// ./statutory-costs.js still carry a sign-off flag, because those are
+// statutory amounts set by order rather than prices we choose.
+
 // ── Base fees ───────────────────────────────────────────────────────
 //
 // The statutory fee sits at the specialist end of the market rather
@@ -132,20 +136,17 @@ export const COLLECTIVE_MATTER_FEES = {
 // a court timetable outside anyone's control and cannot be underwritten
 // on a contingent basis.
 export const SUPPLEMENTS = {
-  absentLandlord: {
-    key: "absentLandlord",
-    label: "Absent landlord supplement (vesting order)",
-    amount: 1500,
-    excludedFromNoCompletionNoFee: true,
-    triggeredBy: "The landlord cannot be identified or traced",
-    note:
-      "Where the landlord cannot be traced the claim proceeds by application to the " +
-      "county court for a vesting order, supported by evidence of a diligent search, " +
-      "with the premium determined by the First-tier Tribunal and paid into court. " +
-      "This is substantially more work than a standard claim and is outside our " +
-      "no-completion-no-fee arrangement.",
-    statutoryRef: "s.50 Leasehold Reform, Housing and Urban Development Act 1993",
-  },
+  // ── absentLandlord REMOVED ────────────────────────────────────────
+  // A claim against an untraceable landlord proceeds by application to
+  // the county court for a vesting order. The firm does not undertake
+  // court or tribunal work, so these claims are declined at the
+  // qualification stage and referred out rather than priced. Quoting a
+  // fixed fee for proceedings we would not be running would be worse
+  // than declining.
+  //
+  // See DECLINED_SCOPE below and the absent-landlord handling in
+  // ../calculate-enfranchisement-quote.js.
+
   intermediateLandlord: {
     key: "intermediateLandlord",
     label: "Intermediate landlord supplement",
@@ -179,6 +180,22 @@ export const SUPPLEMENTS = {
       "defect requires a deed of variation to put right, that is separate work and we " +
       "will quote for it separately.",
   },
+  preservedRightToBuy: {
+    key: "preservedRightToBuy",
+    label: "Right to Buy / Preserved Right to Buy supplement",
+    amount: 175,
+    excludedFromNoCompletionNoFee: false,
+    triggeredBy:
+      "The flat was bought under the Right to Buy, the Preserved Right to Buy or the " +
+      "Right to Acquire",
+    note:
+      "A flat acquired under one of these schemes normally carries a charge securing " +
+      "repayment of the discount, and a restriction on the title requiring the former " +
+      "landlord's consent to a disposal within a set period. Both have to be dealt with " +
+      "before a new lease or a transfer can be registered, and the former landlord has to " +
+      "be approached for consent.",
+  },
+
   // ── Note on lender consent ───────────────────────────────────────
   // Routine lender consent to the surrender and regrant is INSIDE the
   // base fee, not a supplement. Most flats are mortgaged; if routine
@@ -202,6 +219,40 @@ export const SUPPLEMENTS = {
 };
 
 export const VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS = Object.keys(SUPPLEMENTS);
+
+// ── Work outside the firm's scope ───────────────────────────────────
+//
+// Stated as a refusal to act, not as a fee to be confirmed later. The
+// distinction matters: "we will confirm the tribunal fee" implies we
+// would run the tribunal proceedings, and we would not.
+export const DECLINED_SCOPE = {
+  tribunal: {
+    key: "tribunal",
+    label: "First-tier Tribunal proceedings",
+    note:
+      "If the premium cannot be agreed, either party may apply to the First-tier Tribunal " +
+      "to determine it. We do not undertake tribunal work. If your claim reaches that " +
+      "point we will tell you promptly and refer you to a specialist, and our fee for the " +
+      "conveyancing remains as quoted.",
+  },
+  court: {
+    key: "court",
+    label: "County court proceedings",
+    note:
+      "We do not undertake court work of any kind, including applications for a vesting " +
+      "order where a landlord cannot be traced.",
+  },
+  absentLandlord: {
+    key: "absentLandlord",
+    label: "Claims against an untraceable landlord",
+    declineMessage:
+      "Where the landlord cannot be traced, the claim can only proceed by an application " +
+      "to the county court for a vesting order. We do not undertake court work, so we are " +
+      "not able to act on this claim. This is not a problem with your claim — the right " +
+      "still exists, and a firm that handles enfranchisement litigation will be able to " +
+      "pursue it for you. Please contact us and we will point you in the right direction.",
+  },
+};
 
 // ── No-completion-no-fee policy ─────────────────────────────────────
 //
@@ -245,6 +296,17 @@ export const ABORTIVE_POLICY = {
   excludedSupplements: Object.values(SUPPLEMENTS)
     .filter((s) => s.excludedFromNoCompletionNoFee)
     .map((s) => s.key),
+
+  // ── Which matter types carry the arrangement ─────────────────────
+  // Individual lease extensions only. A collective claim runs for a
+  // long time across many parties and can abort for reasons none of
+  // them control; staircasing turns on a valuation and a housing
+  // provider's timetable. Neither is a sensible thing to underwrite on
+  // a contingent basis.
+  appliesToTypes: [
+    ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_STATUTORY,
+    ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL,
+  ],
 };
 
 export function getBaseFee(type) {

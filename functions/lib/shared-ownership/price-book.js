@@ -57,6 +57,31 @@ export const SUPPLEMENTS = {
       "Where the lease has to be varied for a reason other than the final staircasing " +
       "step — correcting a defect, for example, or dealing with a lender requirement.",
   },
+  intermediateLandlord: {
+    key: "intermediateLandlord",
+    label: "Intermediate landlord supplement",
+    amount: 250,
+    excludedFromNoCompletionNoFee: false,
+    triggeredBy: "There is a head lease above your shared ownership lease",
+    note:
+      "Where a head lease sits between your provider and the freeholder there is further " +
+      "title to investigate and an additional party whose consent or involvement may be " +
+      "needed on the staircasing.",
+  },
+  preservedRightToBuy: {
+    key: "preservedRightToBuy",
+    label: "Right to Buy / Preserved Right to Buy supplement",
+    amount: 175,
+    excludedFromNoCompletionNoFee: false,
+    triggeredBy:
+      "The home was acquired under the Right to Buy, the Preserved Right to Buy or the " +
+      "Right to Acquire",
+    note:
+      "Property acquired under one of these schemes normally carries a charge securing " +
+      "repayment of the discount and a restriction on the title requiring the former " +
+      "landlord's consent to a disposal within a set period. Both have to be dealt with " +
+      "before the staircasing can be registered.",
+  },
   unregisteredTitle: {
     key: "unregisteredTitle",
     label: "Unregistered title supplement",
@@ -107,24 +132,31 @@ export const STAIRCASING_VALUATION_FEE = {
     "is why staircasing purchases run to a deadline.",
 };
 
+// ── Abortive costs ──────────────────────────────────────────────────
+//
+// Staircasing does NOT carry a no-completion-no-fee arrangement. The
+// timetable belongs to the housing provider and the valuation, both
+// outside anyone's control here: valuations expire after around three
+// months, providers withdraw offers, and a purchase can fall away
+// through nobody's fault. Underwriting that on a contingent basis is
+// not a sensible risk to take.
+//
+// Said plainly on the quote rather than left for the client to discover
+// in the terms of business.
 export const ABORTIVE_POLICY = {
-  type: "ncnf_conditional",
-  headline: "No completion, no fee",
+  type: "chargeable_on_abort",
+  headline: "If the purchase does not complete",
   summary:
-    "We charge no fee where the matter does not complete through no fault of your own.",
-  faultConditions: [
-    "You instruct us to withdraw from the purchase.",
-    "You do not give us instructions when they are needed, so that the valuation expires " +
-      "or your provider withdraws its offer.",
-    "You do not complete once the price of the share has been agreed.",
-  ],
+    "This matter is not offered on a no-completion-no-fee basis. If the purchase does not " +
+    "complete, we will charge for the work actually done up to that point, and we will " +
+    "tell you what that is before it mounts up.",
+  faultConditions: [],
   thirdPartyCostsStillPayable: true,
   thirdPartyDisclosure:
-    "Our no-completion-no-fee arrangement covers OUR fee only. It does not affect any " +
-    "amount you owe to anyone else. Your valuer's fee and your provider's administration " +
-    "fee remain payable whether or not the purchase completes, and neither is within our " +
-    "control.",
+    "Your valuer's fee and your provider's administration fee are also payable whether or " +
+    "not the purchase completes. Neither is within our control.",
   excludedSupplements: [],
+  appliesToTypes: [],
 };
 
 export function getBaseFee(type) {
