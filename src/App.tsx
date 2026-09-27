@@ -2251,6 +2251,7 @@ function App() {
     key: string;
     label: string;
     family: "conveyancing" | "enfranchisement" | "shared_ownership";
+    hint?: string;
   }[] = [
     { key: "leasehold", label: "Leasehold supplement", family: "conveyancing" },
     { key: "mortgagePresent", label: "Acting for lender supplement", family: "conveyancing" },
@@ -2261,20 +2262,37 @@ function App() {
     { key: "companyBuyer", label: "Buying via company supplement", family: "conveyancing" },
     { key: "giftedDeposit", label: "Gifted deposit supplement", family: "conveyancing" },
     { key: "lifetimeIsa", label: "Lifetime ISA supplement", family: "conveyancing" },
-    { key: "rightToBuy", label: "Right to Buy supplement", family: "conveyancing" },
+    {
+      key: "rightToBuy",
+      label: "Right to Buy purchase supplement",
+      family: "conveyancing",
+      // Distinguished from "preservedRightToBuy" below. Buying NOW.
+      hint: "Acting on the Right to Buy purchase itself — the client is buying their home from their landlord now.",
+    },
     { key: "additionalProperty", label: "Additional property supplement", family: "conveyancing" },
 
     { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "enfranchisement" },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "enfranchisement" },
     { key: "missingLeaseDocuments", label: "Missing or defective lease documentation supplement", family: "enfranchisement" },
-    { key: "preservedRightToBuy", label: "Right to Buy / Right to Acquire supplement", family: "enfranchisement" },
+    {
+      key: "preservedRightToBuy",
+      label: "Former Right to Buy / Right to Acquire supplement",
+      family: "enfranchisement",
+      // Distinguished from "rightToBuy" above. Bought YEARS AGO.
+      hint: "The flat was bought under the scheme years ago — clears the discount charge and consent restriction off the title.",
+    },
     { key: "lenderConsentComplex", label: "Complex lender consent supplement", family: "enfranchisement" },
 
     { key: "mortgageOnStaircasing", label: "Mortgage supplement", family: "shared_ownership" },
     { key: "finalStaircasing", label: "Final staircasing to 100% supplement", family: "shared_ownership" },
     { key: "leaseVariationRequired", label: "Lease variation supplement", family: "shared_ownership" },
     { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "shared_ownership" },
-    { key: "preservedRightToBuy", label: "Right to Buy / Right to Acquire supplement", family: "shared_ownership" },
+    {
+      key: "preservedRightToBuy",
+      label: "Former Right to Buy / Right to Acquire supplement",
+      family: "shared_ownership",
+      hint: "The home was bought under the scheme years ago — clears the discount charge and consent restriction off the title.",
+    },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "shared_ownership" },
   ];
 
@@ -3978,7 +3996,7 @@ function App() {
         { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false },
         { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false },
         { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false },
-        { label: "Right to Buy / Right to Acquire supplement", amount: 175, includes_vat: true, is_disbursement: false },
+        { label: "Former Right to Buy / Right to Acquire supplement", amount: 175, includes_vat: true, is_disbursement: false },
         { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
       ],
       lease_extension_informal: [
@@ -7020,7 +7038,7 @@ function App() {
                       </div>
                       <div className="field">
                         <label htmlFor="preservedRightToBuy">
-                          Was the home bought under Right to Buy?
+                          Was the home originally bought under Right to Buy?
                         </label>
                         <select id="preservedRightToBuy" name="preservedRightToBuy" value={form.preservedRightToBuy} onChange={handleChange}>
                           <option value="">Not sure</option>
@@ -7289,7 +7307,7 @@ function App() {
 
                       <div className="field">
                         <label htmlFor="preservedRightToBuy">
-                          Was the flat bought under Right to Buy?
+                          Was the flat originally bought under Right to Buy?
                         </label>
                         <select
                           id="preservedRightToBuy"
@@ -9369,7 +9387,7 @@ function App() {
                                   ["unregisteredTitle", "Unregistered title"],
                                   ["missingLeaseDocuments", "Missing / defective lease"],
                                   ["lenderConsentComplex", "Complex lender consent"],
-                                  ["preservedRightToBuy", "Right to Buy / Right to Acquire"],
+                                  ["preservedRightToBuy", "Former Right to Buy / Right to Acquire"],
                                   ["intermediateLandlord", "Intermediate landlord"],
                                 ] as [keyof FirmIssueQuoteForm["enfranchisementSupplements"], string][]).map(
                                   ([key, label]) => (
@@ -10242,7 +10260,9 @@ function App() {
                           >
                             <option value="" disabled>Choose a supplement…</option>
                             {availableSupplements.map((o) => (
-                              <option key={o.key} value={o.key}>{o.label}</option>
+                              <option key={o.key} value={o.key}>
+                                {o.hint ? `${o.label} — ${o.hint}` : o.label}
+                              </option>
                             ))}
                           </select>
                           <button
@@ -12359,7 +12379,9 @@ function App() {
                           >
                             <option value="" disabled>Choose a supplement…</option>
                             {availableSupplements.map((o) => (
-                              <option key={o.key} value={o.key}>{o.label}</option>
+                              <option key={o.key} value={o.key}>
+                                {o.hint ? `${o.label} — ${o.hint}` : o.label}
+                              </option>
                             ))}
                           </select>
                           <button

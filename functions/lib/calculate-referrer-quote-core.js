@@ -120,7 +120,18 @@ const SUPPLEMENT_KEYS = [
   {
     key: "rightToBuy",
     requestFlag: (req) => Boolean(req.supplements?.rightToBuy),
-    label: "Right to Buy supplement",
+    // ⚠ NOT the same as "preservedRightToBuy" in the specialist families.
+    // THIS one is for ACTING ON the Right to Buy purchase itself — the
+    // client is a tenant buying their home from their landlord now.
+    // That one is for a property BOUGHT under the scheme years ago,
+    // where the discount charge and consent restriction are still on the
+    // title and have to be cleared before a lease extension, collective
+    // claim or staircasing can be registered.
+    //
+    // Different work, different families, so they never appear in the
+    // same Fee Settings list. See functions/lib/enfranchisement/
+    // price-book.js.
+    label: "Right to Buy purchase supplement",
     triggeredBy: "Right to Buy",
   },
   {

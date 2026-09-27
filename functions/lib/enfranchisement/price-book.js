@@ -182,7 +182,13 @@ export const SUPPLEMENTS = {
   },
   preservedRightToBuy: {
     key: "preservedRightToBuy",
-    label: "Right to Buy / Right to Acquire supplement",
+    // ⚠ NOT the same as "rightToBuy" in the conveyancing family. That
+    // one is for ACTING ON the purchase itself, where the client is
+    // buying their home from their landlord now. THIS one is for a
+    // property bought under the scheme YEARS AGO, where the legacy is
+    // still on the title. Hence "Former" in the label — it is the word
+    // that tells the two apart at a glance in Fee Settings.
+    label: "Former Right to Buy / Right to Acquire supplement",
     amount: 175,
     excludedFromNoCompletionNoFee: false,
     triggeredBy:

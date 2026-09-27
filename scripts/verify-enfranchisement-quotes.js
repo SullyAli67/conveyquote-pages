@@ -556,8 +556,19 @@ checkTrue("the Right to Buy note explains the discount charge",
 const rtbNote = rtbExt.legalFees.find((f) => f.supplementKey === "preservedRightToBuy");
 checkTrue("the supplement label names the Right to Acquire, not just Right to Buy",
   /Right to Acquire/.test(rtbNote.label));
-checkTrue("the supplement label no longer says only Preserved Right to Buy",
-  !/Preserved Right to Buy supplement/.test(rtbNote.label));
+
+// ── The two Right to Buy supplements must be tellable apart ─────────
+// There are two keys with similar names in different families, and a
+// fee earner setting up Fee Settings sees one or the other with no
+// context. "Former" is what distinguishes them at a glance: the
+// conveyancing one acts on the purchase happening NOW, this one clears
+// the legacy of a purchase made YEARS AGO.
+checkTrue("the specialist label leads with 'Former'", /^Former /.test(rtbNote.label));
+const convRtb = (await import("../functions/lib/calculate-firm-quote-core.js"));
+checkTrue("the conveyancing label says 'purchase'",
+  convRtb.VALID_SUPPLEMENT_KEYS.includes("rightToBuy"));
+checkTrue("the two labels are not the same string",
+  rtbNote.label !== "Right to Buy purchase supplement");
 
 const rtbDetail = (await import("../functions/lib/enfranchisement/price-book.js")).getSupplement("preservedRightToBuy");
 checkTrue("it cites the Right to Buy statute", /Housing Act 1985/.test(rtbDetail.note));

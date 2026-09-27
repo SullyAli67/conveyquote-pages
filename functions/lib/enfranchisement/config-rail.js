@@ -196,7 +196,7 @@ export function getDefaultEnfranchisementFeeItems(transactionType) {
       { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false, supplement_key: "finalStaircasing" },
       { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false, supplement_key: "leaseVariationRequired" },
       { label: "Intermediate landlord supplement", amount: 250, includes_vat: true, is_disbursement: false, supplement_key: "intermediateLandlord" },
-      { label: "Right to Buy / Right to Acquire supplement", amount: 175, includes_vat: true, is_disbursement: false, supplement_key: "preservedRightToBuy" },
+      { label: "Former Right to Buy / Right to Acquire supplement", amount: 175, includes_vat: true, is_disbursement: false, supplement_key: "preservedRightToBuy" },
       { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: "unregisteredTitle" },
     ];
   }
