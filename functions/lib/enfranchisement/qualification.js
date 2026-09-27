@@ -301,3 +301,204 @@ export function assessQualification(input = {}, asOfDate) {
 export function mayAutoIssue(qualification) {
   return qualification?.outcome === QUALIFICATION_OUTCOME.QUALIFIES;
 }
+
+// ── Collective enfranchisement (s.13) ────────────────────────────────
+//
+// A different set of tests from an individual lease extension, because
+// the question is about the BUILDING and the GROUP, not one lease.
+//
+// Under Chapter I of Part I of the 1993 Act, broadly:
+//   • the premises must contain at least two flats (s.3);
+//   • at least two-thirds of the flats must be held by qualifying
+//     tenants (s.3);
+//   • any non-residential part must not exceed 25% of the internal
+//     floor area, disregarding common parts (s.4);
+//   • the participants must be qualifying tenants of at least half the
+//     flats in the building — and where there are only two flats, BOTH
+//     must take part (s.13);
+//   • the resident landlord exclusion may apply to small converted
+//     buildings of four or fewer units (s.10).
+//
+// As with the individual gate, anything marginal returns needs_review
+// rather than a confident yes. Establishing the non-residential
+// proportion in particular usually needs a measured floor plan, which
+// is why an unanswered question here never passes silently.
+export function assessCollectiveQualification(input = {}, asOfDate) {
+  const regime = getRegime(asOfDate);
+  const reasons = [];
+  const statutoryRefs = new Set();
+  const flags = { absentLandlord: false, twoFlatBuilding: false };
+
+  let outcome = QUALIFICATION_OUTCOME.QUALIFIES;
+  const fail = (code, message, ref) => {
+    outcome = QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY;
+    reasons.push({ code, severity: "bar", message, statutoryRef: ref || null });
+    if (ref) statutoryRefs.add(ref);
+  };
+  const review = (code, message, ref) => {
+    if (outcome !== QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY) {
+      outcome = QUALIFICATION_OUTCOME.NEEDS_REVIEW;
+    }
+    reasons.push({ code, severity: "review", message, statutoryRef: ref || null });
+    if (ref) statutoryRefs.add(ref);
+  };
+  const note = (code, message, ref) => {
+    reasons.push({ code, severity: "note", message, statutoryRef: ref || null });
+    if (ref) statutoryRefs.add(ref);
+  };
+
+  const totalFlats = toOptionalNumber(input.totalFlats);
+  const qualifyingFlats = toOptionalNumber(input.qualifyingTenantFlats);
+  const participants = toOptionalNumber(input.participantCount);
+  const nonResidentialPercent = toOptionalNumber(input.nonResidentialPercent);
+
+  // ── Two or more flats ──────────────────────────────────────────────
+  if (totalFlats === null) {
+    review("total_flats_unknown", "We need to know how many flats are in the building.");
+  } else if (totalFlats < 2) {
+    fail(
+      "single_flat",
+      "The right to buy the freehold collectively applies to premises containing at " +
+        "least two flats. A single flat cannot be enfranchised this way.",
+      "s.3 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  } else if (totalFlats === 2) {
+    flags.twoFlatBuilding = true;
+    note(
+      "two_flat_building",
+      "There are only two flats, so BOTH leaseholders must take part. If one will not " +
+        "join, a collective claim cannot proceed — though each of you could still extend " +
+        "your own lease individually.",
+      "s.13 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  }
+
+  // ── Two-thirds held by qualifying tenants ──────────────────────────
+  if (totalFlats !== null && totalFlats >= 2) {
+    if (qualifyingFlats === null) {
+      review(
+        "qualifying_flats_unknown",
+        "We need to know how many of the flats are held on long leases. At least " +
+          "two-thirds must be.",
+        "s.3 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    } else if (qualifyingFlats < (2 / 3) * totalFlats) {
+      fail(
+        "two_thirds_test",
+        `Only ${qualifyingFlats} of ${totalFlats} flats are held by qualifying tenants. ` +
+          "At least two-thirds must be, so the building does not qualify.",
+        "s.3 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    }
+
+    // ── Participation threshold ──────────────────────────────────────
+    if (participants === null) {
+      review(
+        "participants_unknown",
+        "We need to know how many leaseholders intend to take part. It must be at least " +
+          "half the flats in the building.",
+        "s.13 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    } else if (totalFlats === 2 && participants < 2) {
+      fail(
+        "two_flat_both_required",
+        "Where the building contains only two flats, both leaseholders must participate.",
+        "s.13 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    } else if (participants < totalFlats / 2) {
+      fail(
+        "participation_threshold",
+        `${participants} of ${totalFlats} flats would be taking part. The participants ` +
+          "must be qualifying tenants of at least half the flats in the building.",
+        "s.13 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    } else if (qualifyingFlats !== null && participants > qualifyingFlats) {
+      review(
+        "participants_exceed_qualifying",
+        `More flats are said to be participating (${participants}) than are held by ` +
+          `qualifying tenants (${qualifyingFlats}). We need to check this.`
+      );
+    }
+  }
+
+  // ── 25% non-residential limit ──────────────────────────────────────
+  if (nonResidentialPercent === null) {
+    review(
+      "non_residential_unknown",
+      "We need to know what proportion of the building is non-residential — shops or " +
+        "offices, for example. If it exceeds 25% of the internal floor area, the building " +
+        "cannot be enfranchised. Establishing this usually needs a measured floor plan.",
+      "s.4 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  } else if (nonResidentialPercent > 25) {
+    fail(
+      "non_residential_limit",
+      `The non-residential part is said to be ${nonResidentialPercent}% of the building. ` +
+        "Where it exceeds 25% of the internal floor area, disregarding common parts, the " +
+        "premises are excluded.",
+      "s.4 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  } else if (nonResidentialPercent > 20) {
+    note(
+      "non_residential_close",
+      `The non-residential part is said to be ${nonResidentialPercent}%, which is close to ` +
+        "the 25% limit. A measured survey will be needed before notice is served."
+    );
+  }
+
+  // ── Resident landlord exclusion ────────────────────────────────────
+  if (isYes(input.residentLandlord)) {
+    if (totalFlats !== null && totalFlats <= 4) {
+      review(
+        "resident_landlord",
+        "The building has four or fewer units and the landlord lives there. The resident " +
+          "landlord exclusion may apply, which would prevent a collective claim. This needs " +
+          "checking against the building's history and construction.",
+        "s.10 Leasehold Reform, Housing and Urban Development Act 1993"
+      );
+    } else {
+      note(
+        "resident_landlord_larger_building",
+        "The landlord lives in the building, but the resident landlord exclusion only " +
+          "applies to premises of four or fewer units."
+      );
+    }
+  }
+
+  // ── Excluded landlords and land ────────────────────────────────────
+  if (isYes(input.landlordIsNationalTrust)) {
+    review("national_trust", "Land held inalienably by the National Trust is outside the scheme.");
+  }
+  if (isYes(input.landlordIsCrown)) {
+    review("crown_land", "The Crown is not bound by the statutory scheme, although it gives voluntary undertakings.");
+  }
+
+  // ── Absent landlord ────────────────────────────────────────────────
+  if (isAnswered(input.landlordIdentifiable) && !isYes(input.landlordIdentifiable)) {
+    flags.absentLandlord = true;
+    note(
+      "absent_landlord",
+      "The freeholder cannot be traced. The claim proceeds by application to the county " +
+        "court for a vesting order. This is charged as a supplement and is outside our " +
+        "no-completion-no-fee arrangement.",
+      "s.26 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  }
+
+  if (isYes(input.noticeAlreadyServed)) {
+    review(
+      "notice_already_served",
+      "A notice has already been served. We need to see it and check the statutory " +
+        "timetable before quoting.",
+      "s.13 Leasehold Reform, Housing and Urban Development Act 1993"
+    );
+  }
+
+  return {
+    outcome,
+    reasons,
+    statutoryRefs: Array.from(statutoryRefs),
+    flags,
+    regimeId: regime.regimeId,
+  };
+}

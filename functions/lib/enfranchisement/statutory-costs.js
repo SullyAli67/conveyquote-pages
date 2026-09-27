@@ -122,6 +122,52 @@ export const LANDLORD_SECTION_60_COSTS = {
     "liability is unaffected by our no-completion-no-fee arrangement.",
 };
 
+// The landlord's costs on a COLLECTIVE claim. Same principle as s.60 on
+// an individual extension, different section and a different basis: the
+// reversioner's costs of investigating the claim, valuing the freehold
+// and conveying it. The participants are jointly liable, so this is a
+// matter-level cost shared between them rather than a per-flat one.
+//
+// Liability survives withdrawal in the same way — s.33(2) fixes the
+// tenant's liability at the costs incurred down to the time the notice
+// ceases to have effect.
+export const LANDLORD_SECTION_33_COSTS = {
+  label: "Freeholder's legal and valuation costs",
+  statutoryRef: "s.33 Leasehold Reform, Housing and Urban Development Act 1993",
+  amountLow: 2500,
+  amountHigh: 6000,
+  status: THIRD_PARTY_COST_STATUS.ESTIMATE,
+  withinFirmControl: false,
+  payableTo: "The freeholder",
+  note:
+    "This is an ESTIMATE ONLY and is NOT a cost we control, set or receive. On a " +
+    "collective claim the participants are liable for the freeholder's reasonable costs " +
+    "of investigating the claim, valuing the freehold and transferring it. The range is " +
+    "wide because it depends heavily on the size of the building and how many interests " +
+    "there are to deal with. If the amount claimed is unreasonable it can be challenged " +
+    "before the First-tier Tribunal, but we cannot fix or guarantee it.",
+  survivesWithdrawalNote:
+    "If the claim is withdrawn or is deemed withdrawn, the participants remain liable for " +
+    "the freeholder's costs incurred up to that point under s.33 of the 1993 Act. This " +
+    "liability is unaffected by our no-completion-no-fee arrangement.",
+};
+
+// The participants' own valuer on a collective claim. A block valuation
+// is a bigger job than a single flat, and scales with the building.
+export const COLLECTIVE_VALUER_FEE = {
+  label: "Your valuer's fee",
+  amountLow: 1200,
+  amountHigh: 3500,
+  status: THIRD_PARTY_COST_STATUS.ESTIMATE,
+  withinFirmControl: false,
+  payableTo: "Your surveyor / valuer",
+  note:
+    "This is an ESTIMATE ONLY and is NOT a cost we control or receive. An enfranchisement " +
+    "valuation of a whole building is a substantially larger piece of work than valuing a " +
+    "single flat and the fee scales with the number of units. You instruct the valuer " +
+    "directly. This fee is payable whether or not the claim completes.",
+};
+
 // The client's own valuer. Instructed by the client, not by us.
 export const LEASEHOLDER_VALUER_FEE = {
   label: "Your valuer's fee",
@@ -165,6 +211,16 @@ export const UNVERIFIED_STATUTORY_FEES = {
       "Where the landlord cannot be traced, an application to the county court for a " +
       "vesting order is required. The court fee will be confirmed when the application " +
       "is made.",
+  },
+  companiesHouseIncorporation: {
+    label: "Companies House — incorporation of the nominee purchaser",
+    amount: null,
+    verified: false,
+    withinFirmControl: false,
+    note:
+      "Most collective claims use a company to hold the freehold. The Companies House " +
+      "incorporation fee is a fixed statutory charge and will be confirmed when the " +
+      "company is formed.",
   },
   tracingAgent: {
     label: "Tracing agent's fee",

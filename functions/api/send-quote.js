@@ -1,8 +1,8 @@
 import { buildQuoteData } from "../lib/calculate-quote.js";
 import {
-  getEnfranchisementLabel,
-  isEnfranchisementType,
-} from "../lib/enfranchisement/types.js";
+  getSpecialistMatterLabel,
+  isSpecialistMatterType,
+} from "../lib/matter-families.js";
 
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -81,8 +81,8 @@ const sectionTable = (title, rows) => `
 const getTransactionLabel = (type) => {
   // Enfranchisement labels live in functions/lib/enfranchisement/types.js
   // so they are defined exactly once across every rail.
-  const enfranchisementLabel = getEnfranchisementLabel(type);
-  if (enfranchisementLabel) return enfranchisementLabel;
+  const specialistLabel = getSpecialistMatterLabel(type);
+  if (specialistLabel) return specialistLabel;
 
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
@@ -250,7 +250,7 @@ export async function onRequestPost(context) {
     let priceValue;
     let lenderLabel;
 
-    if (isEnfranchisementType(type)) {
+    if (isSpecialistMatterType(type)) {
       // A lease extension has no consideration figure. What the admin
       // needs to triage it is the unexpired term (which drives the
       // premium and the urgency) and whether a human has to look at the
@@ -302,7 +302,7 @@ export async function onRequestPost(context) {
     // Enfranchisement matters carry a qualification outcome that decides
     // whether the quote may be issued at all, so it goes at the top of
     // the internal email rather than being buried in the admin screen.
-    if (isEnfranchisementType(type)) {
+    if (isSpecialistMatterType(type)) {
       const outcome = quote.qualification?.outcome || "unknown";
       const outcomeLabel =
         outcome === "qualifies"

@@ -2,7 +2,10 @@
 //
 // scripts/verify-enfranchisement-quotes.js
 //
-// Fixture harness for the enfranchisement engine.
+// Fixture harness for the SPECIALIST matter families — enfranchisement
+// (lease extensions and collective claims) and shared ownership
+// (staircasing). The filename predates the second family; the npm
+// script name is kept so nobody's muscle memory breaks.
 //
 // Why this is a fixture harness and not a cross-engine comparison
 // --------------------------------------------------------------
@@ -19,6 +22,13 @@
 // Exit code: 0 if every assertion passes, 1 otherwise.
 
 import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchisement-quote.js";
+import { buildStaircasingQuote } from "../functions/lib/calculate-staircasing-quote.js";
+import { assessCollectiveQualification } from "../functions/lib/enfranchisement/qualification.js";
+import {
+  getCollectiveMatterFee,
+  getCollectivePerParticipantFee,
+} from "../functions/lib/enfranchisement/price-book.js";
+import { assessStaircasingSdlt } from "../functions/lib/shared-ownership/sdlt.js";
 import { assessQualification, QUALIFICATION_OUTCOME } from "../functions/lib/enfranchisement/qualification.js";
 import { getRegime, listRegimes } from "../functions/lib/enfranchisement/regime.js";
 import { getNewLeaseRegistrationFee } from "../functions/lib/enfranchisement/statutory-costs.js";
@@ -344,6 +354,154 @@ checkTrue("unconfigured supplement warns about under-pricing", railMissingSupple
 check("unconfigured supplement is not invented from the price book", railMissingSupplement.legalFeesExVat, 1750);
 // The nature of the matter, not the pricing, governs the NCNF promise.
 check("NCNF is still disapplied on an unconfigured vesting order matter", railMissingSupplement.abortivePolicy.appliesToThisMatter, false);
+
+
+// ═══════════════════════════════════════════════════════════════════
+section("10. Collective enfranchisement — s.13 qualification");
+// ═══════════════════════════════════════════════════════════════════
+
+const block = {
+  type: "collective_enfranchisement",
+  totalFlats: 8, qualifyingTenantFlats: 8, participantCount: 5,
+  nonResidentialPercent: 0, landlordIdentifiable: "yes",
+};
+const cq = (over) => assessCollectiveQualification({ ...block, ...over }).outcome;
+
+check("clean 8-flat block qualifies", cq({}), QUALIFICATION_OUTCOME.QUALIFIES);
+check("a single flat cannot be enfranchised", cq({ totalFlats: 1 }), QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY);
+check("two flats, both participating", cq({ totalFlats: 2, qualifyingTenantFlats: 2, participantCount: 2 }), QUALIFICATION_OUTCOME.QUALIFIES);
+check("two flats, only one participating", cq({ totalFlats: 2, qualifyingTenantFlats: 2, participantCount: 1 }), QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY);
+check("fails the two-thirds test", cq({ qualifyingTenantFlats: 4 }), QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY);
+check("exactly two-thirds passes", cq({ totalFlats: 9, qualifyingTenantFlats: 6, participantCount: 5 }), QUALIFICATION_OUTCOME.QUALIFIES);
+check("below half participating", cq({ participantCount: 3 }), QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY);
+check("exactly half participating", cq({ participantCount: 4 }), QUALIFICATION_OUTCOME.QUALIFIES);
+check("over 25% commercial is excluded", cq({ nonResidentialPercent: 26 }), QUALIFICATION_OUTCOME.DOES_NOT_QUALIFY);
+check("exactly 25% commercial passes", cq({ nonResidentialPercent: 25 }), QUALIFICATION_OUTCOME.QUALIFIES);
+check("floor area unknown needs review", cq({ nonResidentialPercent: "" }), QUALIFICATION_OUTCOME.NEEDS_REVIEW);
+check("resident landlord in a 4-unit building", cq({ totalFlats: 4, qualifyingTenantFlats: 4, participantCount: 2, residentLandlord: "yes" }), QUALIFICATION_OUTCOME.NEEDS_REVIEW);
+check("resident landlord in a 20-unit building", cq({ totalFlats: 20, qualifyingTenantFlats: 20, participantCount: 10, residentLandlord: "yes" }), QUALIFICATION_OUTCOME.QUALIFIES);
+
+// ═══════════════════════════════════════════════════════════════════
+section("    collective — the per-participant scale");
+// ═══════════════════════════════════════════════════════════════════
+
+// The scale must reward joining (per-flat cost falls) without punishing
+// the firm (matter total never falls). A plain banded scale fails the
+// second test at every band edge — four flats at £1,100 is £4,400 but
+// five at £850 is only £4,250 — which is why the total is floored.
+let prevTotal = 0, prevPer = Infinity, totalMono = true, perMono = true;
+for (let n = 2; n <= 60; n += 1) {
+  const total = getCollectiveMatterFee(n);
+  const per = getCollectivePerParticipantFee(n);
+  if (total < prevTotal - 0.005) totalMono = false;
+  if (per > prevPer + 0.005) perMono = false;
+  prevTotal = total; prevPer = per;
+}
+checkTrue("matter total never falls as the group grows (2-60)", totalMono);
+checkTrue("per-participant cost never rises as the group grows (2-60)", perMono);
+check("2 participants", getCollectiveMatterFee(2), 2800);
+check("4 participants", getCollectiveMatterFee(4), 4400);
+check("5 participants is floored at the 4-participant total", getCollectiveMatterFee(5), 4400);
+check("per-participant at 5 reflects the floor", getCollectivePerParticipantFee(5), 880);
+checkTrue("per-participant share x count equals the matter total", Math.abs(getCollectivePerParticipantFee(7) * 7 - getCollectiveMatterFee(7)) < 0.05);
+
+// ═══════════════════════════════════════════════════════════════════
+section("    collective — pricing, apportionment and the right statute");
+// ═══════════════════════════════════════════════════════════════════
+
+const coll = buildEnfranchisementQuote(block);
+checkTrue("collective claim is priced", coll.priced);
+check("legal fees = scale + participation agreement + nominee company", coll.legalFeesExVat, 4400 + 450 + 350);
+check("apportionment reports the participant count", coll.apportionment.participantCount, 5);
+checkTrue("each share x count equals the whole claim",
+  Math.abs(coll.apportionment.perParticipant.grandTotal * 5 - coll.grandTotal) < 0.05);
+checkTrue("apportionment explains it is an equal split", /participation agreement may allocate/i.test(coll.apportionment.note));
+check("an individual extension has no apportionment", statutory.apportionment, null);
+
+// Citing s.60 on a collective claim would be wrong.
+checkTrue("collective NCNF cites s.33", /s\.33/.test(coll.abortivePolicy.thirdPartyDisclosure));
+checkTrue("collective NCNF does NOT cite s.60", !/s\.60/.test(coll.abortivePolicy.thirdPartyDisclosure));
+checkTrue("extension NCNF still cites s.60(3)", /s\.60\(3\)/.test(statutory.abortivePolicy.thirdPartyDisclosure));
+const collLandlord = coll.thirdPartyCosts.find((c) => /Freeholder/.test(c.label));
+checkTrue("freeholder's costs cite s.33", /s\.33/.test(collLandlord.statutoryRef));
+checkTrue("freeholder's costs say we do not control them", /NOT a cost we control/i.test(collLandlord.note));
+check("collective has no statutory-vs-informal comparison", coll.routeComparison, null);
+checkTrue("collective buys a FREEHOLD, not a new lease",
+  coll.thirdPartyCosts.some((c) => /Price of the freehold/.test(c.label)));
+checkTrue("collective LR line is a freehold transfer",
+  coll.disbursements.some((d) => /transfer of the freehold/i.test(d.label)));
+checkTrue("collective third-party costs are all outside firm control",
+  coll.thirdPartyCosts.every((c) => c.withinFirmControl === false));
+const collBarred = buildEnfranchisementQuote({ ...block, totalFlats: 1 });
+check("a non-qualifying building gets no price", collBarred.priced, false);
+
+// ═══════════════════════════════════════════════════════════════════
+section("11. Staircasing — SDLT rules");
+// ═══════════════════════════════════════════════════════════════════
+
+const sd = (cur, add, mve) =>
+  assessStaircasingSdlt({ currentSharePercent: cur, additionalSharePercent: add, marketValueElection: mve }).outcome;
+
+check("40% + 20% = 60%, no election", sd(40, 20, "no"), "not_payable");
+check("60% + 20% = exactly 80%", sd(60, 20, "no"), "not_payable");
+check("60% + 25% = 85% crosses the threshold", sd(60, 25, "no"), "manual_review");
+check("85% + 15% = 100%, already above", sd(85, 15, "no"), "manual_review");
+check("market value election settles it at 100%", sd(40, 60, "yes"), "not_payable");
+check("market value election settles it above 80%", sd(90, 10, "yes"), "not_payable");
+check("shares unknown", sd(null, null, ""), "unknown");
+checkTrue("the threshold case explains linked transactions",
+  /linked/i.test(assessStaircasingSdlt({ currentSharePercent: 60, additionalSharePercent: 25 }).note));
+
+// ═══════════════════════════════════════════════════════════════════
+section("    staircasing — pricing and third-party costs");
+// ═══════════════════════════════════════════════════════════════════
+
+const stair = buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 35, hasMortgage: "yes", partyCount: 1 });
+check("base fee plus mortgage supplement", stair.legalFeesExVat, 900);
+checkTrue("mortgage supplement applied from the answer, not a checkbox",
+  stair.appliedSupplements.some((s) => s.key === "mortgageOnStaircasing"));
+
+const toFull = buildStaircasingQuote({ type: "staircasing", currentSharePercent: 60, additionalSharePercent: 40, hasMortgage: "no", partyCount: 1 });
+check("reaching 100% adds the final staircasing supplement", toFull.legalFeesExVat, 750 + 125);
+checkTrue("final staircasing applied automatically",
+  toFull.appliedSupplements.some((s) => s.key === "finalStaircasing"));
+checkTrue("reaching 100% flags the lease extension that follows",
+  toFull.qualification.reasons.some((r) => r.code === "final_staircasing"));
+
+check("owning 100% already cannot staircase", buildStaircasingQuote({ type: "staircasing", currentSharePercent: 100, additionalSharePercent: 10 }).priced, false);
+check("shares totalling over 100% are refused", buildStaircasingQuote({ type: "staircasing", currentSharePercent: 80, additionalSharePercent: 30 }).priced, false);
+check("a restrictive lease needs review", buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 20, leaseRestrictsStaircasing: "yes" }).mayAutoIssue, false);
+
+checkTrue("staircasing third-party costs are all outside firm control",
+  stair.thirdPartyCosts.every((c) => c.withinFirmControl === false));
+checkTrue("the provider's admin fee is marked an estimate we do not control",
+  /NOT a cost we control/i.test(stair.thirdPartyCosts.find((c) => /administration fee/i.test(c.label)).note));
+check("the share price is never calculated", stair.premium.status, "not_included");
+check("LR fee is TBC until the share is valued",
+  stair.disbursements.find((d) => /Land Registry/.test(d.label)).status, "tbc");
+const stairPriced = buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 35, sharePrice: 90000 });
+check("LR fee computes once the share price is known",
+  stairPriced.disbursements.find((d) => /Land Registry/.test(d.label)).amount, 40);
+check("grandTotal is fees plus fixable disbursements only", stair.grandTotal,
+  Number((stair.legalTotalInclVat + stair.disbursementTotal).toFixed(2)));
+check("staircasing belongs to its own family", stair.matterFamily, "shared_ownership");
+
+// Rail isolation, same rule as the other families.
+const stairRail = buildStaircasingQuote({
+  type: "staircasing", currentSharePercent: 40, additionalSharePercent: 35, hasMortgage: "yes",
+  legalFeeOverrides: [
+    { label: "Legal fee", amount: 800, vatApplicable: true, supplementKey: null },
+    { label: "Mortgage supplement", amount: 175, vatApplicable: true, supplementKey: "mortgageOnStaircasing" },
+  ],
+});
+check("configured fees replace the central price book", stairRail.legalFeesExVat, 975);
+const stairMissing = buildStaircasingQuote({
+  type: "staircasing", currentSharePercent: 40, additionalSharePercent: 35, hasMortgage: "yes",
+  legalFeeOverrides: [{ label: "Legal fee", amount: 800, vatApplicable: true, supplementKey: null }],
+});
+check("an unconfigured supplement is not invented centrally", stairMissing.legalFeesExVat, 800);
+checkTrue("an unconfigured supplement warns about under-pricing",
+  stairMissing.warnings.some((w) => /under-priced/.test(w)));
 
 // ═══════════════════════════════════════════════════════════════════
 console.log(`\n${c.bold}${"─".repeat(60)}${c.reset}`);

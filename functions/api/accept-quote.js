@@ -1,4 +1,4 @@
-import { getEnfranchisementLabel } from "../lib/enfranchisement/types.js";
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 
 const htmlResponse = (html, status = 200) =>
   new Response(html, {
@@ -23,8 +23,8 @@ const escapeHtml = (value) =>
 const getTransactionLabel = (type) => {
   // Enfranchisement labels come from the one shared module rather than
   // being restated here — see functions/lib/enfranchisement/types.js.
-  const enfranchisementLabel = getEnfranchisementLabel(type);
-  if (enfranchisementLabel) return enfranchisementLabel;
+  const specialistLabel = getSpecialistMatterLabel(type);
+  if (specialistLabel) return specialistLabel;
 
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";

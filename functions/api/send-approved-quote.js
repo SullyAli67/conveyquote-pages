@@ -1,9 +1,9 @@
 import { buildUnsubUrl } from "../lib/unsub.js";
 import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
 import {
-  getEnfranchisementLabel,
-  isEnfranchisementType,
-} from "../lib/enfranchisement/types.js";
+  getSpecialistMatterLabel,
+  isSpecialistMatterType,
+} from "../lib/matter-families.js";
 
 export async function onRequestPost(context) {
   const jsonResponse = (payload, status = 200) =>
@@ -50,7 +50,7 @@ export async function onRequestPost(context) {
     }
 
     const prettyType =
-      getEnfranchisementLabel(type) ||
+      getSpecialistMatterLabel(type) ||
       (type === "purchase"
         ? "Purchase"
         : type === "sale"
@@ -424,7 +424,7 @@ export async function onRequestPost(context) {
         row("Purchase summary", escapeHtml(purchasePart || "Not provided")),
         row("Tenure summary", escapeHtml(tenure || "Not provided")),
       ]);
-    } else if (isEnfranchisementType(type)) {
+    } else if (isSpecialistMatterType(type)) {
       // A lease extension has no consideration figure to report. The
       // unexpired term is what matters — it drives both the premium and
       // the urgency of serving notice.
@@ -468,7 +468,7 @@ export async function onRequestPost(context) {
     // control. An email that showed only the fee total would leave a
     // client believing a £1,440 quote was the cost of their claim.
     let enfranchisementBlocksHtml = "";
-    if (isEnfranchisementType(type)) {
+    if (isSpecialistMatterType(type)) {
       const formatEstimate = (low, high) => {
         if (low == null && high == null) return "A valuation is required";
         if (low === high) return `£${Number(low).toFixed(2)} (estimate)`;

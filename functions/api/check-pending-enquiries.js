@@ -6,7 +6,7 @@
 // Triggered by a cron-job.org schedule (weekdays 9am UK). Reuses FOLLOWUP_SECRET
 // for auth so Sully doesn't have to manage another secret.
 
-import { getEnfranchisementLabel } from "../lib/enfranchisement/types.js";
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 
 const TO_ADDRESS = "info@conveyquote.uk";
 const FROM_ADDRESS = "ConveyQuote <noreply@conveyquote.uk>";
@@ -41,8 +41,8 @@ function checkAuth(request, env) {
 function prettyType(type) {
   const t = safe(type).toLowerCase();
   // Shared module first — see functions/lib/enfranchisement/types.js.
-  const enfranchisementLabel = getEnfranchisementLabel(t, { short: true });
-  if (enfranchisementLabel) return enfranchisementLabel;
+  const specialistLabel = getSpecialistMatterLabel(t, { short: true });
+  if (specialistLabel) return specialistLabel;
   if (t === "purchase") return "Purchase";
   if (t === "sale") return "Sale";
   if (t === "sale_purchase") return "Sale & Purchase";

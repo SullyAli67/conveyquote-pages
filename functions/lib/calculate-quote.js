@@ -12,6 +12,8 @@ import {
 } from "./pass-through-costs.js";
 import { isEnfranchisementType } from "./enfranchisement/types.js";
 import { buildEnfranchisementQuote } from "./calculate-enfranchisement-quote.js";
+import { isSharedOwnershipType } from "./shared-ownership/types.js";
+import { buildStaircasingQuote } from "./calculate-staircasing-quote.js";
 
 // Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
 // engine can source the same values — these costs must not diverge
@@ -745,6 +747,10 @@ export function buildQuoteData(input) {
   // without changing how it calls this function.
   if (isEnfranchisementType(type)) {
     return buildEnfranchisementQuote(input);
+  }
+
+  if (isSharedOwnershipType(type)) {
+    return buildStaircasingQuote(input);
   }
 
   if (type === "purchase") {

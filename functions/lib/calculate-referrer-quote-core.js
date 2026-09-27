@@ -39,8 +39,10 @@ import {
   getLandRegistryFee,
 } from "./disbursement-constants.js";
 import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { isSharedOwnershipType } from "./shared-ownership/types.js";
 import { buildConfigRailEnfranchisementQuote } from "./enfranchisement/config-rail.js";
 import { VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS } from "./enfranchisement/price-book.js";
+import { VALID_STAIRCASING_SUPPLEMENT_KEYS } from "./shared-ownership/price-book.js";
 
 const VAT_RATE = 0.2;
 
@@ -140,6 +142,7 @@ const SUPPLEMENT_KEYS = [
 export const VALID_SUPPLEMENT_KEYS = [
   ...SUPPLEMENT_KEYS.map((e) => e.key),
   ...VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS,
+  ...VALID_STAIRCASING_SUPPLEMENT_KEYS,
 ];
 
 function round2(n) {
@@ -187,7 +190,7 @@ export async function calculateReferrerQuote({ db, referrerId, body }) {
   // cost block are statutory and therefore central: a referrer cannot
   // configure who qualifies for a statutory right, nor what the landlord
   // is entitled to recover under s.60.
-  if (isEnfranchisementType(transactionType)) {
+  if (isEnfranchisementType(transactionType) || isSharedOwnershipType(transactionType)) {
     const enfConfig = await db
       .prepare(
         `SELECT id, label, amount, includes_vat, is_disbursement, sort_order, supplement_key

@@ -176,6 +176,20 @@ export async function onRequestGet(context) {
       is_business_tenancy: quoteSource.isBusinessTenancy || "",
       staircased_to_full: quoteSource.staircasedToFull || "",
       premium_supplied: quoteSource.premium || "",
+
+      // Collective enfranchisement
+      total_flats: quoteSource.totalFlats || "",
+      qualifying_tenant_flats: quoteSource.qualifyingTenantFlats || "",
+      participant_count: quoteSource.participantCount || "",
+      non_residential_percent: quoteSource.nonResidentialPercent || "",
+      resident_landlord: quoteSource.residentLandlord || "",
+
+      // Staircasing
+      current_share_percent: quoteSource.currentSharePercent || "",
+      additional_share_percent: quoteSource.additionalSharePercent || "",
+      market_value_election: quoteSource.marketValueElection || "",
+      has_mortgage: quoteSource.hasMortgage || "",
+      share_price: quoteSource.sharePrice || "",
     };
 
     const {
@@ -243,6 +257,15 @@ export async function onRequestGet(context) {
             mayAutoIssue: authoritative.mayAutoIssue ?? null,
             appliedSupplements: authoritative.appliedSupplements ?? null,
             disclaimerLines: authoritative.disclaimerLines ?? null,
+
+            // Collective enfranchisement and staircasing. adminQuote is
+            // an explicit whitelist, so an unnamed field is dropped
+            // silently on the way to the admin screen.
+            apportionment: authoritative.apportionment ?? null,
+            sdlt: authoritative.sdlt ?? null,
+            currentSharePercent: authoritative.currentSharePercent ?? null,
+            additionalSharePercent: authoritative.additionalSharePercent ?? null,
+            resultingSharePercent: authoritative.resultingSharePercent ?? null,
           }
         : null,
     });

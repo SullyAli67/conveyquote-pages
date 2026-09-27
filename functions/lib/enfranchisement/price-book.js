@@ -39,6 +39,90 @@ import { ENFRANCHISEMENT_TYPES } from "./types.js";
 export const BASE_FEES = {
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_STATUTORY]: 1200,
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL]: 950,
+  // Collective enfranchisement is NOT priced from this table — it is
+  // per participant on the declining scale below. Deliberately absent
+  // so a caller that reaches for a flat fee fails loudly.
+};
+
+// ── Collective enfranchisement: declining per-participant scale ──────
+//
+// A s.13 claim is one piece of work shared between the participants, so
+// the per-flat cost falls as more of them join. Published market rates
+// run at roughly £1,500 + VAT per flat where only two participate,
+// down to about £500 + VAT per flat at twenty or more. The bands below
+// sit at or below that range throughout.
+//
+// Charging a flat fee per flat would penalise small buildings and
+// over-charge large ones; charging one matter fee divided equally would
+// make a two-flat claim look absurdly expensive. The scale is the
+// honest middle.
+//
+// `upTo` is inclusive. The amount is PER PARTICIPANT, excluding VAT.
+export const COLLECTIVE_PER_PARTICIPANT_SCALE = [
+  { upTo: 2, amount: 1400 },
+  { upTo: 4, amount: 1100 },
+  { upTo: 8, amount: 850 },
+  { upTo: 14, amount: 650 },
+  { upTo: Infinity, amount: 500 },
+];
+
+function rawBandAmount(n) {
+  for (const band of COLLECTIVE_PER_PARTICIPANT_SCALE) {
+    if (n <= band.upTo) return band.amount;
+  }
+  return COLLECTIVE_PER_PARTICIPANT_SCALE[
+    COLLECTIVE_PER_PARTICIPANT_SCALE.length - 1
+  ].amount;
+}
+
+// ── Why the matter total is computed, not just multiplied ────────────
+//
+// A plain banded scale is non-monotonic at the band edges: four
+// participants at £1,100 each is £4,400, but five at £850 each is only
+// £4,250. The firm would earn LESS on a larger claim that is plainly
+// more work — five sets of identity checks, five sets of instructions,
+// a bigger participation agreement.
+//
+// So the matter total is floored at the previous participant count's
+// total. The per-participant figure still falls as the group grows,
+// which is the point of the scale, but the total never goes backwards.
+export function getCollectiveMatterFee(participantCount) {
+  const n = Math.max(2, Math.floor(Number(participantCount) || 0));
+  let total = 0;
+  for (let i = 2; i <= n; i += 1) {
+    total = Math.max(total, rawBandAmount(i) * i);
+  }
+  return Number(total.toFixed(2));
+}
+
+// The share each participant carries, derived from the matter total so
+// the two can never disagree.
+export function getCollectivePerParticipantFee(participantCount) {
+  const n = Math.max(2, Math.floor(Number(participantCount) || 0));
+  return Number((getCollectiveMatterFee(n) / n).toFixed(2));
+}
+
+// Work done once for the whole claim regardless of how many flats take
+// part, so it is charged at matter level and shared between them rather
+// than multiplied by the participant count.
+export const COLLECTIVE_MATTER_FEES = {
+  participationAgreement: {
+    key: "participationAgreement",
+    label: "Participation agreement",
+    amount: 450,
+    note:
+      "The agreement between the participating leaseholders setting out who pays what, " +
+      "what happens if someone drops out, and how the freehold will be held afterwards.",
+  },
+  nomineePurchaser: {
+    key: "nomineePurchaser",
+    label: "Nominee purchaser company — formation and advice",
+    amount: 350,
+    note:
+      "Most claims use a company to hold the freehold on the participants' behalf. This " +
+      "covers forming it and advising on its constitution. The Companies House " +
+      "incorporation fee is a separate disbursement.",
+  },
 };
 
 // ── Supplements ─────────────────────────────────────────────────────
@@ -148,6 +232,15 @@ export const ABORTIVE_POLICY = {
     "amount you owe to anyone else. In particular, if the claim is withdrawn or deemed " +
     "withdrawn you remain liable for the landlord's costs incurred up to that point " +
     "under s.60(3) of the 1993 Act, and your valuer's fee remains payable. Neither is " +
+    "within our control.",
+  // The same carve-out on a collective claim, which is governed by s.33
+  // rather than s.60. Citing the wrong section on a client-facing quote
+  // is the kind of error a reader notices and a regulator would.
+  thirdPartyDisclosureCollective:
+    "Our no-completion-no-fee arrangement covers OUR fee only. It does not affect any " +
+    "amount the participants owe to anyone else. In particular, if the claim is withdrawn " +
+    "or deemed withdrawn you remain liable for the freeholder's costs incurred up to that " +
+    "point under s.33 of the 1993 Act, and your valuer's fee remains payable. Neither is " +
     "within our control.",
   excludedSupplements: Object.values(SUPPLEMENTS)
     .filter((s) => s.excludedFromNoCompletionNoFee)

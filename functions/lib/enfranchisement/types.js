@@ -31,10 +31,11 @@
 // existing quote changes by a penny, and the engine-consistency harness
 // in scripts/verify-engine-consistency.js stays meaningful.
 
-export const MATTER_FAMILY = {
-  CONVEYANCING: "conveyancing",
-  ENFRANCHISEMENT: "enfranchisement",
-};
+// The family registry now lives in ../matter-families.js, so a third
+// family does not have to import the enfranchisement module just to name
+// itself. Re-exported here so existing imports keep working.
+export { MATTER_FAMILY } from "../matter-families.js";
+import { MATTER_FAMILY } from "../matter-families.js";
 
 // ── Live enfranchisement matter types (Phase 1) ─────────────────────
 //
@@ -52,22 +53,21 @@ export const MATTER_FAMILY = {
 //   backstop; the term, the ground rent and the lease terms are
 //   whatever the parties agree. Priced separately because the work
 //   profile genuinely differs — see price-book.js.
+//
+// COLLECTIVE_ENFRANCHISEMENT
+//   A claim under s.13 of the 1993 Act. The qualifying tenants of flats
+//   in a building act together to buy the freehold. Costs are shared
+//   between the participants, so pricing is per participant on a
+//   declining scale rather than a single fixed fee — see ./price-book.js.
 export const ENFRANCHISEMENT_TYPES = {
   LEASE_EXTENSION_STATUTORY: "lease_extension_statutory",
   LEASE_EXTENSION_INFORMAL: "lease_extension_informal",
+  COLLECTIVE_ENFRANCHISEMENT: "collective_enfranchisement",
 };
 
 // Planned for later phases, deliberately NOT declared as live values so
 // no rail can accidentally accept a type the engine cannot price:
 //
-//   collective_enfranchisement  — s.13 of the 1993 Act. Phase 2. Note
-//                                 that market pricing for these is per
-//                                 participant on a DECLINING scale
-//                                 (roughly £1,500 + VAT per flat at two
-//                                 participants, falling to about £500 +
-//                                 VAT per flat at twenty or more), so
-//                                 the apportionment model needs banding
-//                                 rather than a flat division.
 //   house_enfranchisement       — freehold purchase, Leasehold Reform
 //                                 Act 1967. Phase 3.
 //   house_lease_extension       — 50-year extension, 1967 Act. Phase 3.
@@ -84,6 +84,8 @@ const ENFRANCHISEMENT_LABELS = {
     "Statutory lease extension (flat)",
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL]:
     "Informal lease extension (flat)",
+  [ENFRANCHISEMENT_TYPES.COLLECTIVE_ENFRANCHISEMENT]:
+    "Collective enfranchisement (buying the freehold)",
 };
 
 // Short labels for constrained UI — dropdowns, table cells, the firm
@@ -91,6 +93,7 @@ const ENFRANCHISEMENT_LABELS = {
 const ENFRANCHISEMENT_SHORT_LABELS = {
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_STATUTORY]: "Lease extension (statutory)",
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL]: "Lease extension (informal)",
+  [ENFRANCHISEMENT_TYPES.COLLECTIVE_ENFRANCHISEMENT]: "Collective enfranchisement",
 };
 
 // The statutory authority for each route. Rendered on the quote so the
@@ -101,12 +104,18 @@ const ENFRANCHISEMENT_STATUTORY_BASIS = {
     "Section 42, Leasehold Reform, Housing and Urban Development Act 1993",
   [ENFRANCHISEMENT_TYPES.LEASE_EXTENSION_INFORMAL]:
     "Negotiated with the freeholder outside the statutory scheme",
+  [ENFRANCHISEMENT_TYPES.COLLECTIVE_ENFRANCHISEMENT]:
+    "Section 13, Leasehold Reform, Housing and Urban Development Act 1993",
 };
 
 // True when `type` belongs to the enfranchisement family. Every rail
 // uses this to decide whether to route to the enfranchisement engine,
 // so there is exactly one definition of "is this an enfranchisement
 // matter" in the codebase.
+export function isCollectiveEnfranchisement(type) {
+  return String(type || "").trim() === ENFRANCHISEMENT_TYPES.COLLECTIVE_ENFRANCHISEMENT;
+}
+
 export function isEnfranchisementType(type) {
   return ENFRANCHISEMENT_TYPE_SET.has(String(type || "").trim());
 }

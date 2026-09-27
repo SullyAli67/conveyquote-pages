@@ -45,7 +45,7 @@ import {
   buildFilename,
   loadFirmBranding,
 } from "../lib/firm-quote-pdf-core.js";
-import { getEnfranchisementLabel } from "../lib/enfranchisement/types.js";
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 
 const RESEND_FROM_ADDRESS = "quotes@conveyquote.uk";
 const RESEND_FROM_FALLBACK_NAME = "ConveyQuote";
@@ -64,7 +64,7 @@ const CONVEYANCING_TRANSACTION_DESCRIPTION = {
 // Enfranchisement wording is not restated here — see
 // functions/lib/enfranchisement/types.js.
 const getTransactionDescription = (transactionType) => {
-  const enfranchisementLabel = getEnfranchisementLabel(transactionType);
+  const specialistLabel = getSpecialistMatterLabel(transactionType);
   if (enfranchisementLabel) return enfranchisementLabel.toLowerCase();
   return (
     CONVEYANCING_TRANSACTION_DESCRIPTION[transactionType] || "conveyancing matter"

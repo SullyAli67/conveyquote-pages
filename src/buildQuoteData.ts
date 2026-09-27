@@ -20,6 +20,8 @@ import {
 // pattern is already proven by disbursement-constants.js above.
 import { isEnfranchisementType } from "../functions/lib/enfranchisement/types.js";
 import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchisement-quote.js";
+import { isSharedOwnershipType } from "../functions/lib/shared-ownership/types.js";
+import { buildStaircasingQuote } from "../functions/lib/calculate-staircasing-quote.js";
 
 type TransactionType =
   | "sale"
@@ -144,18 +146,46 @@ export type BuiltQuoteData = {
     statutoryAvailable: boolean;
     note: string;
     rows: { feature: string; statutory: string; informal: string }[];
-  };
+  } | null;
   thirdPartyCosts?: ThirdPartyCost[];
   indicativeTotalExcludingPremium?: {
     low: number;
     high: number;
     excludesPremium: boolean;
+    excludedItemLabel?: string;
     note: string;
   };
   premium?: { status: string; amount: number | null; valuerRequired: boolean };
   exclusions?: { label: string; note: string; amount: number | null }[];
   abortivePolicy?: AbortivePolicy;
-  regimeId?: string;
+  // Collective enfranchisement only — each participant's equal share of
+  // the group's costs. Null on every other matter type.
+  apportionment?: {
+    participantCount: number;
+    basis: string;
+    perParticipant: {
+      legalFeesExVat: number;
+      vat: number;
+      legalTotalInclVat: number;
+      disbursementTotal: number;
+      grandTotal: number;
+    };
+    note: string;
+  } | null;
+
+  // Staircasing only — the SDLT position, which follows its own
+  // statutory rules rather than the residential rate table.
+  sdlt?: {
+    outcome: "not_payable" | "manual_review" | "unknown";
+    resultingSharePercent: number | null;
+    note: string;
+    statutoryRef: string | null;
+  };
+  currentSharePercent?: number | null;
+  additionalSharePercent?: number | null;
+  resultingSharePercent?: number | null;
+
+  regimeId?: string | null;
   quotedAsOf?: string;
   warnings?: string[];
   mayAutoIssue?: boolean;
@@ -1030,6 +1060,17 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   // produce byte-identical output from one implementation.
   if (isEnfranchisementType(form.type)) {
     return buildEnfranchisementQuote(form) as BuiltQuoteData;
+  }
+
+  if (isSharedOwnershipType(form.type)) {
+    // The staircasing engine is plain JavaScript, so TypeScript infers
+    // its parameter shape from the properties the function happens to
+    // read rather than from the form contract. Casting both sides keeps
+    // the call honest without weakening BuiltQuoteData for every other
+    // caller.
+    return buildStaircasingQuote(
+      form as unknown as Parameters<typeof buildStaircasingQuote>[0]
+    ) as unknown as BuiltQuoteData;
   }
 
   if (type === "sale") {

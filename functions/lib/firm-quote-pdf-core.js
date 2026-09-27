@@ -16,9 +16,9 @@
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  getEnfranchisementLabel,
-  isEnfranchisementType,
-} from "./enfranchisement/types.js";
+  getSpecialistMatterLabel,
+  isSpecialistMatterType,
+} from "./matter-families.js";
 
 // ── Brand constants ──────────────────────────────────────────────────
 const NAVY = rgb(0x06 / 255, 0x2a / 255, 0x63 / 255);
@@ -56,7 +56,7 @@ const CONVEYANCING_TRANSACTION_LABELS = {
 // Enfranchisement labels are NOT duplicated here — they come from
 // ./enfranchisement/types.js, which every rail shares.
 const getTransactionLabel = (transactionType) =>
-  getEnfranchisementLabel(transactionType) ||
+  getSpecialistMatterLabel(transactionType) ||
   CONVEYANCING_TRANSACTION_LABELS[transactionType] ||
   String(transactionType || "");
 
@@ -270,12 +270,21 @@ const curateTransactionDetails = (transactionType, inputs) => {
       if (tenureLabel) details.push(["Tenure", tenureLabel]);
       addTransferRefinementRows(details, i);
       break;
+    case "staircasing":
+    case "collective_enfranchisement":
     case "lease_extension_statutory":
     case "lease_extension_informal": {
       // A lease extension is not driven by a consideration figure, so
       // the rows that matter are the ones that drive the claim: the
       // unexpired term (which governs the premium and the urgency) and
       // whether the landlord can be found.
+      if (i.currentSharePercent)
+        details.push(["Share owned now", `${i.currentSharePercent}%`]);
+      if (i.additionalSharePercent)
+        details.push(["Further share being bought", `${i.additionalSharePercent}%`]);
+      if (i.totalFlats) details.push(["Flats in the building", String(i.totalFlats)]);
+      if (i.participantCount)
+        details.push(["Participating leaseholders", String(i.participantCount)]);
       if (i.unexpiredTermYears)
         details.push(["Unexpired term", `${i.unexpiredTermYears} years`]);
       if (i.originalLeaseTermYears)
@@ -899,7 +908,7 @@ export async function buildQuotePdf({
 
   drawTransactionBlock(renderer, fonts, transactionType, inputs);
 
-  const isEnfranchisement = isEnfranchisementType(transactionType);
+  const isEnfranchisement = isSpecialistMatterType(transactionType);
 
   // Qualification and marriage-value warnings come before any figures.
   if (isEnfranchisement) {

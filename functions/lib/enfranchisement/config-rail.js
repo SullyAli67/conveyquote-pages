@@ -20,8 +20,11 @@
 //     statutory right, nor what the landlord is entitled to recover.
 
 import { buildEnfranchisementQuote } from "../calculate-enfranchisement-quote.js";
+import { buildStaircasingQuote } from "../calculate-staircasing-quote.js";
 import { VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS } from "./price-book.js";
-import { getEnfranchisementLabel } from "./types.js";
+import { VALID_STAIRCASING_SUPPLEMENT_KEYS } from "../shared-ownership/price-book.js";
+import { getEnfranchisementLabel, isEnfranchisementType } from "./types.js";
+import { getSharedOwnershipLabel, isSharedOwnershipType } from "../shared-ownership/types.js";
 import { assessQualification } from "./qualification.js";
 
 function round2(n) {
@@ -56,14 +59,40 @@ export function buildConfigRailEnfranchisementQuote({
   // already use, so Fee Settings behaves consistently across families.
   const requested = body?.supplements || {};
 
-  // The absent-landlord supplement is triggered by the qualification
-  // gate, not by a checkbox, so the gate is consulted here as well. Any
-  // other route would let a rail silently omit a supplement the matter
+  // Which family is this? The adapter serves both so the firm and
+  // referrer rails do not need a near-identical second copy — the
+  // duplication between calculate-firm-quote-core.js and
+  // calculate-referrer-quote-core.js is the mistake this avoids
+  // repeating.
+  const staircasing = isSharedOwnershipType(transactionType);
+  const buildQuote = staircasing ? buildStaircasingQuote : buildEnfranchisementQuote;
+  const validKeys = staircasing
+    ? VALID_STAIRCASING_SUPPLEMENT_KEYS
+    : VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS;
+  const label = staircasing
+    ? getSharedOwnershipLabel(transactionType)
+    : getEnfranchisementLabel(transactionType);
+
+  // Some supplements are triggered by the matter's facts rather than by
+  // a checkbox — an untraceable landlord on an enfranchisement claim, a
+  // mortgage or a final step to 100% on a staircasing. Those are derived
+  // here too, so a rail cannot silently omit a supplement the matter
   // plainly attracts.
-  const gate = assessQualification(body || {}, body?.quotedAsOf);
+  const gate = staircasing ? null : assessQualification(body || {}, body?.quotedAsOf);
+  const derived = new Set();
+  if (gate?.flags?.absentLandlord) derived.add("absentLandlord");
+  if (staircasing) {
+    const yes = (v) => v === true || String(v ?? "").toLowerCase() === "yes";
+    if (yes(body?.hasMortgage)) derived.add("mortgageOnStaircasing");
+    const cur = Number(body?.currentSharePercent);
+    const add = Number(body?.additionalSharePercent);
+    if (Number.isFinite(cur) && Number.isFinite(add) && cur + add === 100) {
+      derived.add("finalStaircasing");
+    }
+  }
 
   const isRequested = (key) => {
-    if (key === "absentLandlord" && gate.flags.absentLandlord) return true;
+    if (derived.has(key)) return true;
     const value = requested[key];
     return value === true || String(value ?? "").toLowerCase() === "yes";
   };
@@ -74,7 +103,7 @@ export function buildConfigRailEnfranchisementQuote({
   for (const row of rows) {
     const supplementKey = row.supplement_key || null;
     if (supplementKey) {
-      if (!VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS.includes(supplementKey)) {
+      if (!validKeys.includes(supplementKey)) {
         warnings.push(
           `Fee row "${String(row.label || "")}" has an unknown supplement_key ` +
             `'${supplementKey}' and was skipped.`
@@ -96,12 +125,12 @@ export function buildConfigRailEnfranchisementQuote({
       ok: false,
       status: 400,
       error:
-        `No fee configuration found for ${getEnfranchisementLabel(transactionType)}. ` +
+        `No fee configuration found for ${label}. ` +
         "Please set up fees in Fee Settings before issuing a quote.",
     };
   }
 
-  const quote = buildEnfranchisementQuote({
+  const quote = buildQuote({
     ...body,
     type: transactionType,
     legalFeeOverrides,
@@ -136,7 +165,10 @@ export function buildConfigRailEnfranchisementQuote({
       priced: quote.priced,
       qualification: quote.qualification,
       marriageValue: quote.marriageValue,
-      routeComparison: quote.routeComparison,
+      routeComparison: quote.routeComparison ?? null,
+      apportionment: quote.apportionment ?? null,
+      sdlt: quote.sdlt ?? null,
+      resultingSharePercent: quote.resultingSharePercent ?? null,
       thirdPartyCosts: quote.thirdPartyCosts,
       indicativeTotalExcludingPremium: quote.indicativeTotalExcludingPremium,
       premium: quote.premium,
@@ -156,6 +188,29 @@ export function buildConfigRailEnfranchisementQuote({
 // first configures an enfranchisement matter type. Mirrors the shape of
 // getDefaultFeeItems() in src/App.tsx.
 export function getDefaultEnfranchisementFeeItems(transactionType) {
+  if (transactionType === "staircasing") {
+    return [
+      { label: "Legal fee", amount: 750, includes_vat: true, is_disbursement: false, supplement_key: null },
+      { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false, supplement_key: "mortgageOnStaircasing" },
+      { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false, supplement_key: "finalStaircasing" },
+      { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false, supplement_key: "leaseVariationRequired" },
+      { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: "unregisteredTitle" },
+    ];
+  }
+
+  if (transactionType === "collective_enfranchisement") {
+    // Collective is priced per participant centrally. A rail configuring
+    // its own fees states a per-participant figure; the engine
+    // multiplies and floors it.
+    return [
+      { label: "Legal fee (per participant)", amount: 850, includes_vat: true, is_disbursement: false, supplement_key: null },
+      { label: "Participation agreement", amount: 450, includes_vat: true, is_disbursement: false, supplement_key: null },
+      { label: "Nominee purchaser company — formation and advice", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: null },
+      { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false, supplement_key: "absentLandlord" },
+      { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false, supplement_key: "unregisteredTitle" },
+    ];
+  }
+
   const base =
     transactionType === "lease_extension_informal" ? 950 : 1200;
 

@@ -427,6 +427,23 @@ type QuoteForm = {
   intermediateLandlord: string;
   missingLeaseDocuments: string;
 
+  // ── Collective enfranchisement (s.13) ──────────────────────────────
+  // These describe the BUILDING and the GROUP, not one lease, which is
+  // why they are separate from the lease extension answers above.
+  totalFlats: string;
+  qualifyingTenantFlats: string;
+  participantCount: string;
+  nonResidentialPercent: string;
+  residentLandlord: string;
+
+  // ── Staircasing (shared ownership) ─────────────────────────────────
+  currentSharePercent: string;
+  additionalSharePercent: string;
+  marketValueElection: string;
+  hasMortgage: string;
+  leaseRestrictsStaircasing: string;
+  sharePrice: string;
+
   saleTenure: string;
   salePrice: string;
   salePostcode: string;
@@ -759,6 +776,24 @@ function EnfranchisementQuoteBlocks({
           is internal triage only — rendering it here would put valuation
           commentary on a fee quote. */}
 
+      {quote.apportionment &&
+        notice(
+          `Your share — 1 of ${quote.apportionment.participantCount} participants`,
+          <>
+            <div style={{ fontSize: "20px", fontWeight: 700, color: ink, margin: "4px 0 8px" }}>
+              {money(quote.apportionment.perParticipant.grandTotal)}
+            </div>
+            {quote.apportionment.note}
+          </>
+        )}
+
+      {quote.sdlt &&
+        notice(
+          "Stamp Duty Land Tax",
+          quote.sdlt.note,
+          quote.sdlt.statutoryRef
+        )}
+
       {quote.thirdPartyCosts && quote.thirdPartyCosts.length > 0 && (
         <div
           style={{
@@ -821,7 +856,8 @@ function EnfranchisementQuoteBlocks({
               {quote.indicativeTotalExcludingPremium && (
                 <tr style={{ borderTop: `2px solid ${panel.border}` }}>
                   <td style={{ padding: "10px 0", fontWeight: 700, color: panel.text }}>
-                    Indicative total, excluding the premium
+                    Indicative total, excluding{" "}
+                    {quote.indicativeTotalExcludingPremium.excludedItemLabel ?? "the premium"}
                     <div style={{ fontSize: "12.5px", fontWeight: 400, lineHeight: 1.6, marginTop: "4px" }}>
                       {quote.indicativeTotalExcludingPremium.note}
                     </div>
@@ -1033,6 +1069,22 @@ const initialFormState: QuoteForm = {
   unregisteredTitle: "",
   intermediateLandlord: "",
   missingLeaseDocuments: "",
+
+  // Collective enfranchisement. Blank, not "no" — an unanswered
+  // question must produce "needs review", not a false pass.
+  totalFlats: "",
+  qualifyingTenantFlats: "",
+  participantCount: "",
+  nonResidentialPercent: "",
+  residentLandlord: "",
+
+  // Staircasing.
+  currentSharePercent: "",
+  additionalSharePercent: "",
+  marketValueElection: "",
+  hasMortgage: "",
+  leaseRestrictsStaircasing: "",
+  sharePrice: "",
 };
 
 const defaultApprovedNextSteps =
@@ -1730,7 +1782,7 @@ function App() {
     const KNOWN_TYPES = [
       "purchase", "sale", "sale_purchase", "remortgage", "transfer",
       "remortgage_transfer", "lease_extension_statutory",
-      "lease_extension_informal",
+      "lease_extension_informal", "collective_enfranchisement", "staircasing",
     ];
     try {
       const requested = new URLSearchParams(window.location.search).get("type");
@@ -1941,7 +1993,9 @@ function App() {
     | "sale_purchase"
     | "remortgage_transfer"
     | "lease_extension_statutory"
-    | "lease_extension_informal";
+    | "lease_extension_informal"
+    | "collective_enfranchisement"
+    | "staircasing";
 
   type FirmIssueQuoteForm = {
     clientName: string;
@@ -1971,11 +2025,26 @@ function App() {
     sharedOwnership: string;
     staircasedToFull: string;
     intermediateLandlordCount: string;
+    // Collective enfranchisement
+    totalFlats: string;
+    qualifyingTenantFlats: string;
+    participantCount: string;
+    nonResidentialPercent: string;
+    residentLandlord: string;
+    // Staircasing
+    currentSharePercent: string;
+    additionalSharePercent: string;
+    marketValueElection: string;
+    hasMortgage: string;
+    sharePrice: string;
     enfranchisementSupplements: {
       unregisteredTitle: boolean;
       intermediateLandlord: boolean;
       missingLeaseDocuments: boolean;
       lenderConsentComplex: boolean;
+      mortgageOnStaircasing: boolean;
+      finalStaircasing: boolean;
+      leaseVariationRequired: boolean;
     };
 
     supplements: {
@@ -2025,11 +2094,24 @@ function App() {
     sharedOwnership: "",
     staircasedToFull: "",
     intermediateLandlordCount: "1",
+    totalFlats: "",
+    qualifyingTenantFlats: "",
+    participantCount: "",
+    nonResidentialPercent: "",
+    residentLandlord: "",
+    currentSharePercent: "",
+    additionalSharePercent: "",
+    marketValueElection: "",
+    hasMortgage: "",
+    sharePrice: "",
     enfranchisementSupplements: {
       unregisteredTitle: false,
       intermediateLandlord: false,
       missingLeaseDocuments: false,
       lenderConsentComplex: false,
+      mortgageOnStaircasing: false,
+      finalStaircasing: false,
+      leaseVariationRequired: false,
     },
 
     supplements: {
@@ -2164,7 +2246,7 @@ function App() {
   const SUPPLEMENT_OPTIONS: {
     key: string;
     label: string;
-    family: "conveyancing" | "enfranchisement";
+    family: "conveyancing" | "enfranchisement" | "shared_ownership";
   }[] = [
     { key: "leasehold", label: "Leasehold supplement", family: "conveyancing" },
     { key: "mortgagePresent", label: "Acting for lender supplement", family: "conveyancing" },
@@ -2183,15 +2265,28 @@ function App() {
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "enfranchisement" },
     { key: "missingLeaseDocuments", label: "Missing or defective lease documentation supplement", family: "enfranchisement" },
     { key: "lenderConsentComplex", label: "Complex lender consent supplement", family: "enfranchisement" },
+
+    { key: "mortgageOnStaircasing", label: "Mortgage supplement", family: "shared_ownership" },
+    { key: "finalStaircasing", label: "Final staircasing to 100% supplement", family: "shared_ownership" },
+    { key: "leaseVariationRequired", label: "Lease variation supplement", family: "shared_ownership" },
+    { key: "unregisteredTitle", label: "Unregistered title supplement", family: "shared_ownership" },
   ];
 
   const ENFRANCHISEMENT_FEE_TYPES = new Set([
     "lease_extension_statutory",
     "lease_extension_informal",
+    "collective_enfranchisement",
   ]);
+  const SHARED_OWNERSHIP_FEE_TYPES = new Set(["staircasing"]);
 
+  // unregisteredTitle exists in both the enfranchisement and shared
+  // ownership sets because the work is the same on either. Filtering by
+  // family keeps each Fee Settings screen offering only keys the engine
+  // for that type will actually trigger.
   const supplementOptionsForType = (transactionType: string) => {
-    const family = ENFRANCHISEMENT_FEE_TYPES.has(transactionType)
+    const family = SHARED_OWNERSHIP_FEE_TYPES.has(transactionType)
+      ? "shared_ownership"
+      : ENFRANCHISEMENT_FEE_TYPES.has(transactionType)
       ? "enfranchisement"
       : "conveyancing";
     return SUPPLEMENT_OPTIONS.filter((o) => o.family === family);
@@ -3865,6 +3960,22 @@ function App() {
         { label: "Missing or defective lease documentation supplement", amount: 250, includes_vat: true, is_disbursement: false },
         { label: "Complex lender consent supplement", amount: 175, includes_vat: true, is_disbursement: false },
       ],
+      collective_enfranchisement: [
+        // Priced PER PARTICIPANT — the engine multiplies by the number
+        // taking part and floors the matter total so it never falls as
+        // the group grows.
+        { label: "Legal fee (per participant)", amount: 850, includes_vat: true, is_disbursement: false },
+        { label: "Participation agreement", amount: 450, includes_vat: true, is_disbursement: false },
+        { label: "Nominee purchaser company — formation and advice", amount: 350, includes_vat: true, is_disbursement: false },
+        { label: "Absent landlord supplement (vesting order)", amount: 1500, includes_vat: true, is_disbursement: false },
+      ],
+      staircasing: [
+        { label: "Legal fee", amount: 750, includes_vat: true, is_disbursement: false },
+        { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false },
+        { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false },
+        { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false },
+        { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
+      ],
       lease_extension_informal: [
         { label: "Legal fee", amount: 950, includes_vat: true, is_disbursement: false },
         { label: "Intermediate landlord supplement", amount: 300, includes_vat: true, is_disbursement: false },
@@ -4229,15 +4340,28 @@ function App() {
     remortgage_transfer: "Remortgage + Transfer",
     lease_extension_statutory: "Lease Extension (statutory)",
     lease_extension_informal: "Lease Extension (informal)",
+    collective_enfranchisement: "Collective Enfranchisement",
+    staircasing: "Staircasing",
   };
 
-  const ENFRANCHISEMENT_ISSUE_TYPES: FirmIssueTransactionType[] = [
+  // Types that are NOT driven by a consideration figure, so the price
+  // field is replaced by the questions that actually drive them.
+  const SPECIALIST_ISSUE_TYPES: FirmIssueTransactionType[] = [
     "lease_extension_statutory",
     "lease_extension_informal",
+    "collective_enfranchisement",
+    "staircasing",
   ];
 
   const isEnfranchisementIssueType = (t: FirmIssueTransactionType) =>
-    ENFRANCHISEMENT_ISSUE_TYPES.includes(t);
+    SPECIALIST_ISSUE_TYPES.includes(t);
+
+  const isLeaseExtensionIssueType = (t: FirmIssueTransactionType) =>
+    t === "lease_extension_statutory" || t === "lease_extension_informal";
+  const isCollectiveIssueType = (t: FirmIssueTransactionType) =>
+    t === "collective_enfranchisement";
+  const isStaircasingIssueType = (t: FirmIssueTransactionType) =>
+    t === "staircasing";
 
   const TRANSACTION_TYPES_WITH_SDLT: FirmIssueTransactionType[] = [
     "purchase",
@@ -4314,6 +4438,20 @@ function App() {
     staircasedToFull: form.staircasedToFull,
     intermediateLandlordCount: form.intermediateLandlordCount,
     partyCount: form.buyerCount,
+
+    // Collective enfranchisement
+    totalFlats: form.totalFlats,
+    qualifyingTenantFlats: form.qualifyingTenantFlats,
+    participantCount: form.participantCount,
+    nonResidentialPercent: form.nonResidentialPercent,
+    residentLandlord: form.residentLandlord,
+
+    // Staircasing
+    currentSharePercent: form.currentSharePercent,
+    additionalSharePercent: form.additionalSharePercent,
+    marketValueElection: form.marketValueElection,
+    hasMortgage: form.hasMortgage,
+    sharePrice: form.sharePrice,
   });
 
   const validateIssueQuoteForm = (form: FirmIssueQuoteForm): string => {
@@ -4321,6 +4459,28 @@ function App() {
 
     // A lease extension is not driven by a consideration figure. What it
     // needs is the information the qualification gate runs on.
+    if (isStaircasingIssueType(form.transactionType)) {
+      const cur = Number(form.currentSharePercent);
+      const add = Number(form.additionalSharePercent);
+      if (!(cur > 0 && cur < 100)) return "The share currently owned must be between 1% and 99%.";
+      if (!(add > 0)) return "The further share being bought is required.";
+      if (cur + add > 100) return `Owning ${cur}% and buying ${add}% comes to more than 100%.`;
+      return "";
+    }
+
+    if (isCollectiveIssueType(form.transactionType)) {
+      if (!form.totalFlats || Number(form.totalFlats) < 2) {
+        return "A collective claim needs at least two flats in the building.";
+      }
+      if (!form.participantCount || Number(form.participantCount) < 1) {
+        return "The number of participating leaseholders is required.";
+      }
+      if (Number(form.participantCount) > Number(form.totalFlats)) {
+        return "There cannot be more participants than flats in the building.";
+      }
+      return "";
+    }
+
     if (isEnfranchisementIssueType(form.transactionType)) {
       if (!form.propertyType) {
         return "Please say whether the property is a flat or a house.";
@@ -5869,6 +6029,8 @@ function App() {
   const isInformalLeaseExtension = form.type === "lease_extension_informal";
   const isLeaseExtension =
     isStatutoryLeaseExtension || isInformalLeaseExtension;
+  const isCollectiveEnfranchisementForm = form.type === "collective_enfranchisement";
+  const isStaircasingForm = form.type === "staircasing";
 
   // Lease extensions do not use the shared Matter Details block: there
   // is no consideration figure and no mortgage question. They get their
@@ -6664,9 +6826,190 @@ function App() {
                       <option value="lease_extension_informal">
                         Lease Extension (informal) — flat
                       </option>
+                      <option value="collective_enfranchisement">
+                        Buying the Freehold Together (collective enfranchisement)
+                      </option>
+                      <option value="staircasing">
+                        Staircasing (buying a further share)
+                      </option>
                     </select>
                   </div>
                 </div>
+
+                {isCollectiveEnfranchisementForm && (
+                  <>
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                      <div>
+                        <h2>Your Building</h2>
+                        <p>
+                          Buying the freehold together is a claim about the
+                          whole building, so these questions are about the
+                          block rather than your own flat. If you are not sure
+                          of an answer, leave it blank and we will check it.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="totalFlats">How many flats are in the building?</label>
+                        <input id="totalFlats" name="totalFlats" type="number" min="1"
+                          value={form.totalFlats} onChange={handleChange} placeholder="e.g. 8" required />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="qualifyingTenantFlats">How many are on long leases?</label>
+                        <input id="qualifyingTenantFlats" name="qualifyingTenantFlats" type="number" min="0"
+                          value={form.qualifyingTenantFlats} onChange={handleChange} placeholder="e.g. 8" />
+                        <small>
+                          At least two-thirds of the flats must be held on long
+                          leases &mdash; broadly, leases originally granted for
+                          more than 21 years.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="participantCount">How many leaseholders want to take part?</label>
+                        <input id="participantCount" name="participantCount" type="number" min="1"
+                          value={form.participantCount} onChange={handleChange} placeholder="e.g. 5" required />
+                        <small>
+                          Must be at least half the flats in the building. Where
+                          there are only two flats, both must join. The more of
+                          you take part, the less each pays.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="nonResidentialPercent">
+                          What percentage of the building is commercial?
+                        </label>
+                        <input id="nonResidentialPercent" name="nonResidentialPercent" type="number" min="0" max="100"
+                          value={form.nonResidentialPercent} onChange={handleChange} placeholder="e.g. 0" />
+                        <small>
+                          Shops or offices, by internal floor area. If it is more
+                          than 25%, the building cannot be enfranchised. Enter 0
+                          if the building is entirely flats.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="residentLandlord">Does the freeholder live in the building?</label>
+                        <select id="residentLandlord" name="residentLandlord" value={form.residentLandlord} onChange={handleChange}>
+                          <option value="">Please select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="landlordIdentifiable">Do you know who the freeholder is?</label>
+                        <select id="landlordIdentifiable" name="landlordIdentifiable" value={form.landlordIdentifiable} onChange={handleChange}>
+                          <option value="">Please select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No &mdash; they cannot be traced</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="noticeAlreadyServed">Has a notice already been served?</label>
+                        <select id="noticeAlreadyServed" name="noticeAlreadyServed" value={form.noticeAlreadyServed} onChange={handleChange}>
+                          <option value="">Please select</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="unregisteredTitle">Is the freehold title unregistered?</label>
+                        <select id="unregisteredTitle" name="unregisteredTitle" value={form.unregisteredTitle} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {isStaircasingForm && (
+                  <>
+                    <div className="section-heading" style={{ marginTop: "10px" }}>
+                      <div>
+                        <h2>Your Share</h2>
+                        <p>
+                          Staircasing means buying a further share of a home you
+                          already part-own. These answers set the fee and tell us
+                          whether any Stamp Duty arises.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="currentSharePercent">What share do you own now?</label>
+                        <input id="currentSharePercent" name="currentSharePercent" type="number" min="1" max="99"
+                          value={form.currentSharePercent} onChange={handleChange} placeholder="e.g. 40" required />
+                        <small>As a percentage &mdash; shown on your lease or your provider&rsquo;s statement.</small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="additionalSharePercent">What further share are you buying?</label>
+                        <input id="additionalSharePercent" name="additionalSharePercent" type="number" min="1" max="99"
+                          value={form.additionalSharePercent} onChange={handleChange} placeholder="e.g. 25" required />
+                        <small>
+                          If this takes you to 100% there is a little more work
+                          to do, and we will show that on the quote.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="postcode">Property postcode</label>
+                        <input id="postcode" name="postcode" type="text"
+                          value={form.postcode} onChange={handleChange} placeholder="e.g. B15 3TR" />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="hasMortgage">Are you using a mortgage?</label>
+                        <select id="hasMortgage" name="hasMortgage" value={form.hasMortgage} onChange={handleChange}>
+                          <option value="">Please select</option>
+                          <option value="no">No &mdash; paying from savings</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                        <small>
+                          A mortgage means acting for your lender as well, which
+                          is charged as a supplement.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="marketValueElection">
+                          Was a market value election made when the home was first bought?
+                        </label>
+                        <select id="marketValueElection" name="marketValueElection" value={form.marketValueElection} onChange={handleChange}>
+                          <option value="">I do not know</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                        <small>
+                          This decides whether Stamp Duty can arise later. If you
+                          are not sure, leave it blank &mdash; we will check your
+                          lease. Most people do not know, and that is fine.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="leaseRestrictsStaircasing">
+                          Does your lease restrict staircasing?
+                        </label>
+                        <select id="leaseRestrictsStaircasing" name="leaseRestrictsStaircasing" value={form.leaseRestrictsStaircasing} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                        <small>
+                          Some leases set a minimum share per step, limit how many
+                          steps you may take, or stop short of 100%.
+                        </small>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="unregisteredTitle">Is the title unregistered?</label>
+                        <select id="unregisteredTitle" name="unregisteredTitle" value={form.unregisteredTitle} onChange={handleChange}>
+                          <option value="">Not sure</option>
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {isLeaseExtension && (
                   <>
@@ -8701,7 +9044,105 @@ function App() {
                           </div>
                         )}
 
-                        {isEnfranchisementIssueType(issueQuoteForm.transactionType) && (
+                        {isCollectiveIssueType(issueQuoteForm.transactionType) && (
+                          <>
+                            <div className="field">
+                              <label htmlFor="iq-totalFlats">Flats in the building</label>
+                              <input id="iq-totalFlats" type="number" min="2" value={issueQuoteForm.totalFlats}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, totalFlats: e.target.value }))} />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-qualifyingFlats">Held on long leases</label>
+                              <input id="iq-qualifyingFlats" type="number" min="0" value={issueQuoteForm.qualifyingTenantFlats}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, qualifyingTenantFlats: e.target.value }))} />
+                              <small>At least two-thirds must be.</small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-participants">Participating leaseholders</label>
+                              <input id="iq-participants" type="number" min="2" value={issueQuoteForm.participantCount}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, participantCount: e.target.value }))} />
+                              <small>
+                                Drives the fee. Priced per participant on a declining
+                                scale, floored so the matter total never falls as the
+                                group grows.
+                              </small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-nonResidential">Non-residential floor area (%)</label>
+                              <input id="iq-nonResidential" type="number" min="0" max="100" value={issueQuoteForm.nonResidentialPercent}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, nonResidentialPercent: e.target.value }))} />
+                              <small>Over 25% and the building is excluded.</small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-residentLandlord">Resident landlord?</label>
+                              <select id="iq-residentLandlord" value={issueQuoteForm.residentLandlord}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, residentLandlord: e.target.value }))}>
+                                <option value="">Please select</option>
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-collLandlordTraceable">Freeholder traceable?</label>
+                              <select id="iq-collLandlordTraceable" value={issueQuoteForm.landlordIdentifiable}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, landlordIdentifiable: e.target.value }))}>
+                                <option value="">Please select</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No — vesting order required</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+
+                        {isStaircasingIssueType(issueQuoteForm.transactionType) && (
+                          <>
+                            <div className="field">
+                              <label htmlFor="iq-currentShare">Share owned now (%)</label>
+                              <input id="iq-currentShare" type="number" min="1" max="99" value={issueQuoteForm.currentSharePercent}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, currentSharePercent: e.target.value }))} />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-additionalShare">Further share being bought (%)</label>
+                              <input id="iq-additionalShare" type="number" min="1" max="99" value={issueQuoteForm.additionalSharePercent}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, additionalSharePercent: e.target.value }))} />
+                              <small>Reaching 100% applies the final staircasing supplement automatically.</small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-sharePrice">Price of the further share (£)</label>
+                              <input id="iq-sharePrice" type="number" min="0" value={issueQuoteForm.sharePrice}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, sharePrice: e.target.value }))} />
+                              <small>
+                                Leave blank until the RICS valuation is in. Supplying it
+                                lets us compute the Land Registry fee.
+                              </small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-hasMortgage">Mortgage?</label>
+                              <select id="iq-hasMortgage" value={issueQuoteForm.hasMortgage}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, hasMortgage: e.target.value }))}>
+                                <option value="">Please select</option>
+                                <option value="no">No — cash</option>
+                                <option value="yes">Yes</option>
+                              </select>
+                              <small>Applies the mortgage supplement automatically.</small>
+                            </div>
+                            <div className="field">
+                              <label htmlFor="iq-mve">Market value election made?</label>
+                              <select id="iq-mve" value={issueQuoteForm.marketValueElection}
+                                onChange={(e) => setIssueQuoteForm((f) => ({ ...f, marketValueElection: e.target.value }))}>
+                                <option value="">Unknown</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                              </select>
+                              <small>
+                                Decides the SDLT position. Yes means no further SDLT
+                                however far the client staircases.
+                              </small>
+                            </div>
+                          </>
+                        )}
+
+                        {isLeaseExtensionIssueType(issueQuoteForm.transactionType) && (
                           <>
                             <div className="field">
                               <label htmlFor="iq-propertyType">Flat or house</label>
@@ -9563,6 +10004,8 @@ function App() {
                         <option value="remortgage_transfer">Remortgage and transfer of equity</option>
                         <option value="lease_extension_statutory">Lease extension (statutory)</option>
                         <option value="lease_extension_informal">Lease extension (informal)</option>
+                        <option value="collective_enfranchisement">Collective enfranchisement</option>
+                        <option value="staircasing">Staircasing</option>
                       </select>
                     </div>
 
@@ -11675,6 +12118,8 @@ function App() {
                         <option value="remortgage_transfer">Remortgage and transfer of equity</option>
                         <option value="lease_extension_statutory">Lease extension (statutory)</option>
                         <option value="lease_extension_informal">Lease extension (informal)</option>
+                        <option value="collective_enfranchisement">Collective enfranchisement</option>
+                        <option value="staircasing">Staircasing</option>
                       </select>
                     </div>
 
@@ -14320,15 +14765,22 @@ function App() {
             freehold on everyone&rsquo;s behalf.
           </p>
           <p>
-            <strong>We quote for these individually.</strong> The price depends
-            on how many flats are taking part and how the building is set up, so
-            there is no instant figure. Tell us about your building and we will
-            come back to you.
+            Because the work is shared, the cost per flat falls as more of you
+            take part &mdash; so the quote asks how many leaseholders are
+            joining, and shows both the total for the claim and your own share
+            of it.
           </p>
-          <p style={{ marginTop: "12px" }}>
-            <a className="muted-button" href="/book-call" style={{ display: "inline-block", textDecoration: "none" }}>
-              Ask about enfranchisement
+          <p style={{ marginTop: "16px" }}>
+            <a className="primary-button" href="/?type=collective_enfranchisement" style={{ display: "inline-block", textDecoration: "none" }}>
+              Get an enfranchisement quote
             </a>
+          </p>
+          <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginTop: "10px" }}>
+            As with a lease extension, our quote covers our fees and the
+            disbursements we can fix. The price of the freehold itself is a
+            valuation matter, and the freeholder&rsquo;s costs under section 33
+            of the 1993 Act are payable by the participants. Both are shown
+            separately as estimates outside our control.
           </p>
 
           <h2>Staircasing your shared ownership home</h2>
@@ -14346,14 +14798,22 @@ function App() {
             up together.
           </p>
           <p>
-            <strong>We quote for these individually.</strong> The work depends on
-            your provider&rsquo;s requirements and the share you are buying, so
-            tell us your situation and we will send you a fixed quote.
+            Whether any Stamp Duty arises depends on two things: whether a
+            market value election was made when the home was first bought, and
+            whether this purchase takes you past 80% ownership. The quote works
+            that out and tells you which of those applies &mdash; and if you do
+            not know whether an election was made, say so and we will check your
+            lease.
           </p>
-          <p style={{ marginTop: "12px" }}>
-            <a className="muted-button" href="/book-call" style={{ display: "inline-block", textDecoration: "none" }}>
-              Ask about staircasing
+          <p style={{ marginTop: "16px" }}>
+            <a className="primary-button" href="/?type=staircasing" style={{ display: "inline-block", textDecoration: "none" }}>
+              Get a staircasing quote
             </a>
+          </p>
+          <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginTop: "10px" }}>
+            The price of the further share is set by a RICS valuation, and your
+            provider charges its own administration fee. Neither is within our
+            control and both are shown separately on the quote.
           </p>
 
           <h2>Selling or remortgaging a leasehold flat</h2>
