@@ -38,19 +38,28 @@ type NavigatorHints = Navigator & {
   deviceMemory?: number;
 };
 
-function canRunLiveHero(): boolean {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+// Same attributes three.js would request, so the probe's context is the one the scene renders with.
+const GL_ATTRIBUTES: WebGLContextAttributes = {
+  alpha: true,
+  antialias: true,
+  depth: true,
+  stencil: true,
+  premultipliedAlpha: true,
+  preserveDrawingBuffer: true,
+  powerPreference: "default",
+  failIfMajorPerformanceCaveat: false,
+};
+
+// Returns the hero canvas's WebGL context when the live scene should run, or null to keep the still.
+function liveHeroContext(canvas: HTMLCanvasElement): WebGLRenderingContext | null {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
   const nav = navigator as NavigatorHints;
-  if (nav.connection?.saveData) return false;
-  if (typeof nav.deviceMemory === "number" && nav.deviceMemory < 4) return false;
+  if (nav.connection?.saveData) return null;
+  if (typeof nav.deviceMemory === "number" && nav.deviceMemory < 4) return null;
   try {
-    const gl = (document.createElement("canvas").getContext("webgl2") ||
-      document.createElement("canvas").getContext("webgl")) as WebGLRenderingContext | null;
-    if (!gl) return false;
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return true;
+    return (canvas.getContext("webgl2", GL_ATTRIBUTES) || canvas.getContext("webgl", GL_ATTRIBUTES)) as WebGLRenderingContext | null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -129,12 +138,15 @@ export default function XrayHero({ summary }: { summary: string }) {
     let timeoutId = 0;
 
     const start = () => {
-      if (cancelled || !canRunLiveHero()) return;
+      if (cancelled) return;
+      const context = liveHeroContext(glRef.current!);
+      if (!context) return;
       import("../hero/xrayScene.js")
         .then(({ mountXrayHero }) => {
           if (cancelled) return;
           dispose = mountXrayHero(hero, {
             canvas: glRef.current,
+            context,
             lens: lensRef.current,
             dot: dotRef.current,
             getSafeRect: () => heroSafeRect(hero, headerRef.current, copyRef.current, cardRef.current),

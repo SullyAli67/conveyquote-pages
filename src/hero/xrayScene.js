@@ -6,7 +6,7 @@ export function mountXrayHero(container, options) {
   var hero = container;
   var glCanvas = options.canvas;
   var lensEl = options.lens, dotEl = options.dot;
-  var renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  var renderer = new THREE.WebGLRenderer({ canvas: glCanvas, context: options.context, antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   var ANISO = renderer.capabilities.getMaxAnisotropy();
