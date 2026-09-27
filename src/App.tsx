@@ -2267,14 +2267,14 @@ function App() {
     { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "enfranchisement" },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "enfranchisement" },
     { key: "missingLeaseDocuments", label: "Missing or defective lease documentation supplement", family: "enfranchisement" },
-    { key: "preservedRightToBuy", label: "Right to Buy / Preserved Right to Buy supplement", family: "enfranchisement" },
+    { key: "preservedRightToBuy", label: "Right to Buy / Right to Acquire supplement", family: "enfranchisement" },
     { key: "lenderConsentComplex", label: "Complex lender consent supplement", family: "enfranchisement" },
 
     { key: "mortgageOnStaircasing", label: "Mortgage supplement", family: "shared_ownership" },
     { key: "finalStaircasing", label: "Final staircasing to 100% supplement", family: "shared_ownership" },
     { key: "leaseVariationRequired", label: "Lease variation supplement", family: "shared_ownership" },
     { key: "intermediateLandlord", label: "Intermediate landlord supplement", family: "shared_ownership" },
-    { key: "preservedRightToBuy", label: "Right to Buy / Preserved Right to Buy supplement", family: "shared_ownership" },
+    { key: "preservedRightToBuy", label: "Right to Buy / Right to Acquire supplement", family: "shared_ownership" },
     { key: "unregisteredTitle", label: "Unregistered title supplement", family: "shared_ownership" },
   ];
 
@@ -3978,7 +3978,7 @@ function App() {
         { label: "Mortgage supplement", amount: 150, includes_vat: true, is_disbursement: false },
         { label: "Final staircasing to 100% supplement", amount: 125, includes_vat: true, is_disbursement: false },
         { label: "Lease variation supplement", amount: 250, includes_vat: true, is_disbursement: false },
-        { label: "Right to Buy / Preserved Right to Buy supplement", amount: 175, includes_vat: true, is_disbursement: false },
+        { label: "Right to Buy / Right to Acquire supplement", amount: 175, includes_vat: true, is_disbursement: false },
         { label: "Unregistered title supplement", amount: 350, includes_vat: true, is_disbursement: false },
       ],
       lease_extension_informal: [
@@ -7025,7 +7025,7 @@ function App() {
                         <select id="preservedRightToBuy" name="preservedRightToBuy" value={form.preservedRightToBuy} onChange={handleChange}>
                           <option value="">Not sure</option>
                           <option value="no">No</option>
-                          <option value="yes">Yes — Right to Buy, Preserved Right to Buy or Right to Acquire</option>
+                          <option value="yes">Yes — under Right to Buy, Preserved Right to Buy or Right to Acquire</option>
                         </select>
                       </div>
 
@@ -7299,10 +7299,12 @@ function App() {
                         >
                           <option value="">Not sure</option>
                           <option value="no">No</option>
-                          <option value="yes">Yes — Right to Buy, Preserved Right to Buy or Right to Acquire</option>
+                          <option value="yes">Yes — under Right to Buy, Preserved Right to Buy or Right to Acquire</option>
                         </select>
                         <small>
-                          These usually leave a charge on the title securing
+                          Includes the Right to Acquire, which housing
+                          association tenants often do not realise is what they
+                          used. All three leave a charge on the title securing
                           repayment of the discount, and a restriction requiring
                           the former landlord&rsquo;s consent.
                         </small>
@@ -9367,7 +9369,7 @@ function App() {
                                   ["unregisteredTitle", "Unregistered title"],
                                   ["missingLeaseDocuments", "Missing / defective lease"],
                                   ["lenderConsentComplex", "Complex lender consent"],
-                                  ["preservedRightToBuy", "Right to Buy / Preserved RTB"],
+                                  ["preservedRightToBuy", "Right to Buy / Right to Acquire"],
                                   ["intermediateLandlord", "Intermediate landlord"],
                                 ] as [keyof FirmIssueQuoteForm["enfranchisementSupplements"], string][]).map(
                                   ([key, label]) => (

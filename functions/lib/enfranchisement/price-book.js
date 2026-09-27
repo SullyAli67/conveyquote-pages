@@ -182,18 +182,35 @@ export const SUPPLEMENTS = {
   },
   preservedRightToBuy: {
     key: "preservedRightToBuy",
-    label: "Right to Buy / Preserved Right to Buy supplement",
+    label: "Right to Buy / Right to Acquire supplement",
     amount: 175,
     excludedFromNoCompletionNoFee: false,
     triggeredBy:
       "The flat was bought under the Right to Buy, the Preserved Right to Buy or the " +
       "Right to Acquire",
     note:
-      "A flat acquired under one of these schemes normally carries a charge securing " +
+      "Property acquired under one of these schemes normally carries a charge securing " +
       "repayment of the discount, and a restriction on the title requiring the former " +
       "landlord's consent to a disposal within a set period. Both have to be dealt with " +
       "before a new lease or a transfer can be registered, and the former landlord has to " +
-      "be approached for consent.",
+      "be approached for consent.\n\n" +
+      "Three separate rights are covered here. The Right to Buy (Housing Act 1985, Part V) " +
+      "belongs to secure tenants of local authorities. The Preserved Right to Buy (s.171A) " +
+      "is that same right carried across where a council transferred its stock to a housing " +
+      "association while the tenant was in occupation. The Right to Acquire (Housing Act " +
+      "1996, s.16) is a different and weaker right belonging to assured tenants of " +
+      "registered providers, with a flat cash discount rather than one scaling with tenure " +
+      "length — and, unlike the Right to Buy, it has no preserved version.\n\n" +
+      "None of them is enfranchisement: they are a TENANT buying their home from their own " +
+      "landlord, whereas enfranchisement is a long LEASEHOLDER buying the freehold or a " +
+      "longer lease. They meet because a Right to Buy flat purchase creates the long lease " +
+      "that is later extended — which is precisely when this charge and restriction have to " +
+      "be cleared.\n\n" +
+      "Note on Wales: the Right to Buy and the Right to Acquire were abolished there by the " +
+      "Abolition of the Right to Buy and Associated Rights (Wales) Act 2018. This supplement " +
+      "still applies to Welsh property, because a historic pre-abolition purchase leaves the " +
+      "same charge and restriction on the title. It is triggered by what is ON the title, " +
+      "not by whether the right could be exercised today.",
   },
 
   // ── Note on lender consent ───────────────────────────────────────

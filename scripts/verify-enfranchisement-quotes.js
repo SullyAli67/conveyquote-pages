@@ -542,6 +542,31 @@ checkTrue("the Right to Buy note explains the discount charge",
   /repayment of the discount/i.test(rtbExt.appliedSupplements.find((s) => s.key === "preservedRightToBuy").note ||
     "repayment of the discount"));
 
+
+// ── Right to Buy, Preserved RTB and Right to Acquire ────────────────
+// Three separate rights, deliberately handled by ONE supplement because
+// what matters to the conveyancing is identical: a discount-repayment
+// charge and a consent restriction that must be cleared before a new
+// lease or transfer can be registered.
+//
+// None of them is enfranchisement — they are a tenant buying from their
+// own landlord, not a leaseholder buying the freehold. They meet only
+// because a Right to Buy flat purchase creates the lease that is later
+// extended.
+const rtbNote = rtbExt.legalFees.find((f) => f.supplementKey === "preservedRightToBuy");
+checkTrue("the supplement label names the Right to Acquire, not just Right to Buy",
+  /Right to Acquire/.test(rtbNote.label));
+checkTrue("the supplement label no longer says only Preserved Right to Buy",
+  !/Preserved Right to Buy supplement/.test(rtbNote.label));
+
+const rtbDetail = (await import("../functions/lib/enfranchisement/price-book.js")).getSupplement("preservedRightToBuy");
+checkTrue("it cites the Right to Buy statute", /Housing Act 1985/.test(rtbDetail.note));
+checkTrue("it cites the Right to Acquire statute", /Housing Act 1996/.test(rtbDetail.note));
+checkTrue("it records that there is no preserved Right to Acquire", /no preserved version/i.test(rtbDetail.note));
+checkTrue("it states these are NOT enfranchisement", /None of them is enfranchisement/i.test(rtbDetail.note));
+checkTrue("it records the Welsh abolition and why the supplement still applies there",
+  /Wales/.test(rtbDetail.note) && /ON the title/.test(rtbDetail.note));
+
 // Intermediate landlord — now covered on all three, not just extensions.
 const interColl = buildEnfranchisementQuote({
   type: "collective_enfranchisement", totalFlats: 8, qualifyingTenantFlats: 8,
