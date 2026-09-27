@@ -38,6 +38,11 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "./disbursement-constants.js";
+import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { isSharedOwnershipType } from "./shared-ownership/types.js";
+import { buildConfigRailEnfranchisementQuote } from "./enfranchisement/config-rail.js";
+import { VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS } from "./enfranchisement/price-book.js";
+import { VALID_STAIRCASING_SUPPLEMENT_KEYS } from "./shared-ownership/price-book.js";
 
 const VAT_RATE = 0.2;
 
@@ -115,7 +120,18 @@ const SUPPLEMENT_KEYS = [
   {
     key: "rightToBuy",
     requestFlag: (req) => Boolean(req.supplements?.rightToBuy),
-    label: "Right to Buy supplement",
+    // ⚠ NOT the same as "preservedRightToBuy" in the specialist families.
+    // THIS one is for ACTING ON the Right to Buy purchase itself — the
+    // client is a tenant buying their home from their landlord now.
+    // That one is for a property BOUGHT under the scheme years ago,
+    // where the discount charge and consent restriction are still on the
+    // title and have to be cleared before a lease extension, collective
+    // claim or staircasing can be registered.
+    //
+    // Different work, different families, so they never appear in the
+    // same Fee Settings list. See functions/lib/enfranchisement/
+    // price-book.js.
+    label: "Right to Buy purchase supplement",
     triggeredBy: "Right to Buy",
   },
   {
@@ -129,7 +145,16 @@ const SUPPLEMENT_KEYS = [
 // Exported so the referrer-fee-config endpoint can validate
 // supplement_key values sent by the frontend without re-declaring the
 // list. Same canonical set as the firm engine.
-export const VALID_SUPPLEMENT_KEYS = SUPPLEMENT_KEYS.map((e) => e.key);
+//
+// The union covers BOTH matter families — see the note on the firm
+// engine's copy. Fee Settings offers only the keys for the selected
+// type's family, but this whitelist must accept either or saving
+// enfranchisement fees is rejected server-side.
+export const VALID_SUPPLEMENT_KEYS = [
+  ...SUPPLEMENT_KEYS.map((e) => e.key),
+  ...VALID_ENFRANCHISEMENT_SUPPLEMENT_KEYS,
+  ...VALID_STAIRCASING_SUPPLEMENT_KEYS,
+];
 
 function round2(n) {
   return Number((Number(n) || 0).toFixed(2));
@@ -169,6 +194,36 @@ export async function calculateReferrerQuote({ db, referrerId, body }) {
   }
 
   const transactionType = String(body.transactionType || "").trim();
+
+  // Enfranchisement matters route to the shared engine. Legal fees still
+  // come 100% from referrer_fee_configs for this referrer — Pattern B
+  // isolation is unchanged. The qualification gate and the third-party
+  // cost block are statutory and therefore central: a referrer cannot
+  // configure who qualifies for a statutory right, nor what the landlord
+  // is entitled to recover under s.60.
+  if (isEnfranchisementType(transactionType) || isSharedOwnershipType(transactionType)) {
+    const enfConfig = await db
+      .prepare(
+        `SELECT id, label, amount, includes_vat, is_disbursement, sort_order, supplement_key
+           FROM referrer_fee_configs
+          WHERE referrer_id = ?
+            AND transaction_type = ?
+          ORDER BY sort_order, id`
+      )
+      .bind(referrerId, transactionType)
+      .all();
+
+    return buildConfigRailEnfranchisementQuote({
+      feeRows: (enfConfig.results || []).filter(
+        (r) => Number(r.is_disbursement) === 0
+      ),
+      body,
+      transactionType,
+      providerName: referrer.referrer_name,
+      providerLabelKey: "referrerName",
+    });
+  }
+
   if (!SUPPORTED_TRANSACTION_TYPES.has(transactionType)) {
     return {
       ok: false,

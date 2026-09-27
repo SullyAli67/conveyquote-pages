@@ -26,6 +26,19 @@ const GUIDES = {
 
 const isEmail = (s) => typeof s === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
+// The email regex rejects whitespace but NOT angle brackets, so a value
+// like "<b>x</b>@y.co" passes validation — as do the classic no-space
+// payloads that use "/" as an attribute separator. Anything interpolated
+// into the lead-notification HTML must therefore be escaped, even though
+// that mail only goes to an internal address.
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 function arrayBufferToBase64(buf) {
   const bytes = new Uint8Array(buf);
   let binary = "";
@@ -103,7 +116,7 @@ export async function onRequestPost(context) {
           to: ["info@conveyquote.uk"],
           reply_to: email,
           subject: `Guide download — ${guide.title}`,
-          html: `<p>${email} downloaded <strong>${guide.title}</strong> (${slug}).</p>`,
+          html: `<p>${escapeHtml(email)} downloaded <strong>${escapeHtml(guide.title)}</strong> (${escapeHtml(slug)}).</p>`,
         }),
       });
     } catch (e) {

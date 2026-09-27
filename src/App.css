@@ -501,6 +501,9 @@ textarea:focus {
 }
 
 .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 54px;
   border: none;
   border-radius: 12px;
@@ -526,6 +529,9 @@ textarea:focus {
 }
 
 .muted-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 54px;
   border: 1.5px solid var(--border);
   border-radius: 12px;
@@ -1067,6 +1073,9 @@ textarea:focus {
 }
 
 .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 54px;
   border: none;
   border-radius: 12px;

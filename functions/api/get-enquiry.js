@@ -162,6 +162,34 @@ export async function onRequestGet(context) {
         quoteSource.remortgageTransferOwnersChanging || "",
       remortgage_transfer_ownership_type:
         quoteSource.remortgageTransferOwnershipType || "",
+
+      // ── Enfranchisement family ───────────────────────────────────
+      // These have never had DB columns and never will — the enquiries
+      // table is at its column ceiling (see migration 0014) and
+      // quote_json is the storage for everything new.
+      property_type: quoteSource.propertyType || "",
+      unexpired_term_years: quoteSource.unexpiredTermYears || "",
+      original_lease_term_years: quoteSource.originalLeaseTermYears || "",
+      ground_rent: quoteSource.groundRent || "",
+      landlord_identifiable: quoteSource.landlordIdentifiable || "",
+      notice_already_served: quoteSource.noticeAlreadyServed || "",
+      is_business_tenancy: quoteSource.isBusinessTenancy || "",
+      staircased_to_full: quoteSource.staircasedToFull || "",
+      premium_supplied: quoteSource.premium || "",
+
+      // Collective enfranchisement
+      total_flats: quoteSource.totalFlats || "",
+      qualifying_tenant_flats: quoteSource.qualifyingTenantFlats || "",
+      participant_count: quoteSource.participantCount || "",
+      non_residential_percent: quoteSource.nonResidentialPercent || "",
+      resident_landlord: quoteSource.residentLandlord || "",
+
+      // Staircasing
+      current_share_percent: quoteSource.currentSharePercent || "",
+      additional_share_percent: quoteSource.additionalSharePercent || "",
+      market_value_election: quoteSource.marketValueElection || "",
+      has_mortgage: quoteSource.hasMortgage || "",
+      share_price: quoteSource.sharePrice || "",
     };
 
     const {
@@ -205,6 +233,39 @@ export async function onRequestGet(context) {
             sdltNote: authoritative.sdltNote ?? null,
             totalIncludingSdlt: authoritative.totalIncludingSdlt ?? null,
             feeBreakdown: authoritative.feeBreakdown || "",
+
+            // ── Enfranchisement family ─────────────────────────────
+            // adminQuote is an explicit whitelist, so these have to be
+            // named or they are silently dropped on the way to the
+            // admin screen. All null on conveyancing matters, so the
+            // existing rail is unaffected.
+            matterFamily: authoritative.matterFamily ?? null,
+            transactionLabel: authoritative.transactionLabel ?? null,
+            statutoryBasis: authoritative.statutoryBasis ?? null,
+            priced: authoritative.priced ?? null,
+            qualification: authoritative.qualification ?? null,
+            marriageValue: authoritative.marriageValue ?? null,
+            routeComparison: authoritative.routeComparison ?? null,
+            thirdPartyCosts: authoritative.thirdPartyCosts ?? null,
+            indicativeTotalExcludingPremium:
+              authoritative.indicativeTotalExcludingPremium ?? null,
+            premium: authoritative.premium ?? null,
+            exclusions: authoritative.exclusions ?? null,
+            abortivePolicy: authoritative.abortivePolicy ?? null,
+            regimeId: authoritative.regimeId ?? null,
+            quotedAsOf: authoritative.quotedAsOf ?? null,
+            mayAutoIssue: authoritative.mayAutoIssue ?? null,
+            appliedSupplements: authoritative.appliedSupplements ?? null,
+            disclaimerLines: authoritative.disclaimerLines ?? null,
+
+            // Collective enfranchisement and staircasing. adminQuote is
+            // an explicit whitelist, so an unnamed field is dropped
+            // silently on the way to the admin screen.
+            apportionment: authoritative.apportionment ?? null,
+            sdlt: authoritative.sdlt ?? null,
+            currentSharePercent: authoritative.currentSharePercent ?? null,
+            additionalSharePercent: authoritative.additionalSharePercent ?? null,
+            resultingSharePercent: authoritative.resultingSharePercent ?? null,
           }
         : null,
     });

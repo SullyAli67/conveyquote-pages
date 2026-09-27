@@ -87,6 +87,16 @@ export function getLandRegistryScale2Fee(amount) {
 //     conservative full propertyValue).
 // HMLR charges ONE fee on combined applications, the higher of the
 // two scenarios.
+/**
+ * @param {{
+ *   transactionType: string,
+ *   purchasePrice?: number,
+ *   mortgageAmount?: number,
+ *   propertyValue?: number,
+ *   sharePercent?: number | null,
+ *   continuingMortgage?: number | null,
+ * }} params
+ */
 export function getLandRegistryFee({
   transactionType,
   purchasePrice = 0,

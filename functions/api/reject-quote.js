@@ -1,5 +1,7 @@
 // MUST STAY IN SYNC with the REASONS mapping in src/App.tsx (admin UI display).
 // Keys are persisted in enquiries.decline_reason; labels are user-facing.
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
+
 const REASONS = {
   price: "Price was higher than expected",
   different_firm: "I went with a different firm",
@@ -39,6 +41,11 @@ const escapeHtml = (value) =>
     .replace(/'/g, "&#39;");
 
 const getTransactionLabel = (type) => {
+  // Enfranchisement labels come from the one shared module rather than
+  // being restated here — see functions/lib/enfranchisement/types.js.
+  const specialistLabel = getSpecialistMatterLabel(type);
+  if (specialistLabel) return specialistLabel;
+
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
   if (type === "sale_purchase") return "Sale and Purchase";

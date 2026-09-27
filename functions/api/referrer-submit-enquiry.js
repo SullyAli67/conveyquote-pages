@@ -30,6 +30,7 @@
 // expresses pricing directly via the line items.
 
 import { buildQuoteData } from "../lib/calculate-quote.js";
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { calculateReferrerQuote } from "../lib/calculate-referrer-quote-core.js";
 import {
   getTokenFromRequest,
@@ -127,6 +128,11 @@ const formatMoney = (v) =>
     : "Not provided";
 
 const getTransactionLabel = (type) => {
+  // Enfranchisement labels live in functions/lib/enfranchisement/types.js
+  // so they are defined exactly once across every rail.
+  const specialistLabel = getSpecialistMatterLabel(type);
+  if (specialistLabel) return specialistLabel;
+
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
   if (type === "sale_purchase") return "Sale and Purchase";

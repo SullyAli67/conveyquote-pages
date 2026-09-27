@@ -2,6 +2,18 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "./disbursement-constants.js";
+import {
+  SEARCH_PACK_FEE,
+  ID_CHECKS_PER_BUYER,
+  OS1_SEARCH_FEE,
+  BANKRUPTCY_SEARCH_PER_BUYER,
+  SDLT_SUBMISSION_FEE,
+  AP1_SUBMISSION_FEE,
+} from "./pass-through-costs.js";
+import { isEnfranchisementType } from "./enfranchisement/types.js";
+import { buildEnfranchisementQuote } from "./calculate-enfranchisement-quote.js";
+import { isSharedOwnershipType } from "./shared-ownership/types.js";
+import { buildStaircasingQuote } from "./calculate-staircasing-quote.js";
 import { getTaxJurisdiction } from "./tax-jurisdiction.js";
 
 // Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
@@ -17,12 +29,18 @@ import { getTaxJurisdiction } from "./tax-jurisdiction.js";
 // statutory sliding scale exported from ./disbursement-constants.js.
 // Call getLandRegistryFee({ transactionType, purchasePrice,
 // mortgageAmount, propertyValue }) directly. HMLR fees are NOT VAT-able.
-export const SEARCH_PACK_FEE = 350;
-export const ID_CHECKS_PER_BUYER = 14.4;
-export const OS1_SEARCH_FEE = 8.8;
-export const BANKRUPTCY_SEARCH_PER_BUYER = 7.6;
-export const SDLT_SUBMISSION_FEE = 6;
-export const AP1_SUBMISSION_FEE = 6;
+// The constants themselves now live in ./pass-through-costs.js so that
+// engines needing them (notably the enfranchisement engine, which this
+// module dispatches to below) can import them without creating a cycle.
+// Re-exported here so existing imports from this module keep working.
+export {
+  SEARCH_PACK_FEE,
+  ID_CHECKS_PER_BUYER,
+  OS1_SEARCH_FEE,
+  BANKRUPTCY_SEARCH_PER_BUYER,
+  SDLT_SUBMISSION_FEE,
+  AP1_SUBMISSION_FEE,
+} from "./pass-through-costs.js";
 
 function toNumber(value) {
   const parsed = Number(String(value ?? "").replace(/,/g, "").trim());
@@ -349,6 +367,36 @@ function buildPurchaseQuote(input, options = {}) {
     addItem(legalFees, "Gifted deposit supplement", 95);
   }
 
+  // ── Five supplements that were missing from this engine ───────────
+  // These exist in src/priceConfig.ts and are quoted on the website, but
+  // were never implemented here — and this engine is the one that
+  // prices the quote actually emailed to the client. Every new build,
+  // shared ownership, Help to Buy, buy-to-let and company purchase was
+  // therefore quoted with the supplement and billed without it.
+  //
+  // Amounts and ordering match src/priceConfig.ts. Both engines are
+  // covered by supplement fixtures in
+  // scripts/verify-engine-consistency.js.
+  if (input.newBuild === "yes") {
+    addItem(legalFees, "New build supplement", 200);
+  }
+
+  if (input.sharedOwnership === "yes") {
+    addItem(legalFees, "Shared ownership supplement", 250);
+  }
+
+  if (input.helpToBuy === "yes") {
+    addItem(legalFees, "Help to Buy supplement", 200);
+  }
+
+  if (input.isCompany === "yes") {
+    addItem(legalFees, "Buying via company supplement", 350);
+  }
+
+  if (input.buyToLet === "yes") {
+    addItem(legalFees, "Buy to let supplement", 150);
+  }
+
   if (input.lifetimeIsa === "yes") {
     addItem(legalFees, "Lifetime ISA admin fee", 50);
   }
@@ -427,7 +475,8 @@ function buildSaleQuote(input, options = {}) {
   }
 
   if (input.managementCompany === "yes") {
-    addItem(legalFees, "Management company / service charge supplement", 175);
+    // £175 here vs £150 in src/priceConfig.ts. Reconciled to the lower.
+    addItem(legalFees, "Management company / service charge supplement", 150);
   }
 
   if (input.tenanted === "yes") {
@@ -545,7 +594,8 @@ function buildTransferQuote(input, options = {}) {
   }
 
   if (input.ownersChanging === "more") {
-    addItem(legalFees, "Complex ownership change supplement", 150);
+    // £150 here vs £100 in src/priceConfig.ts. Reconciled to the lower.
+    addItem(legalFees, "Complex ownership change supplement", 100);
   }
 
   // Office copy entries: tenure-based estimate. In a combined
@@ -700,6 +750,19 @@ function combineQuotes(title, first, second, sdltFromSecond = false, bespokeNote
 
 export function buildQuoteData(input) {
   const type = input.type || "";
+
+  // Enfranchisement matters are a separate matter family with their own
+  // engine, their own qualification gate and their own output contract.
+  // Dispatching here means every existing caller — send-quote.js,
+  // send-approved-quote.js and the TS client — picks up the new family
+  // without changing how it calls this function.
+  if (isEnfranchisementType(type)) {
+    return buildEnfranchisementQuote(input);
+  }
+
+  if (isSharedOwnershipType(type)) {
+    return buildStaircasingQuote(input);
+  }
 
   if (type === "purchase") {
     return buildPurchaseQuote(input);

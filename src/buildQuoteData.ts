@@ -11,6 +11,17 @@ import {
   getOfficeCopyEntriesAmount,
   getLandRegistryFee,
 } from "../functions/lib/disbursement-constants.js";
+// The enfranchisement engine is written ONCE, in JavaScript, under
+// functions/lib/, and imported here rather than reimplemented in
+// TypeScript. The conveyancing price book is duplicated across this file
+// and functions/lib/calculate-quote.js, which is why
+// scripts/verify-engine-consistency.js has to exist at all; the
+// enfranchisement family deliberately does not repeat that. The import
+// pattern is already proven by disbursement-constants.js above.
+import { isEnfranchisementType } from "../functions/lib/enfranchisement/types.js";
+import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchisement-quote.js";
+import { isSharedOwnershipType } from "../functions/lib/shared-ownership/types.js";
+import { buildStaircasingQuote } from "../functions/lib/calculate-staircasing-quote.js";
 import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
 type TransactionType =
@@ -109,6 +120,120 @@ export type BuiltQuoteData = {
   sdltNote?: string;
   totalIncludingSdlt?: number;
   feeBreakdown: string;
+
+  // ── Enfranchisement family only ──────────────────────────────────
+  // Present when matterFamily === "enfranchisement". Every field is
+  // optional so the conveyancing rail is completely unaffected and no
+  // existing consumer needs changing.
+  //
+  // Note that `grandTotal` above keeps its meaning on both families:
+  // our fees plus the disbursements we can fix. The premium, the
+  // landlord's s.60 costs and the client's valuer's fee live in
+  // thirdPartyCosts and are NEVER included in it.
+  matterFamily?: string;
+  transactionLabel?: string;
+  statutoryBasis?: string;
+  priced?: boolean;
+  qualification?: EnfranchisementQualification;
+  // INTERNAL TRIAGE ONLY — never render this to a client. Marriage value
+  // is part of the premium, and the premium is excluded from the quote as
+  // a valuation matter. Present so a fee earner can see a short lease at
+  // a glance. See functions/lib/enfranchisement/regime.js.
+  marriageValue?: {
+    status: "payable" | "approaching" | "not_applicable" | "unknown";
+    note: string;
+    statutoryRef: string | null;
+  };
+  routeComparison?: {
+    statutoryAvailable: boolean;
+    note: string;
+    rows: { feature: string; statutory: string; informal: string }[];
+  } | null;
+  thirdPartyCosts?: ThirdPartyCost[];
+  indicativeTotalExcludingPremium?: {
+    low: number;
+    high: number;
+    excludesPremium: boolean;
+    excludedItemLabel?: string;
+    note: string;
+  };
+  premium?: { status: string; amount: number | null; valuerRequired: boolean };
+  exclusions?: { label: string; note: string; amount: number | null }[];
+  abortivePolicy?: AbortivePolicy;
+  // Collective enfranchisement only — each participant's equal share of
+  // the group's costs. Null on every other matter type.
+  apportionment?: {
+    participantCount: number;
+    basis: string;
+    perParticipant: {
+      legalFeesExVat: number;
+      vat: number;
+      legalTotalInclVat: number;
+      disbursementTotal: number;
+      grandTotal: number;
+    };
+    note: string;
+  } | null;
+
+  // Staircasing only — the SDLT position, which follows its own
+  // statutory rules rather than the residential rate table.
+  sdlt?: {
+    outcome: "not_payable" | "manual_review" | "unknown";
+    resultingSharePercent: number | null;
+    note: string;
+    statutoryRef: string | null;
+  };
+  currentSharePercent?: number | null;
+  additionalSharePercent?: number | null;
+  resultingSharePercent?: number | null;
+
+  regimeId?: string | null;
+  quotedAsOf?: string;
+  warnings?: string[];
+  mayAutoIssue?: boolean;
+  appliedSupplements?: { key: string; label: string; amount: number }[];
+  disclaimerLines?: string[];
+};
+
+export type EnfranchisementQualification = {
+  outcome: "qualifies" | "does_not_qualify" | "needs_review";
+  reasons: {
+    code: string;
+    severity: "bar" | "review" | "note";
+    message: string;
+    statutoryRef: string | null;
+  }[];
+  statutoryRefs: string[];
+  flags: { absentLandlord: boolean; informalRouteAvailable: boolean };
+  regimeId: string;
+};
+
+// A cost the CLIENT pays to SOMEONE ELSE. `withinFirmControl` is always
+// false on these — it is what the renderers key off to present them as
+// estimates outside the firm's control rather than as part of the fee.
+export type ThirdPartyCost = {
+  label: string;
+  status: "estimate" | "tbc" | "not_included";
+  amountLow: number | null;
+  amountHigh: number | null;
+  withinFirmControl: false;
+  payableTo: string;
+  statutoryRef?: string | null;
+  note: string;
+  survivesWithdrawalNote?: string;
+  valuerRequired?: boolean;
+};
+
+export type AbortivePolicy = {
+  type: string;
+  headline: string;
+  summary: string;
+  faultConditions: string[];
+  thirdPartyCostsStillPayable: boolean;
+  thirdPartyDisclosure: string;
+  excludedSupplements: string[];
+  appliesToThisMatter: boolean;
+  disapplicationReason: string | null;
 };
 
 const yes = (value?: string) => value === "yes";
@@ -223,7 +348,18 @@ function getSdltResult(input: {
     return { sdltNote: jurisdiction.note as string };
   }
 
-  if (yes(input.isCompany) || yes(input.sharedOwnership) || yes(input.helpToBuy)) {
+  // Help to Buy is NOT routed to manual review. SDLT on a Help to Buy
+  // equity loan is ordinarily payable on the full purchase price — the
+  // equity loan is not separately chargeable consideration — so the
+  // ordinary calculation applies and the server engine has always
+  // computed it (functions/lib/calculate-quote.js carries no Help to Buy
+  // gate). This gate previously produced a £10,000 gap on a £400k
+  // purchase between the figure shown here and the figure emailed.
+  //
+  // Company and shared ownership purchases DO stay on manual review:
+  // the former can attract the higher corporate rates, and the latter
+  // allows a market-value election and staircasing.
+  if (yes(input.isCompany) || yes(input.sharedOwnership)) {
     return { sdltNote: "SDLT subject to review" as string };
   }
 
@@ -381,27 +517,25 @@ function buildSaleQuote(
     );
   }
 
+  // One TT always, to send the net proceeds to the seller. A second is
+  // added where there is a mortgage to redeem, because funds must also
+  // be wired to the lender. Labels and ordering match
+  // functions/lib/calculate-quote.js exactly.
+  addItem(
+    legalFees,
+    "Telegraphic transfer fee",
+    config.legalFees.telegraphicTransferFee
+  );
+
   if (yes(input.saleMortgage)) {
     addItem(
       legalFees,
-      "Mortgage redemption",
+      "Mortgage redemption supplement",
       config.legalFees.mortgageRedemptionSupplement
     );
     addItem(
       legalFees,
-      "Telegraphic transfer fee - lender redemption",
-      config.legalFees.telegraphicTransferFee
-    );
-    addItem(
-      legalFees,
-      "Telegraphic transfer fee - balance to client",
-      config.legalFees.telegraphicTransferFee
-    );
-  } else {
-    // No mortgage: still need 1x TT to send net proceeds to the seller
-    addItem(
-      legalFees,
-      "Telegraphic transfer fee",
+      "Telegraphic transfer fee (mortgage redemption)",
       config.legalFees.telegraphicTransferFee
     );
   }
@@ -409,7 +543,7 @@ function buildSaleQuote(
   if (yes(input.managementCompany)) {
     addItem(
       legalFees,
-      "Management company",
+      "Management company / service charge supplement",
       config.legalFees.managementCompanySupplement
     );
   }
@@ -417,7 +551,7 @@ function buildSaleQuote(
   if (yes(input.tenanted)) {
     addItem(
       legalFees,
-      "Tenanted property",
+      "Tenanted property supplement",
       config.legalFees.tenantedPropertySupplement
     );
   }
@@ -504,43 +638,43 @@ function buildPurchaseQuote(
   if (yes(input.giftedDeposit)) {
     addItem(
       legalFees,
-      "Gifted deposit",
+      "Gifted deposit supplement",
       config.legalFees.giftedDepositSupplement
     );
   }
 
   if (yes(input.newBuild)) {
-    addItem(legalFees, "New build", config.legalFees.newBuildSupplement);
+    addItem(legalFees, "New build supplement", config.legalFees.newBuildSupplement);
   }
 
   if (yes(input.sharedOwnership)) {
     addItem(
       legalFees,
-      "Shared ownership",
+      "Shared ownership supplement",
       config.legalFees.sharedOwnershipSupplement
     );
   }
 
   if (yes(input.helpToBuy)) {
-    addItem(legalFees, "Help to Buy", config.legalFees.helpToBuySupplement);
+    addItem(legalFees, "Help to Buy supplement", config.legalFees.helpToBuySupplement);
   }
 
   if (yes(input.isCompany)) {
     addItem(
       legalFees,
-      "Company buyer",
+      "Buying via company supplement",
       config.legalFees.companyBuyerSupplement
     );
   }
 
   if (yes(input.buyToLet)) {
-    addItem(legalFees, "Buy to let", config.legalFees.buyToLetSupplement);
+    addItem(legalFees, "Buy to let supplement", config.legalFees.buyToLetSupplement);
   }
 
   if (yes(input.lifetimeIsa)) {
     addItem(
       legalFees,
-      "Lifetime ISA fee",
+      "Lifetime ISA admin fee",
       config.legalFees.lifetimeIsaSupplement
     );
   }
@@ -694,7 +828,7 @@ function buildRemortgageQuote(
   if (yes(input.additionalBorrowing)) {
     addItem(
       legalFees,
-      "Additional borrowing",
+      "Additional borrowing supplement",
       config.legalFees.additionalBorrowingSupplement
     );
   }
@@ -811,11 +945,19 @@ function buildTransferQuote(
     );
   }
 
-  if (input.ownersChanging === "two" || input.ownersChanging === "more") {
+  if (input.ownersChanging === "two") {
     addItem(
       legalFees,
-      "Additional owner change",
+      "Additional ownership change supplement",
       config.legalFees.additionalOwnerChangeSupplement
+    );
+  }
+
+  if (input.ownersChanging === "more") {
+    addItem(
+      legalFees,
+      "Complex ownership change supplement",
+      config.legalFees.complexOwnerChangeSupplement
     );
   }
 
@@ -928,6 +1070,24 @@ function mergeQuotes(
 
 export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
   const type = form.type as TransactionType;
+
+  // Enfranchisement matters route to the shared JS engine. Dispatching
+  // here means the public preview, the admin screens and the server all
+  // produce byte-identical output from one implementation.
+  if (isEnfranchisementType(form.type)) {
+    return buildEnfranchisementQuote(form) as BuiltQuoteData;
+  }
+
+  if (isSharedOwnershipType(form.type)) {
+    // The staircasing engine is plain JavaScript, so TypeScript infers
+    // its parameter shape from the properties the function happens to
+    // read rather than from the form contract. Casting both sides keeps
+    // the call honest without weakening BuiltQuoteData for every other
+    // caller.
+    return buildStaircasingQuote(
+      form as unknown as Parameters<typeof buildStaircasingQuote>[0]
+    ) as unknown as BuiltQuoteData;
+  }
 
   if (type === "sale") {
     return buildSaleQuote({

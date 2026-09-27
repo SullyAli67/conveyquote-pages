@@ -6,6 +6,8 @@
 // Triggered by a cron-job.org schedule (weekdays 9am UK). Reuses FOLLOWUP_SECRET
 // for auth so Sully doesn't have to manage another secret.
 
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
+
 const TO_ADDRESS = "info@conveyquote.uk";
 const FROM_ADDRESS = "ConveyQuote <noreply@conveyquote.uk>";
 const MAX_PER_RUN = 50;
@@ -38,6 +40,9 @@ function checkAuth(request, env) {
 
 function prettyType(type) {
   const t = safe(type).toLowerCase();
+  // Shared module first — see functions/lib/enfranchisement/types.js.
+  const specialistLabel = getSpecialistMatterLabel(t, { short: true });
+  if (specialistLabel) return specialistLabel;
   if (t === "purchase") return "Purchase";
   if (t === "sale") return "Sale";
   if (t === "sale_purchase") return "Sale & Purchase";

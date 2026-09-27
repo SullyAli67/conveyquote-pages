@@ -4,6 +4,7 @@ import {
   validateSession,
   unauthorised,
 } from "../lib/auth.js";
+import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -20,6 +21,11 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;");
 
 const getTransactionLabel = (type) => {
+  // Enfranchisement labels come from the one shared module rather than
+  // being restated here — see functions/lib/enfranchisement/types.js.
+  const specialistLabel = getSpecialistMatterLabel(type);
+  if (specialistLabel) return specialistLabel;
+
   if (type === "purchase") return "Purchase";
   if (type === "sale") return "Sale";
   if (type === "sale_purchase") return "Sale and Purchase";
