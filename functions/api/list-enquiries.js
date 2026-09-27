@@ -1,6 +1,7 @@
 import {
   getTokenFromRequest,
   validateSession,
+  unauthorised,
 } from "../lib/auth.js";
 
 const jsonResponse = (body, status = 200) =>
@@ -12,6 +13,15 @@ const jsonResponse = (body, status = 200) =>
 export async function onRequestGet(context) {
   try {
     const { request, env } = context;
+
+    // Admin-only. This endpoint returns every client's name, email, phone
+    // and property address; it imported the session helpers but never
+    // called them, leaving the whole enquiry table readable by anyone who
+    // knew the URL. Matches the guard used by list-panel-firms.js.
+    const token = getTokenFromRequest(request);
+    const session = await validateSession(env.DB, token, "admin");
+    if (!session) return unauthorised();
+
     const url = new URL(request.url);
     const q = (url.searchParams.get("q") || "").trim();
     const assigned = url.searchParams.get("assigned") === "1";

@@ -36,6 +36,16 @@ export function expiresAt() {
   return d.toISOString();
 }
 
+// Rows written by expiresAt() are ISO-8601 ("2026-09-17T18:45:00.000Z"),
+// but SQLite's datetime('now') is space-separated ("2026-09-17 18:45:00").
+// Comparing the two as plain strings compares "T" (0x54) against " " (0x20)
+// at index 10, so a same-day expiry always sorts as "in the future" and the
+// session survives until the UTC date rolls over — up to 16 hours past its
+// real 8-hour life. Wrapping the column in datetime() normalises both
+// formats (and existing rows) to the same comparable shape.
+const NOT_EXPIRED = "datetime(expires_at) > datetime('now')";
+const HAS_EXPIRED = "datetime(expires_at) <= datetime('now')";
+
 // ── Session management ────────────────────────────────────────
 
 export async function createSession(db, userType, userId = null) {
@@ -61,7 +71,7 @@ export async function validateSession(db, token, requiredType) {
       `SELECT * FROM sessions
        WHERE token = ?
          AND user_type = ?
-         AND expires_at > datetime('now')
+         AND ${NOT_EXPIRED}
        LIMIT 1`
     )
     .bind(token, requiredType)
@@ -79,7 +89,7 @@ export async function deleteSession(db, token) {
 
 export async function cleanExpiredSessions(db) {
   await db
-    .prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`)
+    .prepare(`DELETE FROM sessions WHERE ${HAS_EXPIRED}`)
     .run();
 }
 

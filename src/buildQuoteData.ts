@@ -22,6 +22,7 @@ import { isEnfranchisementType } from "../functions/lib/enfranchisement/types.js
 import { buildEnfranchisementQuote } from "../functions/lib/calculate-enfranchisement-quote.js";
 import { isSharedOwnershipType } from "../functions/lib/shared-ownership/types.js";
 import { buildStaircasingQuote } from "../functions/lib/calculate-staircasing-quote.js";
+import { getTaxJurisdiction } from "../functions/lib/tax-jurisdiction.js";
 
 type TransactionType =
   | "sale"
@@ -37,6 +38,7 @@ type QuoteFormLike = {
   tenure?: string;
   mortgage?: string;
   ownershipType?: string;
+  postcode?: string;
   firstTimeBuyer?: string;
   additionalProperty?: string;
   ukResidentForSdlt?: string;
@@ -330,6 +332,7 @@ function getSdltResult(input: {
   isCompany?: string;
   sharedOwnership?: string;
   helpToBuy?: string;
+  postcode?: string;
 }) {
   const price = toNumber(input.price);
 
@@ -337,11 +340,20 @@ function getSdltResult(input: {
     return { sdltNote: "SDLT subject to review" as string };
   }
 
+  // Jurisdiction first — matches the server engine in
+  // functions/lib/calculate-quote.js. Welsh and Scottish property is
+  // outside SDLT altogether.
+  const jurisdiction = getTaxJurisdiction(input.postcode);
+  if (jurisdiction.regime !== "sdlt") {
+    return { sdltNote: jurisdiction.note as string };
+  }
+
   // Help to Buy is NOT routed to manual review. SDLT on a Help to Buy
   // equity loan is ordinarily payable on the full purchase price — the
   // equity loan is not separately chargeable consideration — so the
   // ordinary calculation applies and the server engine has always
-  // computed it. This gate previously produced a £10,000 gap on a £400k
+  // computed it (functions/lib/calculate-quote.js carries no Help to Buy
+  // gate). This gate previously produced a £10,000 gap on a £400k
   // purchase between the figure shown here and the figure emailed.
   //
   // Company and shared ownership purchases DO stay on manual review:
@@ -576,6 +588,7 @@ function buildPurchaseQuote(
     tenure?: string;
     mortgage?: string;
     ownershipType?: string;
+    postcode?: string;
     firstTimeBuyer?: string;
     additionalProperty?: string;
     ukResidentForSdlt?: string;
@@ -727,6 +740,7 @@ function buildPurchaseQuote(
     isCompany: input.isCompany,
     sharedOwnership: input.sharedOwnership,
     helpToBuy: input.helpToBuy,
+    postcode: input.postcode,
   });
 
   return finaliseQuote(
@@ -745,6 +759,7 @@ function buildPurchaseQuoteWithPrice(
     tenure?: string;
     mortgage?: string;
     ownershipType?: string;
+    postcode?: string;
     firstTimeBuyer?: string;
     additionalProperty?: string;
     ukResidentForSdlt?: string;
@@ -767,6 +782,7 @@ function buildPurchaseQuoteWithPrice(
     isCompany: input.isCompany,
     sharedOwnership: input.sharedOwnership,
     helpToBuy: input.helpToBuy,
+    postcode: input.postcode,
   });
 
   const bespoke = getBespokeNote(toNumber(input.price));
@@ -1090,6 +1106,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       tenure: form.tenure,
       mortgage: form.mortgage,
       ownershipType: form.ownershipType,
+      postcode: form.postcode,
       firstTimeBuyer: form.firstTimeBuyer,
       additionalProperty: form.additionalProperty,
       ukResidentForSdlt: form.ukResidentForSdlt,
@@ -1146,6 +1163,7 @@ export function buildQuoteData(form: QuoteFormLike): BuiltQuoteData {
       tenure: form.purchaseTenure,
       mortgage: form.purchaseMortgage,
       ownershipType: form.purchaseOwnershipType,
+      postcode: form.purchasePostcode,
       firstTimeBuyer: form.purchaseFirstTimeBuyer,
       additionalProperty: form.purchaseAdditionalProperty,
       ukResidentForSdlt: form.purchaseUkResidentForSdlt,

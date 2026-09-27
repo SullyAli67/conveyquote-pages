@@ -14,6 +14,7 @@ import { isEnfranchisementType } from "./enfranchisement/types.js";
 import { buildEnfranchisementQuote } from "./calculate-enfranchisement-quote.js";
 import { isSharedOwnershipType } from "./shared-ownership/types.js";
 import { buildStaircasingQuote } from "./calculate-staircasing-quote.js";
+import { getTaxJurisdiction } from "./tax-jurisdiction.js";
 
 // Pass-through disbursement amounts. Exported so the Type 2 firm-quoting
 // engine can source the same values — these costs must not diverge
@@ -198,9 +199,18 @@ export function calculateSdlt({
   ukResidentForSdlt,
   isCompany,
   sharedOwnership,
+  postcode,
 }) {
   if (price <= 0) {
     return {};
+  }
+
+  // Jurisdiction first. Property tax is devolved, so on a Welsh or
+  // Scottish property an SDLT figure is not a close estimate — it is the
+  // wrong tax entirely. See ./tax-jurisdiction.js.
+  const jurisdiction = getTaxJurisdiction(postcode);
+  if (jurisdiction.regime !== "sdlt") {
+    return { sdltNote: jurisdiction.note };
   }
 
   if (sharedOwnership === "yes" || isCompany === "yes") {
@@ -429,6 +439,7 @@ function buildPurchaseQuote(input, options = {}) {
     ukResidentForSdlt: input.ukResidentForSdlt,
     isCompany: input.isCompany,
     sharedOwnership: input.sharedOwnership,
+    postcode: input.postcode,
   });
 
   return finaliseQuote({
