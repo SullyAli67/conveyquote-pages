@@ -30,6 +30,7 @@ import {
   getCollectivePerParticipantFee,
 } from "../functions/lib/enfranchisement/price-book.js";
 import { assessStaircasingSdlt } from "../functions/lib/shared-ownership/sdlt.js";
+import { readFileSync } from "node:fs";
 import { assessQualification, QUALIFICATION_OUTCOME } from "../functions/lib/enfranchisement/qualification.js";
 import { getRegime, listRegimes } from "../functions/lib/enfranchisement/regime.js";
 import { getNewLeaseRegistrationFee } from "../functions/lib/enfranchisement/statutory-costs.js";
@@ -601,6 +602,49 @@ checkTrue("collective still names the Companies House disbursement",
   collNcnf.exclusions.some((e) => /Companies House/.test(e.label)));
 checkTrue("and explains what the company is for",
   /rather than in their own names/i.test(collNcnf.exclusions.find((e) => /Companies House/.test(e.label)).note));
+
+
+// ═══════════════════════════════════════════════════════════════════
+section("13. The UI must render every family the engines emit");
+// ═══════════════════════════════════════════════════════════════════
+//
+// SpecialistQuoteBlocks in src/App.tsx renders the third-party costs,
+// the qualification outcome, the SDLT position, the apportionment and
+// the exclusions. It gates on matterFamily — and it previously tested
+// only for "enfranchisement", so every staircasing quote rendered NONE
+// of those blocks in the referrer preview, the firm portal and the
+// admin review screen.
+//
+// Nothing in the type system connects the engines' family strings to
+// that allowlist, so this asserts it directly: any family an engine can
+// emit must appear in the component's guard.
+const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+const allowlistMatch = appSource.match(/const SPECIALIST_FAMILIES = \[([^\]]*)\]/);
+checkTrue("SpecialistQuoteBlocks declares a family allowlist", Boolean(allowlistMatch));
+
+const allowlist = allowlistMatch
+  ? allowlistMatch[1].split(",").map((s) => s.trim().replace(/["']/g, "")).filter(Boolean)
+  : [];
+
+const familiesEmitted = [
+  buildEnfranchisementQuote({ ...cleanClaim, type: "lease_extension_statutory" }).matterFamily,
+  buildEnfranchisementQuote({
+    type: "collective_enfranchisement", totalFlats: 8, qualifyingTenantFlats: 8,
+    participantCount: 5, nonResidentialPercent: 0, landlordIdentifiable: "yes",
+  }).matterFamily,
+  buildStaircasingQuote({ type: "staircasing", currentSharePercent: 40, additionalSharePercent: 20 }).matterFamily,
+];
+for (const family of [...new Set(familiesEmitted)]) {
+  checkTrue(`the UI allowlist covers the '${family}' family`, allowlist.includes(family));
+}
+check("every specialist engine emits a family", familiesEmitted.filter(Boolean).length, 3);
+
+// The component must also still be referenced everywhere it is needed:
+// the referrer preview, the firm portal quote, and the admin review.
+check("SpecialistQuoteBlocks is rendered in three places",
+  (appSource.match(/<SpecialistQuoteBlocks/g) || []).length, 3);
+checkTrue("the old enfranchisement-only name is gone",
+  !/EnfranchisementQuoteBlocks/.test(appSource));
 
 // ═══════════════════════════════════════════════════════════════════
 console.log(`\n${c.bold}${"─".repeat(60)}${c.reset}`);

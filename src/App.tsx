@@ -668,9 +668,10 @@ type MembershipEditorState = {
   last_checked_at: string;
 };
 
-// ── Enfranchisement quote blocks ─────────────────────────────────────
+// ── Specialist matter quote blocks ───────────────────────────────────
 //
-// Everything on a lease extension quote that is NOT our fee. Rendered
+// Everything on a lease extension, collective enfranchisement or
+// staircasing quote that is NOT our fee. Rendered
 // wherever a quote is shown to a human, so the separation between what
 // the client pays us and what they pay other people is made the same way
 // every time.
@@ -680,12 +681,21 @@ type MembershipEditorState = {
 // deliberately sit BELOW the fee table, under their own headings, and
 // lead with the statement that the amounts are estimates we neither set
 // nor control.
-function EnfranchisementQuoteBlocks({
+function SpecialistQuoteBlocks({
   quote,
 }: {
   quote: import("./buildQuoteData").BuiltQuoteData;
 }) {
-  if (quote.matterFamily !== "enfranchisement") return null;
+  // ⚠ Must match EVERY specialist family, not just enfranchisement.
+  // This previously tested only for "enfranchisement", so a staircasing
+  // quote — matterFamily "shared_ownership" — rendered none of these
+  // blocks at all: no third-party costs, no SDLT position, no
+  // exclusions, no abortive-costs statement, in the referrer preview,
+  // the firm portal and the admin review screen alike.
+  const SPECIALIST_FAMILIES = ["enfranchisement", "shared_ownership"];
+  if (!quote.matterFamily || !SPECIALIST_FAMILIES.includes(quote.matterFamily)) {
+    return null;
+  }
 
   const money = (n: number) =>
     `£${Number(n || 0).toLocaleString("en-GB", {
@@ -1388,12 +1398,33 @@ type FirmQuotePreviewResult = {
   legalFeesNet: number;
   vat: number;
   legalFeesGross: number;
-  disbursements: { label: string; amount: number }[];
+  disbursements: { label: string; amount: number; status?: string }[];
   disbursementsTotal: number;
-  sdlt: number;
+  // Conveyancing matters put a number here. Staircasing puts the SDLT
+  // ASSESSMENT object, because the answer is a rule outcome rather than
+  // an amount; enfranchisement puts null. Guard on typeof before
+  // treating it as money.
+  sdlt: number | Record<string, unknown> | null;
   grandTotal: number;
   warnings: string[];
   firmName: string;
+
+  // ── Specialist families ───────────────────────────────────────────
+  // Present so the fee earner issuing the quote sees exactly what the
+  // client will receive — above all the qualification outcome, which
+  // decides whether the quote should go out at all.
+  //
+  // Declared explicitly rather than intersected with BuiltQuoteData:
+  // that type declares legalFees and disbursements with a different
+  // shape, and the intersection made the two irreconcilable.
+  matterFamily?: string;
+  qualification?: import("./buildQuoteData").BuiltQuoteData["qualification"];
+  thirdPartyCosts?: import("./buildQuoteData").BuiltQuoteData["thirdPartyCosts"];
+  indicativeTotalExcludingPremium?: import("./buildQuoteData").BuiltQuoteData["indicativeTotalExcludingPremium"];
+  exclusions?: import("./buildQuoteData").BuiltQuoteData["exclusions"];
+  abortivePolicy?: import("./buildQuoteData").BuiltQuoteData["abortivePolicy"];
+  routeComparison?: import("./buildQuoteData").BuiltQuoteData["routeComparison"];
+  apportionment?: import("./buildQuoteData").BuiltQuoteData["apportionment"];
 };
 
 function FirmIssueQuotePreview({
@@ -1533,7 +1564,7 @@ function FirmIssueQuotePreview({
         </div>
       </div>
 
-      {result.sdlt > 0 && (
+      {typeof result.sdlt === "number" && result.sdlt > 0 && (
         <div style={{ marginBottom: "20px" }}>
           <h3 style={{ margin: "0 0 8px 0", color: "var(--navy)", fontSize: "16px" }}>
             Stamp Duty Land Tax
@@ -1542,7 +1573,7 @@ function FirmIssueQuotePreview({
             <div className="detail-row">
               <div className="detail-row__label">Estimated SDLT</div>
               <div className="detail-row__value" style={{ textAlign: "right" }}>
-                {fmt(result.sdlt)}
+                {fmt(result.sdlt as number)}
               </div>
             </div>
           </div>
@@ -1561,12 +1592,27 @@ function FirmIssueQuotePreview({
         }}
       >
         <div style={{ color: "var(--navy)", fontWeight: 700, fontSize: "18px" }}>
-          Total Estimated Cost
+          {/* On a lease extension, collective claim or staircasing,
+              grandTotal is what is payable to US — the premium and the
+              third-party costs sit outside it. Calling that "Total
+              Estimated Cost" would mislead the fee earner as badly as it
+              would the client. */}
+          {result.matterFamily ? "Total payable to us" : "Total Estimated Cost"}
         </div>
         <div style={{ color: "var(--navy)", fontWeight: 700, fontSize: "24px" }}>
           {fmt(result.grandTotal)}
         </div>
       </div>
+
+      {/* Everything the client will see that is NOT our fee: the
+          qualification outcome, the third-party costs, the apportionment
+          on a collective claim, the SDLT position on a staircasing, and
+          the exclusions. Previously absent, so a fee earner could send a
+          quote on a claim flagged for review without ever seeing the
+          flag. */}
+      <SpecialistQuoteBlocks
+        quote={result as unknown as import("./buildQuoteData").BuiltQuoteData}
+      />
 
       {actions ? <div style={{ marginTop: "20px" }}>{actions}</div> : null}
     </div>
@@ -1799,6 +1845,11 @@ function App() {
   const [submissionResult, setSubmissionResult] = useState<
     { reference: string; email: string } | null
   >(null);
+  // Set when the loaded enquiry belongs to a specialist matter family.
+  // Null for ordinary conveyancing, where there is nothing extra to show.
+  const [loadedSpecialistQuote, setLoadedSpecialistQuote] =
+    useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
+
   const [approvedQuote, setApprovedQuote] = useState<ApprovedQuoteForm>(
     initialApprovedQuoteState
   );
@@ -5599,6 +5650,18 @@ function App() {
           result.adminQuote || enquiry.quote || null;
 
         setLoadedEnquiry(enquiry);
+        // The approved-quote form maps the quote down to editable fee
+        // lines and drops everything else. For a lease extension,
+        // collective claim or staircasing that discards the
+        // qualification outcome, the third-party costs, the
+        // apportionment and the SDLT position — so the admin approving
+        // the quote could not see why a claim had been flagged for
+        // review. Keep the whole object alongside the editable form.
+        setLoadedSpecialistQuote(
+          quote && (quote as { matterFamily?: string }).matterFamily
+            ? (quote as unknown as import("./buildQuoteData").BuiltQuoteData)
+            : null
+        );
 
         if (quote) {
           const quoteData: ApprovedQuoteData = {
@@ -13417,6 +13480,17 @@ function App() {
                       />
                     </div>
 
+                    {loadedSpecialistQuote && (
+                      <div className="field field--full">
+                        {/* Shown ABOVE the fee lines deliberately: on a
+                            specialist matter the qualification outcome
+                            decides whether this quote should be issued
+                            at all, so it has to be read before the
+                            numbers are edited. */}
+                        <SpecialistQuoteBlocks quote={loadedSpecialistQuote} />
+                      </div>
+                    )}
+
                     <div className="field field--full">
                       <label>Legal fee items</label>
                       <div className="detail-table">
@@ -16272,7 +16346,7 @@ function ReferrerSimpleForm({
           </table>
         </div>
 
-        <EnfranchisementQuoteBlocks quote={preview} />
+        <SpecialistQuoteBlocks quote={preview} />
 
         <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
           <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
