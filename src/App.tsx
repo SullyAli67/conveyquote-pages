@@ -1266,6 +1266,58 @@ function getSellerCount(numberOfSellers?: string) {
   return 1;
 }
 
+// ── Buyer questions that follow from earlier answers ─────────────────────
+// Shared ownership is only asked for a leasehold purchase. A first-time buyer
+// cannot own another home, buy to let or buy through a company, and only a
+// first-time buyer can use a Lifetime ISA. The Purchase form and the purchase
+// half of Sale and purchase hide those questions, so the answers they hide are
+// set here to what they must be ("no") and the fees and Stamp Duty are worked
+// out exactly as if the buyer had answered them. A question that reappears is
+// cleared, so the buyer answers it rather than inheriting the automatic "no".
+const BUYER_ANSWER_RULES = [
+  {
+    // "tenure" is shared with other forms; the rules only apply to a purchase.
+    formType: "purchase",
+    tenure: "tenure",
+    sharedOwnership: "sharedOwnership",
+    firstTimeBuyer: "firstTimeBuyer",
+    notForFirstTimeBuyers: ["additionalProperty", "buyToLet", "isCompany"],
+    lifetimeIsa: "lifetimeIsa",
+  },
+  {
+    formType: "sale_purchase",
+    tenure: "purchaseTenure",
+    sharedOwnership: "purchaseSharedOwnership",
+    firstTimeBuyer: "purchaseFirstTimeBuyer",
+    notForFirstTimeBuyers: ["purchaseAdditionalProperty", "purchaseBuyToLet", "purchaseIsCompany"],
+    lifetimeIsa: "purchaseLifetimeIsa",
+  },
+] as const;
+
+function applyBuyerAnswerRules<T extends object>(prev: T, next: T, changed: string): T {
+  const before = prev as unknown as Record<string, unknown>;
+  const after = { ...next } as unknown as Record<string, unknown>;
+  for (const rule of BUYER_ANSWER_RULES) {
+    if (after.type !== rule.formType) continue;
+    if (changed === rule.tenure) {
+      if (after[rule.tenure] !== "leasehold") after[rule.sharedOwnership] = "no";
+      else if (before[rule.tenure] !== "leasehold") after[rule.sharedOwnership] = "";
+    }
+    if (changed === rule.firstTimeBuyer) {
+      const was = before[rule.firstTimeBuyer] === "yes";
+      const is = after[rule.firstTimeBuyer] === "yes";
+      if (is) {
+        rule.notForFirstTimeBuyers.forEach((key) => (after[key] = "no"));
+        if (!was) after[rule.lifetimeIsa] = "";
+      } else {
+        if (was) rule.notForFirstTimeBuyers.forEach((key) => (after[key] = ""));
+        after[rule.lifetimeIsa] = "no";
+      }
+    }
+  }
+  return after as unknown as T;
+}
+
 // ── First-time buyer / additional property conflict ──────────────────────
 //
 // A buyer who will still own another dwelling at the end of the day of
@@ -1912,6 +1964,11 @@ function App() {
   // genuinely means both answers is never blocked out of enquiring.
   const [ftbConflictSeen, setFtbConflictSeen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
+  // The current token, readable in the same tick it is set. Login sets the token and then loads the dashboard straight
+  // away; reading state there would send the previous render's (empty) token, get a 401 and log the admin out again as
+  // "session expired".
+  const adminTokenRef = useRef(adminToken);
+  adminTokenRef.current = adminToken;
 
   // Firm portal state
   const [firmEmail, setFirmEmail] = useState("");
@@ -2637,10 +2694,7 @@ function App() {
       return;
     }
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => applyBuyerAnswerRules(prev, { ...prev, [name]: value }, name));
   };
 
   const handleApprovedQuoteChange = (
@@ -2676,7 +2730,7 @@ function App() {
       ...options,
       headers: {
         ...(options.headers || {}),
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${adminTokenRef.current}`,
       },
     });
 
@@ -3585,6 +3639,7 @@ function App() {
 
       if (result.success) {
         setAdminToken(result.token);
+        adminTokenRef.current = result.token;
         setIsAdminUnlocked(true);
         setAdminPassword("");
         // Persist so a page refresh does not log the admin out
@@ -7772,21 +7827,23 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="additionalProperty">
-                          Will you own another property after completion?
-                        </label>
-                        <select
-                          id="additionalProperty"
-                          name="additionalProperty"
-                          value={form.additionalProperty}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.firstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="additionalProperty">
+                            Will you own another property after completion?
+                          </label>
+                          <select
+                            id="additionalProperty"
+                            name="additionalProperty"
+                            value={form.additionalProperty}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
 
                       {hasFtbConflict(
@@ -7834,19 +7891,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="buyToLet">Buy to let?</label>
-                        <select
-                          id="buyToLet"
-                          name="buyToLet"
-                          value={form.buyToLet}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.firstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="buyToLet">Buy to let?</label>
+                          <select
+                            id="buyToLet"
+                            name="buyToLet"
+                            value={form.buyToLet}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="newBuild">New build?</label>
@@ -7862,19 +7921,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="sharedOwnership">Shared ownership?</label>
-                        <select
-                          id="sharedOwnership"
-                          name="sharedOwnership"
-                          value={form.sharedOwnership}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.tenure === "leasehold" && (
+                        <div className="field">
+                          <label htmlFor="sharedOwnership">Shared ownership?</label>
+                          <select
+                            id="sharedOwnership"
+                            name="sharedOwnership"
+                            value={form.sharedOwnership}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="helpToBuy">Help to Buy / scheme?</label>
@@ -7890,19 +7951,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="isCompany">Buying via company?</label>
-                        <select
-                          id="isCompany"
-                          name="isCompany"
-                          value={form.isCompany}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.firstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="isCompany">Buying via company?</label>
+                          <select
+                            id="isCompany"
+                            name="isCompany"
+                            value={form.isCompany}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="giftedDeposit">Any gifted deposit?</label>
@@ -7918,19 +7981,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="lifetimeIsa">Using a Lifetime ISA?</label>
-                        <select
-                          id="lifetimeIsa"
-                          name="lifetimeIsa"
-                          value={form.lifetimeIsa}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.firstTimeBuyer === "yes" && (
+                        <div className="field">
+                          <label htmlFor="lifetimeIsa">Using a Lifetime ISA?</label>
+                          <select
+                            id="lifetimeIsa"
+                            name="lifetimeIsa"
+                            value={form.lifetimeIsa}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="rightToBuy">Right to Buy?</label>
@@ -8264,21 +8329,23 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="purchaseAdditionalProperty">
-                          Will you own another property after completion?
-                        </label>
-                        <select
-                          id="purchaseAdditionalProperty"
-                          name="purchaseAdditionalProperty"
-                          value={form.purchaseAdditionalProperty}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.purchaseFirstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="purchaseAdditionalProperty">
+                            Will you own another property after completion?
+                          </label>
+                          <select
+                            id="purchaseAdditionalProperty"
+                            name="purchaseAdditionalProperty"
+                            value={form.purchaseAdditionalProperty}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
 
                       {hasFtbConflict(
@@ -8326,19 +8393,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="purchaseBuyToLet">Buy to let?</label>
-                        <select
-                          id="purchaseBuyToLet"
-                          name="purchaseBuyToLet"
-                          value={form.purchaseBuyToLet}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.purchaseFirstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="purchaseBuyToLet">Buy to let?</label>
+                          <select
+                            id="purchaseBuyToLet"
+                            name="purchaseBuyToLet"
+                            value={form.purchaseBuyToLet}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="purchaseNewBuild">New build?</label>
@@ -8354,19 +8423,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="purchaseSharedOwnership">Shared ownership?</label>
-                        <select
-                          id="purchaseSharedOwnership"
-                          name="purchaseSharedOwnership"
-                          value={form.purchaseSharedOwnership}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.purchaseTenure === "leasehold" && (
+                        <div className="field">
+                          <label htmlFor="purchaseSharedOwnership">Shared ownership?</label>
+                          <select
+                            id="purchaseSharedOwnership"
+                            name="purchaseSharedOwnership"
+                            value={form.purchaseSharedOwnership}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="purchaseHelpToBuy">Help to Buy / scheme?</label>
@@ -8382,19 +8453,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="purchaseIsCompany">Buying via company?</label>
-                        <select
-                          id="purchaseIsCompany"
-                          name="purchaseIsCompany"
-                          value={form.purchaseIsCompany}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.purchaseFirstTimeBuyer !== "yes" && (
+                        <div className="field">
+                          <label htmlFor="purchaseIsCompany">Buying via company?</label>
+                          <select
+                            id="purchaseIsCompany"
+                            name="purchaseIsCompany"
+                            value={form.purchaseIsCompany}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field">
                         <label htmlFor="purchaseGiftedDeposit">Any gifted deposit?</label>
@@ -8410,19 +8483,21 @@ function App() {
                         </select>
                       </div>
 
-                      <div className="field">
-                        <label htmlFor="purchaseLifetimeIsa">Using a Lifetime ISA?</label>
-                        <select
-                          id="purchaseLifetimeIsa"
-                          name="purchaseLifetimeIsa"
-                          value={form.purchaseLifetimeIsa}
-                          onChange={handleChange}
-                        >
-                          <option value="">Please select</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
+                      {form.purchaseFirstTimeBuyer === "yes" && (
+                        <div className="field">
+                          <label htmlFor="purchaseLifetimeIsa">Using a Lifetime ISA?</label>
+                          <select
+                            id="purchaseLifetimeIsa"
+                            name="purchaseLifetimeIsa"
+                            value={form.purchaseLifetimeIsa}
+                            onChange={handleChange}
+                          >
+                            <option value="">Please select</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        </div>
+                      )}
 
                       <div className="field field--full">
                         <label htmlFor="combinedPurchaseSdltHint">
