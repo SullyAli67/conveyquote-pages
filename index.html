@@ -4,13 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      // Homepage only: fetch the hero still (matching the <picture> in XrayHero.tsx) and heading font before the app loads.
+      // Homepage only: fetch the hero stills (matching the <picture>s in XrayHero.tsx) and heading font before the app loads.
       if (location.pathname === "/") (function () {
-        var s = "/images/redesign-2026/terrace-still-", w = [480, 800, 1200];
+        var tall = "(max-aspect-ratio: 4/5)", wide = "not all and (max-aspect-ratio: 4/5)";
+        function still(base, framing, sizes, widths, media) {
+          var s = "/images/redesign-2026/" + base + "-" + framing + "-";
+          return { href: s + "800.webp", imagesrcset: widths.map(function (n) { return s + n + ".webp " + n + "w"; }).join(", "), imagesizes: sizes, media: media, as: "image", type: "image/webp", fetchpriority: "high" };
+        }
+        var house = [480, 640, 800, 1200], street = [480, 640, 800, 1200, 1600];
         var hints = [
-          { href: s + "tall-800.webp", imagesrcset: w.map(function (n) { return s + "tall-" + n + ".webp " + n + "w"; }).join(", "), imagesizes: "38vh", media: "(max-aspect-ratio: 4/5)", as: "image", type: "image/webp", fetchpriority: "high" },
-          { href: s + "wide-800.webp", imagesrcset: w.map(function (n) { return s + "wide-" + n + ".webp " + n + "w"; }).join(", "), imagesizes: "58vh", media: "not all and (max-aspect-ratio: 4/5)", as: "image", type: "image/webp", fetchpriority: "high" },
-          { href: "/fonts/manrope-latin-800-normal.woff2", as: "font", type: "font/woff2", crossorigin: "" }
+          still("terrace-still", "tall", "38vh", house, tall),
+          still("terrace-still", "wide", "58vh", house, wide),
+          still("terrace-street", "tall", "46vh", street, tall),
+          still("terrace-street", "wide", "160vh", street, wide),
+          { href: "/fonts/manrope-latin-wght-normal.woff2", as: "font", type: "font/woff2", crossorigin: "" }
         ];
         hints.forEach(function (h) { var l = document.createElement("link"); l.rel = "preload"; for (var k in h) l.setAttribute(k, h[k]); document.head.appendChild(l); });
       })();

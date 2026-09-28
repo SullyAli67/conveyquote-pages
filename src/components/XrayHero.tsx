@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "r
 import logoMark240 from "../assets/brand/logo-mark-240.png";
 import logoMark480 from "../assets/brand/logo-mark-480.png";
 import { drawContours } from "../hero/contours.js";
-import { drawStreetMask, fitScale, heroAvoidRects, heroSafeRect, scaleAbout, shiftInto } from "../hero/fit.js";
+import { heroAvoidRects, heroSafeRect } from "../hero/fit.js";
+import { fitStills, PORTRAIT_QUERY } from "../hero/stillFit.js";
 import "../home2026.css";
 
 // From 768px the first five live in the header (as the button and visible links); the menu keeps the logins.
@@ -22,27 +23,18 @@ const HEADER_LINKS = ["/leasehold/", "/sdlt-calculator/", "/conveyancing-fees/",
 const STILL = "/images/redesign-2026/terrace-still";
 // The rest of the terrace from the same frame, drawn under the house still and faded near the text like the live street.
 const STREET = "/images/redesign-2026/terrace-street";
-const PORTRAIT_QUERY = "(max-aspect-ratio: 4/5)";
-// Stills are the scene's first frame per camera framing; hull is the house outline xrayScene.js also fits, so both move together.
-const STILL_HULL = {
-  wide: { left: 0.0175, top: 0.0123, right: 0.9827, bottom: 0.9925 },
-  tall: { left: 0.026, top: 0.0194, right: 0.9742, bottom: 0.9805 },
-};
-const srcset = (framing: string, base = STILL, widths = [480, 800, 1200]) =>
+// index.html preloads the same candidates (house and street), so keep these widths in step with its hints.
+const srcset = (framing: string, base = STILL, widths = [480, 640, 800, 1200]) =>
   widths.map((w) => `${base}-${framing}-${w}.webp ${w}w`).join(", ");
 const STILL_SOURCES = {
   tall: { srcSet: srcset("tall"), sizes: "38vh", png: `${STILL}-tall-800.png`, width: 800, height: 1071 },
   wide: { srcSet: srcset("wide"), sizes: "58vh", png: `${STILL}-wide-800.png`, width: 800, height: 1147 },
 };
-const STREET_WIDTHS = [480, 800, 1200, 1600];
+const STREET_WIDTHS = [480, 640, 800, 1200, 1600];
 const STREET_SOURCES = {
   tall: { srcSet: srcset("tall", STREET, STREET_WIDTHS), sizes: "46vh", png: `${STREET}-tall-800.png`, width: 800, height: 922 },
   wide: { srcSet: srcset("wide", STREET, STREET_WIDTHS), sizes: "160vh", png: `${STREET}-wide-800.png`, width: 800, height: 415 },
 };
-
-// translate() scale() for an element whose own centre is (cx, cy), matching a scale by s about the hero centre and then a shift.
-const fitTransform = (cx: number, cy: number, W: number, H: number, s: number, dx: number, dy: number) =>
-  `translate(${(W / 2 + (cx - W / 2) * s + dx - cx).toFixed(1)}px, ${(H / 2 + (cy - H / 2) * s + dy - cy).toFixed(1)}px) scale(${s.toFixed(4)})`;
 
 type NavigatorHints = Navigator & {
   connection?: { saveData?: boolean };
@@ -111,42 +103,11 @@ export default function XrayHero({ summary }: { summary: string }) {
 
   useLayoutEffect(() => {
     const hero = heroRef.current!;
-    const img = stillRef.current!;
     let raf = 0;
     let lastSize = "";
-    let maskKey = "";
-    const maskCanvas = document.createElement("canvas");
-    const frameStill = () => {
-      const W = hero.clientWidth, H = hero.clientHeight;
-      const w0 = img.offsetWidth, h0 = img.offsetHeight;
-      if (!W || !H || !w0 || !h0) return;
-      const left0 = img.offsetLeft, top0 = img.offsetTop;
-      const cx0 = left0 + w0 / 2, cy0 = top0 + h0 / 2;
-      const hull = STILL_HULL[window.matchMedia(PORTRAIT_QUERY).matches ? "tall" : "wide"];
-      const content = {
-        left: left0 + hull.left * w0,
-        right: left0 + hull.right * w0,
-        top: top0 + hull.top * h0,
-        bottom: top0 + hull.bottom * h0,
-      };
-      const safe = heroSafeRect(hero, headerRef.current, copyRef.current, cardRef.current);
-      const s = fitScale(content, safe);
-      const { dx, dy } = shiftInto(scaleAbout(content, s, W / 2, H / 2), safe);
-      hero.style.setProperty("--xh-still", fitTransform(cx0, cy0, W, H, s, dx, dy));
-      const street = streetRef.current!;
-      if (street.offsetWidth) {
-        const scx = street.offsetLeft + street.offsetWidth / 2, scy = street.offsetTop + street.offsetHeight / 2;
-        hero.style.setProperty("--xh-street-still", fitTransform(scx, scy, W, H, s, dx, dy));
-      }
-      // Same fade the live street uses near the heading and card, so the swap from still to live is seamless.
-      const rects = heroAvoidRects(hero, null, copyRef.current, cardRef.current);
-      const key = `${W}x${H}:${rects.map((r) => [r.left, r.top, r.right, r.bottom].map(Math.round).join(",")).join(";")}`;
-      if (key !== maskKey) {
-        maskKey = key;
-        drawStreetMask(maskCanvas, W, H, rects);
-        hero.style.setProperty("--xh-street-mask", `url(${maskCanvas.toDataURL()})`);
-      }
-    };
+    const state = { maskKey: "", canvas: null };
+    const frameStill = () =>
+      fitStills(hero, hero, { house: stillRef.current, street: streetRef.current, header: headerRef.current, copy: copyRef.current, card: cardRef.current }, state);
     const ro = new ResizeObserver(() => {
       frameStill();
       const size = `${hero.clientWidth}x${hero.clientHeight}`;
@@ -156,6 +117,9 @@ export default function XrayHero({ summary }: { summary: string }) {
       raf = requestAnimationFrame(() => drawContours(contoursRef.current, hero.clientWidth, hero.clientHeight));
     });
     [hero, headerRef.current!, copyRef.current!, cardRef.current!, streetRef.current!].forEach((el) => ro.observe(el));
+    // The prerendered homepage placed the stills early (stillFit.inline.js); from here on this effect owns them.
+    frameStill();
+    (window as Window & { __xhStillsOff?: () => void }).__xhStillsOff?.();
     return () => {
       ro.disconnect();
       cancelAnimationFrame(raf);
@@ -198,7 +162,11 @@ export default function XrayHero({ summary }: { summary: string }) {
       else timeoutId = window.setTimeout(start, 200);
     };
     // Waits for the visitor's first interaction so the scene's start-up never blocks the page before they engage.
-    if (!prefersStillHero()) INTERACTIONS.forEach((type) => window.addEventListener(type, schedule, { passive: true }));
+    // On the prerendered homepage that interaction may already have happened before the app loaded (stillFit.inline.js).
+    if (!prefersStillHero()) {
+      if ((window as Window & { __xhInteracted?: boolean }).__xhInteracted) schedule();
+      else INTERACTIONS.forEach((type) => window.addEventListener(type, schedule, { passive: true }));
+    }
 
     return () => {
       cancelled = true;
@@ -231,14 +199,15 @@ export default function XrayHero({ summary }: { summary: string }) {
 
   return (
     <section ref={heroRef} className={`xh${live ? " is-live" : ""}`} aria-labelledby="xh-heading">
-      <canvas ref={contoursRef} className="xh-layer" aria-hidden="true" />
+      {/* Already drawn (and sized) by stillFit.inline.js on the prerendered homepage. */}
+      <canvas ref={contoursRef} className="xh-layer" aria-hidden="true" suppressHydrationWarning />
       <canvas ref={driftRef} className="xh-layer" aria-hidden="true" />
       <div className="xh-street" aria-hidden="true">
         <picture className="xh-still">
           <source media={PORTRAIT_QUERY} type="image/webp" srcSet={STREET_SOURCES.tall.srcSet} sizes={STREET_SOURCES.tall.sizes} width={STREET_SOURCES.tall.width} height={STREET_SOURCES.tall.height} />
           <source type="image/webp" srcSet={STREET_SOURCES.wide.srcSet} sizes={STREET_SOURCES.wide.sizes} />
           <source media={PORTRAIT_QUERY} type="image/png" srcSet={STREET_SOURCES.tall.png} width={STREET_SOURCES.tall.width} height={STREET_SOURCES.tall.height} />
-          <img ref={streetRef} src={STREET_SOURCES.wide.png} width={STREET_SOURCES.wide.width} height={STREET_SOURCES.wide.height} alt="" decoding="async" />
+          <img ref={streetRef} src={STREET_SOURCES.wide.png} width={STREET_SOURCES.wide.width} height={STREET_SOURCES.wide.height} alt="" {...{ fetchpriority: "high" }} />
         </picture>
       </div>
       <picture className="xh-still">

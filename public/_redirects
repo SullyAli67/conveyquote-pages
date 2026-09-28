@@ -7,4 +7,9 @@
 # answer with "308 Permanent Redirect → /" instead of a 200 rewrite,
 # which Google Search Console reports as "Page with redirect".
 # Unmatched paths fall through to this catch-all and get a clean 200.
+#
+# The build (scripts/prerender-home.mjs) prerenders the homepage into
+# dist/index.html, saves the empty app shell as dist/app.html and points
+# this catch-all at /app.html in dist/_redirects. If that step is skipped,
+# the rule below is used unchanged.
 /* /index.html 200
