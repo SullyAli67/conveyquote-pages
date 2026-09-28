@@ -1,9 +1,11 @@
 // Prerenders the homepage into dist/index.html after the client build, so its content paints before the app's
 // JavaScript has downloaded (main.tsx then hydrates it rather than rebuilding it).
 //
-// Every other route keeps the empty app shell: it is saved as dist/app.html and the SPA catch-all in dist/_redirects
-// is pointed at it. If this step fails, dist is left exactly as the client build produced it (no prerender, same
-// behaviour as before), so a failure here can never break other routes.
+// Routing is untouched: the _redirects catch-all still serves index.html for every other route. Those routes must not
+// show the homepage, so a guard hides #root before it is parsed and empties it straight after; the app then renders
+// the route as before. (Pointing the catch-all at a second HTML file loops on Cloudflare Pages: it redirects
+// /app.html to /app, which the catch-all rewrites to /app.html again.) If this step fails, dist is left exactly as
+// the client build produced it.
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,7 +15,9 @@ import { build as esbuild } from "esbuild";
 const SHELL_ROOT = '<div id="root"></div>';
 const STYLESHEET = /<link rel="stylesheet"[^>]*href="(\/assets\/[^"]+\.css)"[^>]*>/;
 const APP_SCRIPT = /<script type="module" crossorigin src="\/assets\/[^"]+\.js"><\/script>/;
-const CATCH_ALL = /^\/\*\s+\/index\.html\s+200\s*$/m;
+// Before #root: hide it on any route but "/". After #root: empty it there and unhide, before the app script runs.
+const GUARD_BEFORE = '<style>.cq-shell #root{visibility:hidden}</style><script>if(location.pathname!=="/")document.documentElement.classList.add("cq-shell")</script>';
+const GUARD_AFTER = '<script>if(location.pathname!=="/"){document.getElementById("root").textContent="";document.documentElement.classList.remove("cq-shell")}</script>';
 
 function memoryStorage() {
   const m = new Map();
@@ -53,11 +57,8 @@ async function renderHome(entryFile) {
 
 export async function prerenderHome({ root, outDir }) {
   const indexFile = path.join(outDir, "index.html");
-  const redirectsFile = path.join(outDir, "_redirects");
   const shell = fs.readFileSync(indexFile, "utf8");
-  const redirects = fs.readFileSync(redirectsFile, "utf8");
   if (!shell.includes(SHELL_ROOT)) throw new Error("dist/index.html has no empty #root to fill");
-  if (!CATCH_ALL.test(redirects)) throw new Error("dist/_redirects has no '/* /index.html 200' catch-all to repoint");
 
   const ssrDir = path.join(root, "node_modules/.cache/prerender");
   await viteBuild({
@@ -86,11 +87,9 @@ export async function prerenderHome({ root, outDir }) {
   const home = shell
     .replace(css[0], () => `<style>${cssText}</style>`)
     .replace(app[0], () => app[0].replace("<script ", '<script fetchpriority="low" '))
-    .replace(SHELL_ROOT, () => `<div id="root">${html}</div><script>${script}</script>`);
+    .replace(SHELL_ROOT, () => `${GUARD_BEFORE}<div id="root">${html}</div>${GUARD_AFTER}<script>${script}</script>`);
 
-  fs.writeFileSync(path.join(outDir, "app.html"), shell);
   fs.writeFileSync(indexFile, home);
-  fs.writeFileSync(redirectsFile, redirects.replace(CATCH_ALL, "/* /app.html 200"));
   return { bytes: html.length };
 }
 
@@ -106,16 +105,14 @@ export function prerenderHomePlugin() {
     async closeBundle() {
       if (config.build.ssr) return;
       const outDir = path.resolve(config.root, config.build.outDir);
-      const indexFile = path.join(outDir, "index.html"), redirectsFile = path.join(outDir, "_redirects");
-      const before = [fs.readFileSync(indexFile), fs.existsSync(redirectsFile) ? fs.readFileSync(redirectsFile) : null];
+      const indexFile = path.join(outDir, "index.html");
+      const before = fs.readFileSync(indexFile);
       try {
         const { bytes } = await prerenderHome({ root: config.root, outDir });
         config.logger.info(`prerender-home: homepage prerendered (${(bytes / 1024).toFixed(1)} kB of HTML)`);
       } catch (err) {
         // Put back anything half-written; the site then works exactly as an un-prerendered build.
-        fs.writeFileSync(indexFile, before[0]);
-        if (before[1]) fs.writeFileSync(redirectsFile, before[1]);
-        fs.rmSync(path.join(outDir, "app.html"), { force: true });
+        fs.writeFileSync(indexFile, before);
         config.logger.warn(`prerender-home: skipped, homepage will render client-side (${err && err.message})`);
       }
     },
