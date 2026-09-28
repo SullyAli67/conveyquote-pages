@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
+      // A short-lived deploy answered "/" and other routes with a permanent (308) redirect to /app, which browsers cache.
+      // /app is not a page, so show the homepage there and put "/" back in the address bar. Rewriting the URL (rather
+      // than navigating to "/") matters: a navigation would hit the cached redirect and bounce straight back.
+      if (/^\/app(\.html)?\/?$/.test(location.pathname)) history.replaceState(history.state, "", "/" + location.search + location.hash);
       // Homepage only: fetch the hero stills (matching the <picture>s in XrayHero.tsx) and heading font before the app loads.
       if (location.pathname === "/") (function () {
         var tall = "(max-aspect-ratio: 4/5)", wide = "not all and (max-aspect-ratio: 4/5)";
