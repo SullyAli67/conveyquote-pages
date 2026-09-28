@@ -8,8 +8,7 @@
 # which Google Search Console reports as "Page with redirect".
 # Unmatched paths fall through to this catch-all and get a clean 200.
 #
-# The build (scripts/prerender-home.mjs) prerenders the homepage into
-# dist/index.html, saves the empty app shell as dist/app.html and points
-# this catch-all at /app.html in dist/_redirects. If that step is skipped,
-# the rule below is used unchanged.
+# Do NOT point this at any other .html file (e.g. /app.html): Pages
+# redirects /app.html to /app, which this rule rewrites back to
+# /app.html, and every route loops (ERR_TOO_MANY_REDIRECTS).
 /* /index.html 200

@@ -10,12 +10,13 @@ const app = (
   </React.StrictMode>
 );
 
-// The homepage arrives prerendered for a plain "/" (scripts/prerender-home.mjs). Query parameters such as ?type= or
-// ?city= change what it renders, so only attach to that markup when every parameter is one that never does.
+// index.html carries the prerendered homepage (scripts/prerender-home.mjs); other routes arrive with #root already
+// emptied. Query parameters such as ?type= or ?city= change what "/" renders, so only attach to that markup when every
+// parameter is one that never does.
 const RENDER_NEUTRAL_PARAM = /^(utm_[a-z_]+|gclid|gbraid|wbraid|dclid|fbclid|msclkid|ttclid|twclid|li_fat_id|_gl|ref)$/;
 const matchesPrerender = [...new URLSearchParams(window.location.search).keys()].every((key) => RENDER_NEUTRAL_PARAM.test(key));
 
-if (root.hasChildNodes() && matchesPrerender) {
+if (window.location.pathname === "/" && root.hasChildNodes() && matchesPrerender) {
   ReactDOM.hydrateRoot(root, app);
 } else {
   root.textContent = "";
