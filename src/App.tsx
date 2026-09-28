@@ -6914,7 +6914,7 @@ function App() {
       <nav className="site-nav">
         <div className="site-nav__inner">
           <a href="/">
-            <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="36px" alt="ConveyQuote UK" className="site-nav__logo" />
+            <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="36px" width={256} height={256} alt="ConveyQuote UK" className="site-nav__logo" />
           </a>
           <div className="site-nav__links">
             <a href="/" className={isHomePage ? "active" : ""}>Get a Quote</a>
@@ -6932,7 +6932,7 @@ function App() {
       <header className="hero">
         <div className="hero__inner">
           <div className="hero__brand">
-            <img src={logoSquare512} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="280px" alt="ConveyQuote UK" className="hero__logo" />
+            <img src={logoSquare512} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="280px" width={512} height={512} alt="ConveyQuote UK" className="hero__logo" />
           </div>
 
           <div className="hero__text">
@@ -15379,7 +15379,7 @@ function App() {
         <div className="site-footer__inner">
           <div className="site-footer__grid">
             <div>
-              <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="44px" alt="ConveyQuote UK" className="site-footer__logo" />
+              <img src={logoSquare256} srcSet={`${logoSquare256} 256w, ${logoSquare512} 512w`} sizes="44px" width={256} height={256} alt="ConveyQuote UK" className="site-footer__logo" />
               <p>ConveyQuote is a trading name of Essentially Law Limited (Company No. 14625839), registered in England and Wales.</p>
               <p>We are not a firm of solicitors and do not provide legal advice. We operate an introduction service connecting clients with SRA-regulated conveyancing firms.</p>
               <p>A referral fee may be received if you proceed with an instructed firm. This does not affect the cost of your legal services.</p>
