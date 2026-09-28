@@ -1964,6 +1964,11 @@ function App() {
   // genuinely means both answers is never blocked out of enquiring.
   const [ftbConflictSeen, setFtbConflictSeen] = useState(false);
   const [adminToken, setAdminToken] = useState("");
+  // The current token, readable in the same tick it is set. Login sets the token and then loads the dashboard straight
+  // away; reading state there would send the previous render's (empty) token, get a 401 and log the admin out again as
+  // "session expired".
+  const adminTokenRef = useRef(adminToken);
+  adminTokenRef.current = adminToken;
 
   // Firm portal state
   const [firmEmail, setFirmEmail] = useState("");
@@ -2725,7 +2730,7 @@ function App() {
       ...options,
       headers: {
         ...(options.headers || {}),
-        Authorization: `Bearer ${adminToken}`,
+        Authorization: `Bearer ${adminTokenRef.current}`,
       },
     });
 
@@ -3634,6 +3639,7 @@ function App() {
 
       if (result.success) {
         setAdminToken(result.token);
+        adminTokenRef.current = result.token;
         setIsAdminUnlocked(true);
         setAdminPassword("");
         // Persist so a page refresh does not log the admin out
