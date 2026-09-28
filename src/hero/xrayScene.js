@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { fitScale, shiftInto } from './fit.js';
+import { createDrift } from './drift.js';
 
 // Scene, lens mask and frame() are verbatim from design/redesign-2026/reference/hero-xray.html so behaviour matches the tested reference.
 export function mountXrayHero(container, options) {
@@ -12,10 +14,11 @@ export function mountXrayHero(container, options) {
   var ANISO = renderer.capabilities.getMaxAnisotropy();
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(28, 1, 0.1, 200);
-  var hemi = new THREE.HemisphereLight(0xffffff, 0xa9b0b5, 0.58); scene.add(hemi);
-  var key = new THREE.DirectionalLight(0xfff3e2, 0.8); key.position.set(6, 10, 9); key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048); key.shadow.camera.left = -8; key.shadow.camera.right = 8; key.shadow.camera.top = 8; key.shadow.camera.bottom = -8; key.shadow.bias = -0.0006; key.shadow.radius = 3; scene.add(key);
-  var fill = new THREE.DirectionalLight(0xe2f2ff, 0.35); fill.position.set(-7, 4, 5); scene.add(fill);
+  var hemi = new THREE.HemisphereLight(0xffffff, 0xa4a9ad, 0.46); scene.add(hemi);
+  var key = new THREE.DirectionalLight(0xfff5e8, 0.82); key.position.set(-5, 9.5, 8); key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048); key.shadow.camera.left = -11; key.shadow.camera.right = 11; key.shadow.camera.top = 11; key.shadow.camera.bottom = -11; key.shadow.bias = -0.0006; key.shadow.radius = 3; scene.add(key);
+  var fill = new THREE.DirectionalLight(0xd6e8ff, 0.22); fill.position.set(8, 3, 4); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xfff1dc, 0.55); rim.position.set(4, 7, -9); scene.add(rim);
 
   var seed = 7;
   function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
@@ -326,6 +329,228 @@ export function mountXrayHero(container, options) {
     var l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x2E7FA8, transparent: true, opacity: 0.5 })); l.layers.set(1); parts.walls.add(l);
   })();
 
+  // ---------- Look: front-left daylight, reflections on metal and glass, warm lamps, contact shadow, ink outlines ----------
+  // Studio reflections on metal and glass only; the painted surfaces keep their flat, saturated look.
+  function reflect(root) {
+    root.traverse(function (o) {
+      if (!o.isMesh || o.layers.mask !== 1) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) {
+        if (m && m.isMeshStandardMaterial) m.envMapIntensity = m.userData.env !== undefined ? m.userData.env : m === M.glass ? 0.2 : m.metalness > 0.3 ? 0.8 : 0;
+      });
+    });
+  }
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  var envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+  scene.environment = envTex;
+  reflect(scene);
+  M.glass.emissiveIntensity = 0.04; M.hall.emissiveIntensity = 0.16; M.shutter.emissiveIntensity = 0.06; M.lamp.emissiveIntensity = 0.9;
+  porchLight.intensity = 0.5;
+  catcher.material.opacity = 0.13;
+  var contactTex = (function () {
+    var c = document.createElement('canvas'); c.width = c.height = 128; var cg = c.getContext('2d');
+    var gr = cg.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(16,36,58,0.42)'); gr.addColorStop(0.55, 'rgba(16,36,58,0.16)'); gr.addColorStop(1, 'rgba(16,36,58,0)');
+    cg.fillStyle = gr; cg.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+  var contact = new THREE.Mesh(new THREE.PlaneGeometry(W + 2.2, WALLZ + FRONT + 2.4), new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false, toneMapped: false }));
+  contact.rotation.x = -Math.PI / 2; contact.position.set(0, -0.065, (WALLZ - FRONT) / 2 + 0.2); contact.userData.noHull = true; contact.renderOrder = -1;
+  house.add(contact);
+  // Fine navy outlines on the everyday house, sharing the blueprint's edge geometry.
+  {
+    var inkLine = new THREE.LineBasicMaterial({ color: 0x10243A, transparent: true, opacity: 0.32 });
+    meshes.forEach(function (m) {
+      m.children.forEach(function (c) { if (c.isLineSegments && c.layers.mask === 2) m.add(new THREE.LineSegments(c.geometry, inkLine)); });
+    });
+  }
+
+  // ---------- The rest of the terrace: neighbours stepping away to the left, the pavement, a side garden and a street tree ----------
+  // Everything here is merged into one mesh per material and fades out with distance along the street, so it adds few draw calls.
+  // The street also dissolves near the heading (widely) and the semi-opaque card (narrowly) (rects in CSS pixels), so the text always sits on a clear background.
+  var fadeU = { value: new THREE.Matrix4() }, textU = { value: [new THREE.Vector4(-1e5, -1e5, -1e5, -1e5), new THREE.Vector4(-1e5, -1e5, -1e5, -1e5)] }, screenU = { value: new THREE.Vector2(1, 1) };
+  function fading(mat, opaque) {
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uHouseInv = fadeU; sh.uniforms.uText = textU; sh.uniforms.uScreen = screenU;
+      sh.vertexShader = 'uniform mat4 uHouseInv;\nvarying float vHouseX;\n' + sh.vertexShader.replace('#include <project_vertex>',
+        '#include <project_vertex>\n  vec4 fadeP = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\n  fadeP = instanceMatrix * fadeP;\n#endif\n  vHouseX = (uHouseInv * modelMatrix * fadeP).x;');
+      sh.fragmentShader = 'varying float vHouseX;\nuniform vec4 uText[2];\nuniform vec2 uScreen;\n' +
+        'float textGap(vec4 r, vec2 p, float soft) { vec2 d = max(max(r.xy - p, p - r.zw), 0.0); return smoothstep(10.0, soft, length(d)); }\n' +
+        sh.fragmentShader.replace(/\}\s*$/,
+        '  vec2 cssP = vec2(gl_FragCoord.x / uScreen.x, uScreen.y - gl_FragCoord.y / uScreen.x);\n' +
+        '  float streetFade = (1.0 - smoothstep(3.5, 10.5, -vHouseX)) * (1.0 - smoothstep(6.5, 9.5, vHouseX)) * textGap(uText[0], cssP, 190.0) * textGap(uText[1], cssP, 70.0);\n' +
+        (opaque ? '  gl_FragColor *= streetFade;\n' : '  gl_FragColor.a *= streetFade;\n') + '}');
+    };
+    mat.customProgramCacheKey = function () { return opaque ? 'street-fade-opaque' : 'street-fade-alpha'; };
+    return mat;
+  }
+  fading(catcher.material, false);
+  var streetTex = [];
+  function tex(t) { var c = t.clone(); c.needsUpdate = true; streetTex.push(c); return c; }
+  function smat(params, env) { var m = fading(new THREE.MeshStandardMaterial(params), true); m.userData.env = env || 0; return m; }
+  var SM = {
+    brick: smat({ map: tex(brickTex), roughness: 0.95 }), brickB: smat({ map: tex(brickTex), color: 0xE8D5BA, roughness: 0.95 }),
+    paint: smat({ color: 0xF1EADB, roughness: 0.8 }), white: smat({ color: 0xFBFBF8, roughness: 0.5 }), stone: smat({ color: 0xE3DED3, roughness: 0.85 }),
+    slate: smat({ map: tex(slateTex), roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide }), tile: smat({ map: tex(tileTex), roughness: 0.75, side: THREE.DoubleSide }),
+    glass: smat({ color: 0x3E5563, roughness: 0.06, metalness: 0.35 }, 0.2), iron: smat({ color: 0x1a1b1d, roughness: 0.5, metalness: 0.55 }, 0.8),
+    black: smat({ color: 0x18191c, roughness: 0.4 }), green: smat({ color: 0x1E4636, roughness: 0.45 }), red: smat({ color: 0x6A1F26, roughness: 0.45 }),
+    shutter: smat({ color: 0xEDEBE4, roughness: 0.7 }), recess: smat({ color: 0x1d2327, roughness: 0.9 }), pot: smat({ color: 0xA05C44, roughness: 0.85 }),
+    leaf: smat({ color: 0x3d6534, roughness: 0.9 }), grass: smat({ color: 0x7a9a55, roughness: 1 }), gravel: smat({ color: 0x8f8a82, roughness: 1 }),
+    kerb: smat({ color: 0x8b8883, roughness: 0.9 }), pave: smat({ map: tex(paveTex), roughness: 0.95 }), check: smat({ map: tex(checkTex), roughness: 0.4 }),
+    bark: smat({ color: 0x6d6356, roughness: 0.95 })
+  };
+  var street = new THREE.Group(), tree = new THREE.Group(); house.add(street); street.add(tree);
+  (function () {
+    var bucket = {};
+    function put(k, g) { g = g.index ? g.toNonIndexed() : g; (bucket[k] = bucket[k] || []).push(g); }
+    function sb(k, w, h, d, x, y, z, ry) { var g = new THREE.BoxGeometry(w, h, d); if (ry) g.rotateY(ry); g.translate(x, y, z); put(k, g); }
+    function sc(k, r0, r1, h, x, y, z) { var g = new THREE.CylinderGeometry(r0, r1, h, 10); g.translate(x, y, z); put(k, g); }
+    function tri(k, list, uvf) {
+      var pos = [], uv = [];
+      list.forEach(function (v) { pos.push(v[0], v[1], v[2]); var t = uvf(v); uv.push(t[0], t[1]); });
+      var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); put(k, g);
+    }
+    function stick(k, r0, r1, a, b) {
+      var A = new THREE.Vector3().fromArray(a), B = new THREE.Vector3().fromArray(b), d = B.clone().sub(A);
+      var g = new THREE.CylinderGeometry(r1, r0, d.length(), 8);
+      g.applyMatrix4(new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()), new THREE.Vector3(1, 1, 1)));
+      put(k, g);
+    }
+    function railings(x0, x1) {
+      for (var x = x0; x <= x1 + 0.001; x += 0.075) sb('iron', 0.016, 0.37, 0.016, x, WH + 0.235, WALLZ);
+      sb('iron', x1 - x0 + 0.02, 0.025, 0.03, (x0 + x1) / 2, WH + 0.42, WALLZ); sb('iron', x1 - x0 + 0.02, 0.02, 0.025, (x0 + x1) / 2, WH + 0.09, WALLZ);
+    }
+    function frontWall(k, x0, x1) {
+      sb(k, x1 - x0, WH, WT, (x0 + x1) / 2, WH / 2, WALLZ); sb('stone', x1 - x0 + 0.02, 0.05, WT + 0.06, (x0 + x1) / 2, WH + 0.025, WALLZ);
+    }
+    function pierAt(k, x) { sb(k, 0.26, 0.74, 0.26, x, 0.37, WALLZ); sb('stone', 0.32, 0.06, 0.32, x, 0.77, WALLZ); sb('stone', 0.2, 0.05, 0.2, x, 0.825, WALLZ); }
+    function pavement(x0, x1) {
+      sb('pave', x1 - x0, 0.06, 1.1, (x0 + x1) / 2, 0, WALLZ + 0.65); sb('kerb', x1 - x0, 0.1, 0.12, (x0 + x1) / 2, -0.02, WALLZ + 1.21);
+    }
+    function sashN(x, cy, w, h) {
+      var fz = FRONT + 0.07;
+      sb('white', w + 0.16, h + 0.14, 0.05, x, cy, FRONT + 0.025); sb('glass', w, h, 0.02, x, cy, FRONT + 0.055);
+      sb('white', 0.04, h, 0.03, x - w / 2 + 0.02, cy, fz); sb('white', 0.04, h, 0.03, x + w / 2 - 0.02, cy, fz);
+      sb('white', w, 0.045, 0.03, x, cy + h / 2 - 0.022, fz); sb('white', w, 0.06, 0.03, x, cy - h / 2 + 0.03, fz);
+      sb('white', w, 0.04, 0.035, x, cy, fz + 0.004); sb('white', 0.022, h, 0.025, x, cy, fz);
+      sb('stone', w + 0.24, 0.05, 0.14, x, cy - h / 2 - 0.095, FRONT + 0.07);
+      sb('white', w + 0.3, 0.06, 0.15, x, cy + h / 2 + 0.15, FRONT + 0.075); sb('white', w + 0.22, 0.05, 0.1, x, cy + h / 2 + 0.1, FRONT + 0.05);
+    }
+    // One terraced house centred on cx; m = 1 keeps the hero's layout (door on the left), m = -1 mirrors it, as real terraces pair up.
+    function neighbour(cx, m, s) {
+      function X(lx) { return cx + m * lx; }
+      var wk = s.paint ? 'paint' : s.brick;
+      sb(wk, W, H, D, cx, H / 2, 0);
+      sb('white', W + 0.02, 0.07, 0.06, cx, 2.02, FRONT + 0.03);
+      sc('iron', 0.035, 0.035, E, cx - W / 2 + 0.08, E / 2, FRONT + 0.08);
+      // Roof: stops short of the hero's overhang so the two never fight for the same pixels.
+      var x0 = cx - W / 2, x1 = Math.min(cx + W / 2, -W / 2 - 0.03), mid = (x0 + x1) / 2, P = { FL: [x0, E, zf], FR: [x1, E, zf], RL: [x0, RT, 0], RR: [x1, RT, 0], BL: [x0, E, zb], BR: [x1, E, zb] };
+      var list = []; [['FL','FR','RR'],['FL','RR','RL'],['BR','BL','RL'],['BR','RL','RR']].forEach(function (t) { t.forEach(function (n) { list.push(P[n]); }); });
+      tri('slate', list, function (v) { return [v[0] / 0.5, (v[1] > E ? slopeLen : 0) / 0.32]; });
+      sb('recess', x1 - x0, 0.06, 0.1, mid, RT + 0.01, 0);
+      sb('iron', x1 - x0, 0.09, 0.09, mid, E - 0.02, zf + 0.02); sb('white', x1 - x0, 0.12, 0.04, mid, E - 0.02, zf - 0.03);
+      // Shared chimney stack on the far party wall
+      var xp = cx - W / 2;
+      sb('brick', 0.9, 1.2, 0.75, xp, TOP - 0.6, 0); sb('stone', 1.0, 0.08, 0.85, xp, TOP + 0.04, 0);
+      [-0.3, -0.1, 0.1, 0.3].forEach(function (o, i) { sc('pot', 0.055, 0.075, 0.26 + (i % 2) * 0.05, xp + o, TOP + 0.21 + (i % 2) * 0.025, 0); });
+      sashN(X(DX), 2.7, 0.56, 0.92); sashN(X(0.62), 2.7, 0.62, 0.92);
+      // Bay window (symmetric, so only its centre moves when mirrored)
+      var bc = X(bx);
+      [[0, 0.02, 1.62, 'white'], [0.035, 0.02, 0.1, 'stone'], [0.06, 1.6, 0.1, 'white'], [0.1, 1.7, 0.06, 'white']].forEach(function (L) {
+        var g = L[0], sh = new THREE.Shape();
+        sh.moveTo(bc - bwh - g * 0.6, -(FRONT - 0.005)); sh.lineTo(bc - fw / 2 - g * 0.55, -(FRONT + p + g));
+        sh.lineTo(bc + fw / 2 + g * 0.55, -(FRONT + p + g)); sh.lineTo(bc + bwh + g * 0.6, -(FRONT - 0.005)); sh.lineTo(bc - bwh - g * 0.6, -(FRONT - 0.005));
+        var geo = new THREE.ExtrudeGeometry(sh, { depth: L[2], bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, L[1], 0); put(L[3], geo);
+      });
+      [{ cx: bc, cz: FRONT + p, ry: 0, len: fw },
+       { cx: bc - (fw / 2 + bwh) / 2, cz: FRONT + p / 2, ry: -ang, len: p / Math.sin(ang) },
+       { cx: bc + (fw / 2 + bwh) / 2, cz: FRONT + p / 2, ry: ang, len: p / Math.sin(ang) }].forEach(function (f) {
+        var w = f.len - 0.22, c = Math.cos(f.ry), sn = Math.sin(f.ry);
+        function fb(k, bw, bh, bd, lx, y, lz) { sb(k, bw, bh, bd, f.cx + lx * c + lz * sn, y, f.cz - lx * sn + lz * c, f.ry); }
+        fb('white', w + 0.16, 1.12, 0.05, 0, 1.02, 0.025); fb('glass', w, 0.98, 0.02, 0, 1.02, 0.055);
+        fb('white', w, 0.045, 0.03, 0, 1.49, 0.07); fb('white', w, 0.06, 0.03, 0, 0.56, 0.07); fb('white', w, 0.04, 0.035, 0, 1.24, 0.074);
+        if (s.shutters) fb('shutter', w - 0.08, 0.62, 0.02, 0, 0.9, 0.066); else fb('white', 0.022, 0.98, 0.025, 0, 1.02, 0.07);
+      });
+      [[bc - fw / 2, FRONT + p], [bc + fw / 2, FRONT + p], [bc - bwh, FRONT + 0.02], [bc + bwh, FRONT + 0.02]].forEach(function (q) {
+        sc('white', 0.045, 0.05, 1.05, q[0], 1.02, q[1] + 0.02); sb('white', 0.13, 0.08, 0.13, q[0], 1.58, q[1] + 0.02);
+      });
+      var rg = 0.12, ry0 = 1.76, ryt = 2.2, BL = [bc - bwh - rg, ry0, FRONT], FL = [bc - fw / 2 - rg, ry0, FRONT + p + rg], FR = [bc + fw / 2 + rg, ry0, FRONT + p + rg], BR = [bc + bwh + rg, ry0, FRONT];
+      var TL = [bc - bwh * 0.45, ryt, FRONT], TR = [bc + bwh * 0.45, ryt, FRONT];
+      tri(s.bayRoof, [FL, FR, TR, FL, TR, TL, BL, FL, TL, FR, BR, TR], function (v) { return [(v[0] + v[2]) * 2.2, (v[1] - ry0) * 9 + (FRONT + p + rg - v[2]) * 2]; });
+      // Door, fanlight and surround
+      var dx = X(DX);
+      sb('stone', 0.95, 0.09, 0.22, dx, 0.045, FRONT + 0.26); sb('stone', 0.95, 0.09, 0.22, dx, 0.135, FRONT + 0.1);
+      sb('recess', 0.62, 1.42, 0.02, dx, DB + 0.71, FRONT + 0.005); sb(s.door, 0.52, 1.12, 0.05, dx, DB + 0.56, FRONT + 0.03);
+      [[-0.12, 0.83, 0.42], [0.12, 0.83, 0.42], [-0.12, 0.3, 0.32], [0.12, 0.3, 0.32]].forEach(function (q) { sb(s.door, 0.17, q[2], 0.02, dx + q[0], DB + q[1], FRONT + 0.064); });
+      sb('white', 0.52, 0.04, 0.04, dx, DB + 1.14, FRONT + 0.035); sb('glass', 0.5, 0.2, 0.02, dx, DB + 1.26, FRONT + 0.02);
+      [-1, 1].forEach(function (k) { var px = dx + k * 0.37; sb('white', 0.13, 1.44, 0.1, px, DB + 0.72, FRONT + 0.05); sb('white', 0.19, 0.1, 0.14, px, DB + 1.47, FRONT + 0.07); });
+      sb('white', 0.96, 0.2, 0.13, dx, DB + 1.62, FRONT + 0.065); sb('white', 1.08, 0.07, 0.21, dx, DB + 1.755, FRONT + 0.105);
+      // Front garden, path, low wall with railings and gate
+      sb('gravel', W, 0.05, gd, cx, 0.025, FRONT + gd / 2);
+      var pl = WALLZ - (FRONT + 0.37);
+      sb(s.path, 0.7, 0.012, pl, dx, 0.056, FRONT + 0.37 + pl / 2);
+      sb(s.brick, 0.14, WH * 0.9, gd - 0.1, cx - W / 2 + 0.07, WH * 0.45, FRONT + (gd - 0.1) / 2); sb('stone', 0.18, 0.04, gd - 0.1, cx - W / 2 + 0.07, WH * 0.9 + 0.02, FRONT + (gd - 0.1) / 2);
+      var gi = dx + m * 0.55, ge = cx + m * (W / 2 - 0.13), wa = Math.min(gi, ge) + 0.13, wb = Math.max(gi, ge) - 0.13;
+      pierAt(s.brick, Math.min(Math.max(dx - m * 0.55, cx - W / 2 + 0.16), cx + W / 2 - 0.16)); pierAt(s.brick, gi); pierAt(s.brick, ge); frontWall(s.brick, wa, wb);
+      if (s.hedge) sb('leaf', wb - wa, 0.62, 0.34, (wa + wb) / 2, 0.33, WALLZ - 0.28); else railings(wa + 0.04, wb - 0.04);
+      [-0.4, 0.4].forEach(function (o) { sb('iron', 0.03, 0.7, 0.03, dx + o, 0.43, WALLZ); });
+      for (var gx = dx - 0.33; gx < dx + 0.34; gx += 0.07) sb('iron', 0.014, 0.66, 0.014, gx, 0.43, WALLZ);
+      sb('iron', 0.8, 0.025, 0.025, dx, 0.12, WALLZ); sb('iron', 0.8, 0.025, 0.025, dx, 0.78, WALLZ);
+      pavement(cx - W / 2, cx + W / 2);
+    }
+    neighbour(-W, -1, { paint: true, brick: 'brickB', door: 'black', shutters: true, bayRoof: 'slate', path: 'check', hedge: false });
+    neighbour(-2 * W, 1, { brick: 'brick', door: 'green', shutters: false, bayRoof: 'tile', path: 'stone', hedge: true });
+    neighbour(-3 * W, -1, { brick: 'brickB', door: 'red', shutters: true, bayRoof: 'slate', path: 'check', hedge: false });
+
+    // Past the hero's gable end: a side garden behind a low wall, the pavement carrying on, and a street tree.
+    var sx0 = W / 2, sx1 = W / 2 + 2.9;
+    sb('grass', sx1 - sx0, 0.04, WALLZ - WT / 2 + FRONT, (sx0 + sx1) / 2, 0.02, (WALLZ - WT / 2 - FRONT) / 2);
+    pierAt('brick', sx1 - 0.13); frontWall('brick', sx0, sx1 - 0.26);
+    sb('leaf', sx1 - sx0 - 0.5, 0.6, 0.36, (sx0 + sx1) / 2 - 0.1, 0.32, WALLZ - 0.3);
+    pavement(W / 2, 9.5);
+    var tx = 4.5, tz = WALLZ + 0.72;
+    sb('recess', 0.62, 0.012, 0.62, tx, 0.036, tz);
+    stick('bark', 0.12, 0.085, [tx, 0, tz], [tx + 0.05, 2.1, tz - 0.05]);
+    var tips = [[tx - 0.6, 3.5, tz + 0.2], [tx + 0.6, 3.8, tz - 0.3], [tx + 0.05, 4.3, tz + 0.1], [tx - 0.25, 3.1, tz - 0.55]];
+    tips.forEach(function (t) { stick('bark', 0.07, 0.03, [tx + 0.05, 2.05, tz - 0.05], t); });
+    var LEAVES = 1100, canopy = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), smat({ roughness: 0.9 }), LEAVES);
+    var canopyBlue = new THREE.InstancedMesh(canopy.geometry, fading(new THREE.MeshBasicMaterial({ color: 0x1F5E9E }), true), LEAVES);
+    var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+    for (var i = 0; i < LEAVES; i++) {
+      var t = tips[i % tips.length], a = rnd() * Math.PI * 2, u = rnd() * 2 - 1, r = Math.cbrt(rnd()) * 0.66, sq = Math.sqrt(1 - u * u), sz = 0.032 + rnd() * 0.04;
+      q.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3));
+      m4.compose(new THREE.Vector3(t[0] + Math.cos(a) * sq * r, t[1] + u * r * 0.7 + 0.2, t[2] + Math.sin(a) * sq * r), q, new THREE.Vector3(sz, sz, sz));
+      canopy.setMatrixAt(i, m4); canopyBlue.setMatrixAt(i, m4);
+      canopy.setColorAt(i, col.setHSL(0.2 + rnd() * 0.07, 0.26 + rnd() * 0.16, 0.33 + rnd() * 0.13));
+    }
+    canopy.castShadow = true; canopy.receiveShadow = true; canopyBlue.layers.set(1);
+    tree.add(canopy); tree.add(canopyBlue);
+
+    // Merge each material's pieces into one mesh, with ink outlines and a blueprint twin like the hero's.
+    var UVS = { brick: BRICK, brickB: BRICK, pave: 0.9, check: 0.2 };
+    var ink = fading(new THREE.LineBasicMaterial({ color: 0x10243A, transparent: true, opacity: 0.32 }), false);
+    var bFill = fading(new THREE.MeshBasicMaterial({ color: 0x0B3A6E, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, side: THREE.DoubleSide }), true);
+    var bLine = fading(new THREE.LineBasicMaterial({ color: 0x4FC9D3, transparent: true, opacity: 0.55 }), false);
+    Object.keys(bucket).forEach(function (k) {
+      var list = bucket[k], n = 0, o = 0;
+      list.forEach(function (g) { n += g.attributes.position.count; });
+      var pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+      list.forEach(function (g) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); uv.set(g.attributes.uv.array, o * 2); o += g.attributes.position.count; g.dispose(); });
+      if (UVS[k]) for (var v = 0; v < n; v++) {
+        var ax = Math.abs(nor[v * 3]), ay = Math.abs(nor[v * 3 + 1]), az = Math.abs(nor[v * 3 + 2]), px = pos[v * 3], py = pos[v * 3 + 1], pz = pos[v * 3 + 2];
+        uv[v * 2] = (ay >= ax && ay >= az ? px : ax >= az ? pz : px) / UVS[k]; uv[v * 2 + 1] = (ay >= ax && ay >= az ? pz : py) / UVS[k];
+      }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      var into = k === 'bark' ? tree : street;
+      var mesh = new THREE.Mesh(g, SM[k]); mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.noHull = true; into.add(mesh);
+      var edges = new THREE.EdgesGeometry(g, 28);
+      if (k !== 'leaf' && k !== 'glass' && k !== 'grass') into.add(new THREE.LineSegments(edges, ink));
+      var f = new THREE.Mesh(g, bFill); f.layers.set(1); into.add(f);
+      var e = new THREE.LineSegments(edges, bLine); e.layers.set(1); into.add(e);
+    });
+  })();
+
   // ---------- Pieces that pull apart near the lens ----------
   var PULL = { roof: [0, 1, 0, 0.34], chimneys: [0, 1, 0, 0.32], pots: [0, 1, 0, 0.5], windows: [0, 0.05, 1, 0.34],
     bay: [0.15, 0, 1, 0.3], bayRoof: [0.1, 0.8, 0.6, 0.38], porch: [0, 0, 1, 0.26], door: [0, 0, 1, 0.34],
@@ -433,7 +658,7 @@ export function mountXrayHero(container, options) {
     house.updateMatrixWorld(true);
     var inv = new THREE.Matrix4().copy(house.matrixWorld).invert(), m = new THREE.Matrix4();
     house.traverse(function (o) {
-      if (!o.isMesh || o.isInstancedMesh || o.layers.mask !== 1 || o === catcher) return;
+      if (!o.isMesh || o.isInstancedMesh || o.layers.mask !== 1 || o === catcher || o.userData.noHull) return;
       for (var a = o; a && a !== house; a = a.parent) if (!a.visible) return;
       var g = o.geometry; if (!g.boundingBox) g.computeBoundingBox();
       var bb = g.boundingBox; m.multiplyMatrices(inv, o.matrixWorld);
@@ -451,7 +676,7 @@ export function mountXrayHero(container, options) {
     return box;
   }
   function placeCamera(dist) {
-    camera.position.copy(target).addScaledVector(camDir, dist); camera.lookAt(target); camera.near = dist * 0.55; camera.far = dist * 1.6; camera.updateProjectionMatrix();
+    camera.position.copy(target).addScaledVector(camDir, dist); camera.lookAt(target); camera.near = dist * 0.4; camera.far = dist * 1.8; camera.updateProjectionMatrix();
   }
   function panCamera(dx, dy, dist, h) {
     camera.updateMatrixWorld();
@@ -462,6 +687,7 @@ export function mountXrayHero(container, options) {
   }
 
   var drift = { x: 0.56, y: 0.47, s: 1 };
+  var logoDrift = options.drift ? createDrift(options.drift) : null, driftVP = { x: 0, y: 0 }, driftAvoid = [], lastDrift = 0;
   function layout() {
     var w = hero.clientWidth, h = hero.clientHeight;
     if (!w || !h) return;
@@ -471,6 +697,7 @@ export function mountXrayHero(container, options) {
     rtBase.setSize(w * dpr, h * dpr); rtBlue.setSize(w * dpr, h * dpr);
     camera.aspect = aspect;
     var dist = aspect < 0.8 ? 27 : 17.5;
+    tree.visible = aspect >= 0.8;
     target.set(aspect < 0.8 ? -0.2 : -0.9, aspect < 0.8 ? 0.2 : 0.55, 0);
     placeCamera(dist);
     drift.x = aspect < 0.8 ? 0.5 : 0.56; drift.y = aspect < 0.8 ? 0.42 : 0.47; drift.s = 1;
@@ -490,6 +717,15 @@ export function mountXrayHero(container, options) {
       drift.s = s;
       house.rotation.y = ry;
     }
+    if (logoDrift) {
+      var hb = projectHull(w, h);
+      driftVP = { x: (hb.left + hb.right) / 2, y: (hb.top + hb.bottom) / 2 };
+      driftAvoid = options.getAvoidRects ? options.getAvoidRects() : [];
+      logoDrift.resize(w, h);
+    }
+    var tr = options.getTextRects ? options.getTextRects() : [];
+    textU.value.forEach(function (v, i) { var r = tr[i]; if (r) v.set(r.left, r.top, r.right, r.bottom); else v.set(-1e5, -1e5, -1e5, -1e5); });
+    screenU.value.set(dpr, h);
     var mw = 360; maskCanvas.width = mw; maskCanvas.height = Math.round(mw / aspect);
     mg.fillStyle = '#000'; mg.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
   }
@@ -570,6 +806,10 @@ export function mountXrayHero(container, options) {
     if (dirty) { brickMesh.instanceMatrix.needsUpdate = true; brickBlue.instanceMatrix.needsUpdate = true; }
     } catch (err) { pullBroken = true; resetPieces(); if (window.console) console.warn('Pull-apart effect disabled:', err); }
     }
+    render();
+  }
+  function render() {
+    house.updateMatrixWorld(true); fadeU.value.copy(house.matrixWorld).invert();
     camera.layers.set(0); renderer.setRenderTarget(rtBase); renderer.clear(); renderer.render(scene, camera);
     renderer.shadowMap.autoUpdate = false;
     camera.layers.set(1); renderer.setRenderTarget(rtBlue); renderer.clear(); renderer.render(scene, camera);
@@ -580,7 +820,13 @@ export function mountXrayHero(container, options) {
   house.position.set(0, -2.2, -1.1);
 
   var alive = true, disposed = false, started = false, running = false, onScreen = true, rafId = 0, fontTimer = 0;
-  function loop() { rafId = 0; if (!running) return; frame(); rafId = requestAnimationFrame(loop); }
+  function drawDrift() {
+    if (!logoDrift) return;
+    var now = performance.now(), dt = lastDrift ? Math.min(0.05, (now - lastDrift) / 1000) : 0;
+    lastDrift = now;
+    logoDrift.draw(dt, driftVP, driftAvoid);
+  }
+  function loop() { rafId = 0; if (!running) { lastDrift = 0; return; } frame(); drawDrift(); rafId = requestAnimationFrame(loop); }
   function sync() {
     var should = started && alive && onScreen && document.visibilityState !== 'hidden';
     if (should && !running) { running = true; rafId = requestAnimationFrame(loop); }
@@ -613,6 +859,7 @@ export function mountXrayHero(container, options) {
     label('Stamp Duty Land Tax', V3(bx, 1.05, FRONT + p + 0.3));
     label('Bank transfer fee', V3(0.35, 0.5, WALLZ + 0.35));
     try { initPieces(); initBricks(); } catch (err) { pullBroken = true; resetPieces(); if (window.console) console.warn('Pull-apart effect disabled:', err); }
+    reflect(scene);
     try { buildHull(); layout(); frame(); } catch (err) { fail(err); return; }
     started = true;
     if (options.onFirstFrame) options.onFirstFrame();
@@ -639,7 +886,8 @@ export function mountXrayHero(container, options) {
         if (o.shadow && o.shadow.map) free(o.shadow.map);
       });
     });
-    [rtBase, rtBlue, maskTex, brickTex, slateTex, tileTex, checkTex, paveTex].forEach(free);
+    [rtBase, rtBlue, maskTex, brickTex, slateTex, tileTex, checkTex, paveTex, envTex, contactTex].concat(streetTex).forEach(free);
+    if (logoDrift) logoDrift.clear();
     renderer.dispose();
   };
 }

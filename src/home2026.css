@@ -38,8 +38,8 @@
   height: 82.857cqh;
   top: 17.143vh;
   top: 17.143cqh;
-  left: calc(50% - 23.071vh);
-  left: calc(50% - 23.071cqh);
+  left: calc(50% - 22.214vh);
+  left: calc(50% - 22.214cqh);
   transform: var(--xh-still, none);
   transition: opacity 0.4s ease;
 }
@@ -50,9 +50,45 @@
     height: 51.283cqh;
     top: 25.462vh;
     top: 25.462cqh;
-    left: calc(50% - 19.867vh);
-    left: calc(50% - 19.867cqh);
+    left: calc(50% - 18.943vh);
+    left: calc(50% - 18.943cqh);
   }
+}
+
+/* The street still reaches the render's edges; soften those cuts so wider screens never show a hard edge. */
+.xh-street img {
+  height: 82.929vh;
+  height: 82.929cqh;
+  top: 17.071vh;
+  top: 17.071cqh;
+  left: calc(50% - 80vh);
+  left: calc(50% - 80cqh);
+  transform: var(--xh-street-still, none);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+@media (max-aspect-ratio: 4/5) {
+  .xh-street img {
+    height: 53.234vh;
+    height: 53.234cqh;
+    top: 25.154vh;
+    top: 25.154cqh;
+    left: calc(50% - 23.101vh);
+    left: calc(50% - 23.101cqh);
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 9%);
+    mask-image: linear-gradient(to left, transparent, #000 9%);
+  }
+}
+
+.xh-street {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  -webkit-mask-image: var(--xh-street-mask, none);
+  mask-image: var(--xh-street-mask, none);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 .xh.is-live .xh-still img {
@@ -348,19 +384,6 @@
   transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity 0.4s;
-}
-
-.xh-lens::after {
-  content: attr(data-label);
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translate(-50%, 10px);
-  white-space: nowrap;
-  font: 600 11px var(--cq-font-body);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cq-teal-text);
 }
 
 .xh-dot {
