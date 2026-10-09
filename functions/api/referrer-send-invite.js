@@ -1,9 +1,10 @@
 // functions/api/referrer-send-invite.js
 //
 // Admin "Send invite / reset link" button on the Edit Referrer form.
-// Emails the referrer a fresh 7-day set-password link (cancelling any
-// earlier unused one). Requires portal access to be ticked and saved, so
-// the link the referrer receives actually lets them log in.
+// Emails the referrer a fresh set-password link (4 days if they have no
+// password yet, 7 days otherwise), cancelling any earlier unused one.
+// Requires portal access to be ticked and saved, so the link the
+// referrer receives actually lets them log in.
 
 import {
   getTokenFromRequest,
@@ -39,7 +40,7 @@ export async function onRequestPost(context) {
     if (!result.sent) {
       return jsonResponse({ success: false, error: `Email could not be sent: ${result.error}` }, 502);
     }
-    return jsonResponse({ success: true, sent_to: referrer.portal_email });
+    return jsonResponse({ success: true, sent_to: referrer.portal_email, days: result.days });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
   }

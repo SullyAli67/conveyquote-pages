@@ -49,18 +49,63 @@ portal, and can never send an email.
    **not** send anything by itself.
 3. Open his record again and click **Send invite / reset link**. David
    receives an email from `noreply@conveyquote.uk` with a **Set your
-   password** button. The link works once and lasts **7 days**. No
+   password** button. The link works once and lasts **4 days**. No
    password is ever emailed.
 4. He chooses his password, then logs in at
    `https://conveyquote.uk/referrer-login/` and sees the five sample cases.
 
 If the link expires or David forgets his password, he can use
-**Forgot password?** on the login page, or you can press **Send invite /
-reset link** again (this cancels any earlier link).
+**Forgot password?** on the login page (that link lasts **7 days**), or you
+can press **Send invite / reset link** again (this cancels any earlier link).
 
 Why the order matters: creating a referrer with **Portal access active**
 ticked sends the welcome email immediately. Creating it unticked (Part 2)
 sends nothing, so you can load the sample cases first.
+
+## Testing the invite and password emails yourself first
+
+Do this with a separate test referrer before inviting David, so you see
+exactly what he will see. Use **your own email address** as the test
+login. Replace `YOUR-TEST-EMAIL` below with it.
+
+1. **Welcome email (4-day link).** In **Referrers**, add "Test Referrer"
+   with **Portal login email** = your address and **Portal access active**
+   ticked, then **Create Referrer**. The admin screen says the welcome email
+   was sent. Check your inbox: the email says when the link expires (4 days
+   from now).
+2. **Set a password.** Click **Set your password**, type a password twice
+   and save. Then log in at `/referrer-login/`.
+3. **Link works once.** Click the same email button again. The page says
+   the link has expired or has already been used.
+4. **Forgot password (7-day link).** Log out, click **Forgot password?**,
+   enter your address and press **Send link**. Check the new email says it
+   expires 7 days from now. Pressing **Send link** again within 5 minutes
+   sends nothing more (same on-screen reply).
+5. **Unknown address.** Use **Forgot password?** with an address that has
+   no account. You see the same reply and no email is sent.
+6. **Expired link.** Request another link, then make it expire by pasting
+   this in the D1 console before clicking it:
+
+   ```sql
+   UPDATE sessions SET expires_at = '2000-01-01T00:00:00Z' WHERE user_type = 'referrer_setup' AND user_id = (SELECT id FROM referrers WHERE portal_email = 'YOUR-TEST-EMAIL');
+   ```
+
+   Clicking the link now says it has expired.
+7. **See the link dates** at any time:
+
+   ```sql
+   SELECT user_id, created_at, expires_at FROM sessions WHERE user_type = 'referrer_setup';
+   ```
+
+8. **Remove the test referrer** when finished (one statement at a time):
+
+   ```sql
+   DELETE FROM sessions WHERE user_type IN ('referrer', 'referrer_setup') AND user_id = (SELECT id FROM referrers WHERE portal_email = 'YOUR-TEST-EMAIL');
+   ```
+
+   ```sql
+   DELETE FROM referrers WHERE portal_email = 'YOUR-TEST-EMAIL' AND referrer_name = 'Test Referrer';
+   ```
 
 ## Taking a real referral (optional, during the demo)
 

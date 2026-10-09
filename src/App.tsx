@@ -4080,7 +4080,7 @@ function App() {
       });
       const result = await res.json();
       setReferrerInviteMessage(
-        result.success ? `\u2713 Set-password link sent to ${result.sent_to}. It lasts 7 days.` : result.error || "Failed to send."
+        result.success ? `\u2713 Set-password link sent to ${result.sent_to}. It lasts ${result.days} days.` : result.error || "Failed to send."
       );
     } catch {
       setReferrerInviteMessage("Something went wrong.");

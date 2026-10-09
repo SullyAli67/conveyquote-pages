@@ -7,27 +7,29 @@
 // The link carries a random token stored in the existing sessions table
 // with user_type 'referrer_setup' (no schema change). That type can't be
 // used to log in: login sessions are validated as user_type 'referrer'.
-// A token lasts 7 days, works once, and issuing a new one cancels any
-// earlier unused link for the same referrer. No password is ever emailed.
+// A welcome link (account has no password yet) lasts 4 days; a reset link
+// (forgot password, or admin resend once a password exists) lasts 7 days.
+// Each works once, and issuing a new one cancels any earlier unused link
+// for the same referrer. No password is ever emailed.
 
 import { generateToken } from "./auth.js";
 
 export const SETUP_TOKEN_TYPE = "referrer_setup";
-const SETUP_LINK_DAYS = 7;
+export const LINK_DAYS = { welcome: 4, reset: 7 };
 const SET_PASSWORD_URL = "https://conveyquote.uk/referrer-set-password/";
 const LOGIN_URL = "https://conveyquote.uk/referrer-login/";
 
 const escapeHtml = (v) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export async function createSetupLink(db, referrerId) {
+export async function createSetupLink(db, referrerId, days) {
   await db
     .prepare(`DELETE FROM sessions WHERE user_type = ? AND user_id = ?`)
     .bind(SETUP_TOKEN_TYPE, referrerId)
     .run();
 
   const token = generateToken();
-  const expires = new Date(Date.now() + SETUP_LINK_DAYS * 24 * 60 * 60 * 1000);
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   await db
     .prepare(`INSERT INTO sessions (token, user_type, user_id, expires_at) VALUES (?, ?, ?, ?)`)
     .bind(token, SETUP_TOKEN_TYPE, referrerId, expires.toISOString())
@@ -92,14 +94,17 @@ export async function sendSetupEmail(env, { to, referrerName, url, expires, kind
 }
 
 // Creates a fresh link and emails it. Caller has already checked the
-// referrer is active and has a portal email.
+// referrer is active and has a portal email. Returns the send result plus
+// how many days the link lasts.
 export async function issueSetupLink(env, referrer, kind) {
-  const { url, expires } = await createSetupLink(env.DB, referrer.id);
-  return sendSetupEmail(env, {
+  const days = LINK_DAYS[kind];
+  const { url, expires } = await createSetupLink(env.DB, referrer.id, days);
+  const result = await sendSetupEmail(env, {
     to: referrer.portal_email,
     referrerName: referrer.referrer_name,
     url,
     expires,
     kind,
   });
+  return { ...result, days };
 }
