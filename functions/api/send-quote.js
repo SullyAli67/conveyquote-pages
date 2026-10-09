@@ -1,4 +1,5 @@
 import { buildQuoteData } from "../lib/calculate-quote.js";
+import { insertEnquiryWithUniqueReference } from "../lib/enquiry-reference.js";
 import {
   getSpecialistMatterLabel,
   isSpecialistMatterType,
@@ -179,19 +180,10 @@ export async function onRequestPost(context) {
 
     const prettyType = getTransactionLabel(type);
 
-    const now = new Date();
-    const reference = `CQ-${now.getFullYear()}${String(
-      now.getMonth() + 1
-    ).padStart(2, "0")}${String(now.getDate()).padStart(
-      2,
-      "0"
-    )}-${Math.floor(1000 + Math.random() * 9000)}`;
-
     const quote = buildQuoteData(body);
     const quoteJson = JSON.stringify(quote);
 
     const enquiryRow = {
-      reference,
       client_name: name || "",
       client_email: email || "",
       client_phone: phone || "",
@@ -240,7 +232,11 @@ export async function onRequestPost(context) {
       quote_json: JSON.stringify({ ...body, ...quote }),
     };
 
-    await insertEnquiryRow(env.DB, enquiryRow);
+    const reference = await insertEnquiryWithUniqueReference(
+      env.DB,
+      enquiryRow,
+      insertEnquiryRow
+    );
 
     const adminUrl = `https://conveyquote.uk/admin/?ref=${encodeURIComponent(reference)}`;
 

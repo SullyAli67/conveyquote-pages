@@ -39,6 +39,7 @@
 import { buildQuoteData } from "../lib/calculate-quote.js";
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { calculateReferrerQuote } from "../lib/calculate-referrer-quote-core.js";
+import { insertEnquiryWithUniqueReference } from "../lib/enquiry-reference.js";
 import {
   getTokenFromRequest,
   validateSession,
@@ -118,13 +119,6 @@ const adaptReferrerQuoteToBuildShape = (engineQuote) => {
     warnings: engineQuote.warnings || [],
   };
 };
-
-function generateReference() {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `CQ-${date}-${rand}`;
-}
 
 const escapeHtml = (v) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -255,8 +249,6 @@ export async function onRequestPost(context) {
 
     if (!referrer) return unauthorised();
 
-    const reference = generateReference();
-
     // Pricing path: prefer the per-referrer engine when admin has set
     // up referrer_fee_configs for this transaction type; otherwise fall
     // back to the legacy global engine + fee_markup so referrers that
@@ -321,8 +313,7 @@ export async function onRequestPost(context) {
     }
     void usedReferrerEngine;
 
-    await insertEnquiryRow(env.DB, {
-      reference,
+    const reference = await insertEnquiryWithUniqueReference(env.DB, {
       client_name: name || null,
       client_email: email,
       client_phone: phone || null,
@@ -358,7 +349,7 @@ export async function onRequestPost(context) {
       referrer_id: referrerId,
       referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
       referral_fee_amount: Number(referrer.referral_fee) || 0,
-    });
+    }, insertEnquiryRow);
 
     // Persist workflow fields (referrer_note, parent_enquiry_id) in the
     // referrer_workflow side-table — they used to live on enquiries but
