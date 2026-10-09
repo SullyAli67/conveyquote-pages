@@ -25,8 +25,9 @@ merged. The new code reads the new table and column.
    - **Referral fee (£):** 75 — purchase, sale, sale & purchase
    - **Remortgage / transfer fee (£):** 40 — remortgage, transfer of equity
    - **Portal login email:** `info@trustedconveyancers.co.uk`
-   - **Portal password:** leave blank
-   - **Portal access active:** leave **unticked** for now
+   - **Portal password:** leave blank (David sets his own in Part 4)
+   - **Portal access active:** leave **unticked** for now — this is what stops
+     the welcome email going out before the sample cases are loaded
 3. Click **Create Referrer**.
 
 ## Part 3 — load the five sample cases (Cloudflare D1 console)
@@ -43,11 +44,23 @@ portal, and can never send an email.
 
 ## Part 4 — give David access
 
-1. Open David's record in the **Referrers** tab.
-2. Type a new password of at least 8 characters in **Portal password**,
-   tick **Portal access active** and click **Update Referrer**.
-3. Give David the password by phone. His login page is
-   `https://conveyquote.uk/referrer-login/`.
+1. Open David's record in the **Referrers** tab (click **Edit**).
+2. Tick **Portal access active** and click **Update Referrer**. Saving does
+   **not** send anything by itself.
+3. Open his record again and click **Send invite / reset link**. David
+   receives an email from `noreply@conveyquote.uk` with a **Set your
+   password** button. The link works once and lasts **7 days**. No
+   password is ever emailed.
+4. He chooses his password, then logs in at
+   `https://conveyquote.uk/referrer-login/` and sees the five sample cases.
+
+If the link expires or David forgets his password, he can use
+**Forgot password?** on the login page, or you can press **Send invite /
+reset link** again (this cancels any earlier link).
+
+Why the order matters: creating a referrer with **Portal access active**
+ticked sends the welcome email immediately. Creating it unticked (Part 2)
+sends nothing, so you can load the sample cases first.
 
 ## Taking a real referral (optional, during the demo)
 

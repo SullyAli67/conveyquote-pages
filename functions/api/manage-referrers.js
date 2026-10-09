@@ -6,6 +6,7 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+import { issueSetupLink } from "../lib/referrer-setup-link.js";
 
 const toFlag = (v) => (v ? 1 : 0);
 
@@ -110,7 +111,28 @@ export async function onRequestPost(context) {
         `INSERT INTO referrers (${cols.join(", ")}) VALUES (${placeholders})`
       ).bind(...vals).run();
 
-      return jsonResponse({ success: true, id: result.meta?.last_row_id, mode: "created" });
+      const newId = result.meta?.last_row_id;
+
+      // Welcome email with a set-password link — only when portal access
+      // is ticked and there is a login email. Created with access unticked,
+      // nothing is sent; use "Send invite / reset link" later instead.
+      let invite = null;
+      const loginEmail = portal_email ? String(portal_email).toLowerCase().trim() : "";
+      if (toFlag(portal_active) && loginEmail && newId) {
+        invite = await issueSetupLink(
+          env,
+          { id: newId, referrer_name: String(referrer_name).trim(), portal_email: loginEmail },
+          "welcome"
+        );
+      }
+
+      return jsonResponse({
+        success: true,
+        id: newId,
+        mode: "created",
+        invite_sent: Boolean(invite?.sent),
+        invite_error: invite && !invite.sent ? invite.error : undefined,
+      });
     }
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
