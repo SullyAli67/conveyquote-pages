@@ -16,7 +16,7 @@ export async function onRequestGet(context) {
     const referrerId = session.user_id;
 
     const referrer = await env.DB.prepare(
-      `SELECT id, referrer_name, contact_email, contact_phone, referral_fee, notes, created_at
+      `SELECT id, referrer_name, contact_email, contact_phone, referral_fee, remortgage_referral_fee, notes, created_at
        FROM referrers WHERE id = ? LIMIT 1`
     ).bind(referrerId).first();
 
@@ -25,6 +25,8 @@ export async function onRequestGet(context) {
     // Phase 1: include property_address, target_completion_date, fall_through_reason, negotiator_name
     // Workflow fields (referrer_note, parent_enquiry_id, allocated_at)
     // live in the referrer_workflow side-table — see migration 0013.
+    // Referral fee payouts to the referrer live in referrer_fee_payments
+    // (migration 0020); a row there means the fee has been paid.
     const enquiriesResult = await env.DB.prepare(
       `SELECT
          e.id, e.reference, e.client_name, e.client_email, e.client_phone,
@@ -42,10 +44,12 @@ export async function onRequestGet(context) {
          e.management_company, e.tenanted, e.number_of_sellers,
          e.additional_borrowing, e.remortgage_transfer, e.transfer_mortgage,
          e.owners_changing,
-         w.parent_enquiry_id, w.allocated_at,
+         w.parent_enquiry_id, w.allocated_at, w.allocation_requested_at,
+         p.paid_at AS fee_paid_at, p.amount AS fee_paid_amount,
          e.quote_json, e.approved_quote_json, e.approved_quote_amount
        FROM enquiries e
        LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+       LEFT JOIN referrer_fee_payments p ON p.enquiry_id = e.id
        WHERE e.referrer_id = ?
        ORDER BY e.created_at DESC`
     ).bind(referrerId).all();

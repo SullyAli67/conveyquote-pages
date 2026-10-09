@@ -40,6 +40,8 @@ import { buildQuoteData } from "../lib/calculate-quote.js";
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { calculateReferrerQuote } from "../lib/calculate-referrer-quote-core.js";
 import { insertEnquiryWithUniqueReference } from "../lib/enquiry-reference.js";
+import { referrerFeeFor } from "../lib/referrer-fee.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 import {
   getTokenFromRequest,
   validateSession,
@@ -218,7 +220,7 @@ export async function onRequestPost(context) {
         );
       }
       const parentRow = await env.DB.prepare(
-        `SELECT e.id, e.referrer_id, w.allocated_at
+        `SELECT e.id, e.reference, e.referrer_id, w.allocated_at
            FROM enquiries e
            LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
           WHERE e.id = ?
@@ -228,6 +230,12 @@ export async function onRequestPost(context) {
         return jsonResponse(
           { success: false, error: "Original referral not found." },
           404
+        );
+      }
+      if (isSampleReference(parentRow.reference)) {
+        return jsonResponse(
+          { success: false, error: "This is a sample case, so it can't be re-quoted." },
+          409
         );
       }
       if (parentRow.allocated_at) {
@@ -244,10 +252,12 @@ export async function onRequestPost(context) {
 
     // Load referrer details — include fee_markup for referrer pricing
     const referrer = await env.DB.prepare(
-      `SELECT referrer_name, referral_fee, contact_email, fee_markup FROM referrers WHERE id = ? LIMIT 1`
+      `SELECT referrer_name, referral_fee, remortgage_referral_fee, contact_email, fee_markup FROM referrers WHERE id = ? LIMIT 1`
     ).bind(referrerId).first();
 
     if (!referrer) return unauthorised();
+
+    const referrerFee = referrerFeeFor(referrer, type);
 
     // Pricing path: prefer the per-referrer engine when admin has set
     // up referrer_fee_configs for this transaction type; otherwise fall
@@ -347,8 +357,8 @@ export async function onRequestPost(context) {
       quote_json: JSON.stringify({ ...body, ...quote }),
       status: "new",
       referrer_id: referrerId,
-      referral_fee_payable: Number(referrer.referral_fee) > 0 ? 1 : 0,
-      referral_fee_amount: Number(referrer.referral_fee) || 0,
+      referral_fee_payable: referrerFee > 0 ? 1 : 0,
+      referral_fee_amount: referrerFee,
     }, insertEnquiryRow);
 
     // Persist workflow fields (referrer_note, parent_enquiry_id) in the
@@ -401,7 +411,7 @@ export async function onRequestPost(context) {
                     <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(transactionLabel)}</td></tr>
                     <tr><td style="padding:7px 0;color:#6b7280;">Property value</td><td style="padding:7px 0;">${formatMoney(price)}</td></tr>
                     ${trimmedNote ? `<tr><td style="padding:7px 0;color:#6b7280;">Referrer note</td><td style="padding:7px 0;">${escapeHtml(trimmedNote)}</td></tr>` : ""}
-                    ${Number(referrer.referral_fee) > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${Number(referrer.referral_fee).toFixed(2)}</td></tr>` : ""}
+                    ${referrerFee > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${referrerFee.toFixed(2)}</td></tr>` : ""}
                   </table>
                   <div style="margin-top:16px;">
                     <a href="${adminUrl}" style="background:#0f2747;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">

@@ -19,6 +19,7 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 
 const escapeHtml = (v) =>
   String(v ?? "")
@@ -56,6 +57,13 @@ export async function onRequestPost(context) {
 
     if (!enquiry || Number(enquiry.referrer_id) !== Number(referrerId)) {
       return jsonResponse({ success: false, error: "Referral not found." }, 404);
+    }
+
+    if (isSampleReference(enquiry.reference)) {
+      return jsonResponse(
+        { success: false, error: "This is a sample case, so it can't be allocated." },
+        409
+      );
     }
 
     if (enquiry.allocated_at) {

@@ -1,6 +1,7 @@
 // MUST STAY IN SYNC with the REASONS mapping in src/App.tsx (admin UI display).
 // Keys are persisted in enquiries.decline_reason; labels are user-facing.
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 
 const REASONS = {
   price: "Price was higher than expected",
@@ -526,6 +527,11 @@ export async function onRequestGet(context) {
       return textResponse("Missing reference", 400);
     }
 
+    // Sample (demo) quotes can't be accepted or declined, and never email.
+    if (isSampleReference(reference)) {
+      return textResponse("This is a sample quote used for demonstration. No action has been taken.");
+    }
+
     const enquiry = await loadEnquiry(env, reference);
 
     if (!enquiry) {
@@ -592,6 +598,11 @@ export async function onRequestPost(context) {
 
     if (!reference) {
       return textResponse("Missing reference", 400);
+    }
+
+    // Sample (demo) quotes can't be accepted or declined, and never email.
+    if (isSampleReference(reference)) {
+      return textResponse("This is a sample quote used for demonstration. No action has been taken.");
     }
 
     const enquiry = await loadEnquiry(env, reference);

@@ -1,5 +1,6 @@
 import { buildUnsubUrl } from "../lib/unsub.js";
 import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 import {
   getSpecialistMatterLabel,
   isSpecialistMatterType,
@@ -46,6 +47,13 @@ export async function onRequestPost(context) {
       return jsonResponse(
         { success: false, error: "Quote reference is missing." },
         400
+      );
+    }
+
+    if (isSampleReference(quoteReference)) {
+      return jsonResponse(
+        { success: false, error: "This is a sample case. Sample quotes are never emailed." },
+        409
       );
     }
 
