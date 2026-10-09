@@ -2054,6 +2054,8 @@ function App() {
     JSON.stringify(initialReferrerEditorState)
   );
   const [referrerSaveMessage, setReferrerSaveMessage] = useState("");
+  const [referrerInviteMessage, setReferrerInviteMessage] = useState("");
+  const [isSendingReferrerInvite, setIsSendingReferrerInvite] = useState(false);
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
 
   // Per-referrer pricing config (Pattern B). Mirrors the firm Fee
@@ -2529,6 +2531,16 @@ function App() {
   const [referrerEmail, setReferrerEmail] = useState("");
   const [referrerPassword, setReferrerPassword] = useState("");
   const [referrerLoginError, setReferrerLoginError] = useState("");
+  // "Forgot password?" on the login page, and the set-password page
+  // reached from the emailed link (see functions/lib/referrer-setup-link.js).
+  const [showReferrerForgot, setShowReferrerForgot] = useState(false);
+  const [referrerForgotMessage, setReferrerForgotMessage] = useState("");
+  const [isSendingReferrerForgot, setIsSendingReferrerForgot] = useState(false);
+  const [newReferrerPassword, setNewReferrerPassword] = useState("");
+  const [newReferrerPasswordConfirm, setNewReferrerPasswordConfirm] = useState("");
+  const [referrerSetPasswordError, setReferrerSetPasswordError] = useState("");
+  const [referrerSetPasswordDoneEmail, setReferrerSetPasswordDoneEmail] = useState("");
+  const [isSettingReferrerPassword, setIsSettingReferrerPassword] = useState(false);
   const [isReferrerLoggingIn, setIsReferrerLoggingIn] = useState(false);
   const [referrerToken, setReferrerToken] = useState("");
   const [referrerSession, setReferrerSession] = useState<{ referrer_id: number; referrer_name: string } | null>(null);
@@ -2554,6 +2566,10 @@ function App() {
   const [openCase, setOpenCase] = useState<string | null>(null);
   const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
   const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
+  // "Request update" message box: which case it is open on, and the draft.
+  const [requestUpdateOpen, setRequestUpdateOpen] = useState<string | null>(null);
+  const [requestUpdateText, setRequestUpdateText] = useState("");
+  const [isSendingRequestUpdate, setIsSendingRequestUpdate] = useState(false);
   // Re-quote (Pattern B) — keyed by the parent matter's reference. When
   // set, the matching matter card renders an inline ReferrerSimpleForm
   // pre-filled with the parent's inputs.
@@ -2663,6 +2679,7 @@ function App() {
   const isFirmPortalPage = currentPath === "/firm-portal" || currentPath === "/firm-portal/";
   const isReferrerLoginPage = currentPath === "/referrer-login" || currentPath === "/referrer-login/";
   const isReferrerPortalPage = currentPath === "/referrer-portal" || currentPath === "/referrer-portal/";
+  const isReferrerSetPasswordPage = currentPath === "/referrer-set-password" || currentPath === "/referrer-set-password/";
   const isAboutPage = currentPath === "/about" || currentPath === "/about/";
   const isTermsPage = currentPath === "/terms" || currentPath === "/terms/";
   const isPrivacyPage = currentPath === "/privacy" || currentPath === "/privacy/";
@@ -4055,6 +4072,27 @@ function App() {
     finally { setIsLoadingReferrers(false); }
   };
 
+  const handleSendReferrerInvite = async () => {
+    if (!referrerEditor.id) return;
+    setIsSendingReferrerInvite(true);
+    setReferrerInviteMessage("");
+    try {
+      const res = await adminFetch("/api/referrer-send-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: referrerEditor.id }),
+      });
+      const result = await res.json();
+      setReferrerInviteMessage(
+        result.success ? `\u2713 Set-password link sent to ${result.sent_to}. It lasts ${result.days} days.` : result.error || "Failed to send."
+      );
+    } catch {
+      setReferrerInviteMessage("Something went wrong.");
+    } finally {
+      setIsSendingReferrerInvite(false);
+    }
+  };
+
   const handleSaveReferrer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSavingReferrer(true);
@@ -4074,7 +4112,15 @@ function App() {
       });
       const result = await res.json();
       if (result.success) {
-        setReferrerSaveMessage(result.mode === "created" ? "Referrer created." : "Referrer updated.");
+        setReferrerSaveMessage(
+          result.mode !== "created"
+            ? "Referrer updated."
+            : result.invite_sent
+            ? `Referrer created. Welcome email with a set-password link sent to ${referrerEditor.portal_email.trim()}.`
+            : result.invite_error
+            ? `Referrer created, but the welcome email failed (${result.invite_error}). Open the referrer and use "Send invite / reset link".`
+            : "Referrer created. No email sent — portal access is off."
+        );
         setReferrerEditor(initialReferrerEditorState);
         referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
         await loadAllReferrers();
@@ -6957,7 +7003,7 @@ function App() {
     },
   ];
 
-  const isPublicPage = !isAdminPage && !isFirmLoginPage && !isFirmPortalPage && !isReferrerLoginPage && !isReferrerPortalPage;
+  const isPublicPage = !isAdminPage && !isFirmLoginPage && !isFirmPortalPage && !isReferrerLoginPage && !isReferrerPortalPage && !isReferrerSetPasswordPage;
   const isHomePage = isPublicPage && (currentPath === "/" || currentPath === "");
 
   return (
@@ -6992,7 +7038,7 @@ function App() {
             <a href="/about/" className={isAboutPage ? "active" : ""}>About Us</a>
             <a href="/conveyancing-fees/" className={isFeesPage ? "active" : ""}>Fees Guide</a>
             <a href="/firm-login/" className={isFirmLoginPage || isFirmPortalPage ? "active" : ""}>Firm Login</a>
-            <a href="/referrer-login/" className={isReferrerLoginPage || isReferrerPortalPage ? "active" : ""}>Referrer Login</a>
+            <a href="/referrer-login/" className={isReferrerLoginPage || isReferrerPortalPage || isReferrerSetPasswordPage ? "active" : ""}>Referrer Login</a>
           </div>
         </div>
       </nav>
@@ -7006,10 +7052,10 @@ function App() {
 
           <div className="hero__text">
             <span className="eyebrow">
-              {isAdminPage ? "Internal Admin" : isAboutPage ? "About Us" : isSdltPage ? "SDLT Calculator" : isLeaseholdPage ? "Leasehold Services" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Conveyancing Fees Guide" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Instant Conveyancing Quotes"}
+              {isAdminPage ? "Internal Admin" : isAboutPage ? "About Us" : isSdltPage ? "SDLT Calculator" : isLeaseholdPage ? "Leasehold Services" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Conveyancing Fees Guide" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage || isReferrerSetPasswordPage ? "Referrer Portal" : "Instant Conveyancing Quotes"}
             </span>
             <h1>
-              {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isLeaseholdPage ? "Lease extensions, enfranchisement and staircasing" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
+              {isAdminPage ? "Admin Dashboard" : isAboutPage ? "About ConveyQuote" : isSdltPage ? "Stamp Duty Land Tax Calculator" : isLeaseholdPage ? "Lease extensions, enfranchisement and staircasing" : isTermsPage ? "Terms & Conditions" : isPrivacyPage ? "Privacy Policy" : isFeesPage ? "Understanding Conveyancing Fees" : isFirmLoginPage || isFirmPortalPage ? "Firm Portal" : isReferrerLoginPage || isReferrerPortalPage || isReferrerSetPasswordPage ? "Referrer Portal" : "Compare conveyancing quotes from regulated solicitors"}
             </h1>
           </div>
         </div>
@@ -12415,6 +12461,7 @@ function App() {
                           setReferrerEditor(initialReferrerEditorState);
                           referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                           setReferrerSaveMessage("");
+                          setReferrerInviteMessage("");
                           setReferrerPricingItems([]);
                           referrerPricingBaselineRef.current = JSON.stringify([]);
                           setReferrerPricingMessage("");
@@ -12461,6 +12508,7 @@ function App() {
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
                                   };
                                   setReferrerEditor(loaded);
+                                  setReferrerInviteMessage("");
                                   referrerEditorBaselineRef.current = JSON.stringify(loaded);
                                   setReferrerSaveMessage("");
                                   setReferrerPricingType("purchase");
@@ -12557,6 +12605,7 @@ function App() {
                             setReferrerEditor(initialReferrerEditorState);
                             referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
                             setReferrerSaveMessage("");
+                            setReferrerInviteMessage("");
                             setReferrerPricingItems([]);
                             referrerPricingBaselineRef.current = JSON.stringify([]);
                             setReferrerPricingMessage("");
@@ -12564,10 +12613,22 @@ function App() {
                           }}>
                           Clear
                         </button>
+                        {referrerEditor.id && (
+                          <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
+                            disabled={isSendingReferrerInvite}
+                            onClick={() => void handleSendReferrerInvite()}>
+                            {isSendingReferrerInvite ? "Sending…" : "Send invite / reset link"}
+                          </button>
+                        )}
                         <button type="submit" className="primary-button" style={{ minHeight: 40, padding: "0 20px" }} disabled={isSavingReferrer}>
                           {isSavingReferrer ? "Saving…" : referrerEditor.id ? "Update Referrer" : "Create Referrer"}
                         </button>
                       </div>
+                      {referrerInviteMessage && (
+                        <p className="form-note" style={{ marginTop: "10px", color: referrerInviteMessage.startsWith("\u2713") ? "#065f46" : "#dc2626" }}>
+                          {referrerInviteMessage}
+                        </p>
+                      )}
                     </form>
                   </SummaryCard>
 
@@ -14652,9 +14713,105 @@ function App() {
                 <button type="submit" className="primary-button" disabled={isReferrerLoggingIn}>{isReferrerLoggingIn ? "Logging in…" : "Log In"}</button>
               </div>
             </form>
+
+            {/* Forgot password: emails a one-time set-password link. The
+                reply is the same whether or not the address has an account. */}
+            <div style={{ marginTop: "14px", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
+              {!showReferrerForgot ? (
+                <button type="button" onClick={() => { setShowReferrerForgot(true); setReferrerForgotMessage(""); }}
+                  style={{ background: "none", border: "none", padding: "8px 0", minHeight: 44, color: "var(--teal)", fontWeight: 600, fontSize: "14px", cursor: "pointer" }}>
+                  Forgot password?
+                </button>
+              ) : (
+                <form className="quote-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  setIsSendingReferrerForgot(true);
+                  setReferrerForgotMessage("");
+                  fetch("/api/referrer-forgot-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: referrerEmail }),
+                  }).then((r) => r.json()).then((result: { success: boolean; message?: string; error?: string }) => {
+                    setReferrerForgotMessage(result.message || result.error || "Something went wrong.");
+                  }).catch(() => setReferrerForgotMessage("Something went wrong. Please try again."))
+                    .finally(() => setIsSendingReferrerForgot(false));
+                }}>
+                  <p className="form-note" style={{ margin: "0 0 10px" }}>Enter your login email and we'll send you a link to set a new password.</p>
+                  <div className="field field--full">
+                    <label htmlFor="refForgotEmail">Email address</label>
+                    <input id="refForgotEmail" type="email" value={referrerEmail ?? ""} onChange={(e) => setReferrerEmail?.(e.target.value)} placeholder="you@example.com" required autoComplete="email" />
+                  </div>
+                  {referrerForgotMessage && <p className="form-note" style={{ color: "#065f46" }}>{referrerForgotMessage}</p>}
+                  <div className="form-footer">
+                    <button type="button" className="muted-button" onClick={() => setShowReferrerForgot(false)}>Back to log in</button>
+                    <button type="submit" className="primary-button" disabled={isSendingReferrerForgot}>{isSendingReferrerForgot ? "Sending…" : "Send link"}</button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
+
+      {/* ── Referrer set-password page (from the emailed link) ── */}
+      {isReferrerSetPasswordPage && (() => {
+        const token = new URLSearchParams(window.location.search).get("token") || "";
+        return (
+          <div className="public-page" style={{ maxWidth: 460, width: "100%", boxSizing: "border-box" }}>
+            <div className="card">
+              <h2 style={{ color: "var(--navy)", margin: "0 0 6px" }}>Set your password</h2>
+              {referrerSetPasswordDoneEmail ? (
+                <>
+                  <p style={{ color: "#065f46", fontWeight: 600 }}>✓ Your password has been set.</p>
+                  <p className="form-note">You can now log in with <strong>{referrerSetPasswordDoneEmail}</strong> and your new password.</p>
+                  <a className="primary-button" href="/referrer-login/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", marginTop: "12px" }}>Go to log in</a>
+                </>
+              ) : !token ? (
+                <p className="form-note">This link is incomplete. Please use the button in your email, or use "Forgot password?" on the <a href="/referrer-login/">login page</a> to get a new link.</p>
+              ) : (
+                <form className="quote-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  setReferrerSetPasswordError("");
+                  if (newReferrerPassword.length < 8) { setReferrerSetPasswordError("Password must be at least 8 characters."); return; }
+                  if (newReferrerPassword !== newReferrerPasswordConfirm) { setReferrerSetPasswordError("The two passwords don't match."); return; }
+                  setIsSettingReferrerPassword(true);
+                  fetch("/api/referrer-set-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token, password: newReferrerPassword }),
+                  }).then((r) => r.json()).then((result: { success: boolean; email?: string; error?: string }) => {
+                    if (result.success) {
+                      setNewReferrerPassword("");
+                      setNewReferrerPasswordConfirm("");
+                      setReferrerEmail(result.email || "");
+                      setReferrerSetPasswordDoneEmail(result.email || "your login email");
+                    } else {
+                      setReferrerSetPasswordError(result.error || "Something went wrong.");
+                    }
+                  }).catch(() => setReferrerSetPasswordError("Something went wrong. Please try again."))
+                    .finally(() => setIsSettingReferrerPassword(false));
+                }}>
+                  <p className="form-note" style={{ marginTop: 0 }}>Choose a password of at least 8 characters for your ConveyQuote referrer portal.</p>
+                  <div className="form-grid">
+                    <div className="field field--full">
+                      <label htmlFor="refNewPw">New password</label>
+                      <input id="refNewPw" type="password" value={newReferrerPassword} onChange={(e) => setNewReferrerPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+                    </div>
+                    <div className="field field--full">
+                      <label htmlFor="refNewPw2">Confirm new password</label>
+                      <input id="refNewPw2" type="password" value={newReferrerPasswordConfirm} onChange={(e) => setNewReferrerPasswordConfirm(e.target.value)} required minLength={8} autoComplete="new-password" />
+                    </div>
+                  </div>
+                  {referrerSetPasswordError && <p className="form-note" style={{ color: "#dc2626" }}>{referrerSetPasswordError}</p>}
+                  <div className="form-footer">
+                    <button type="submit" className="primary-button" disabled={isSettingReferrerPassword}>{isSettingReferrerPassword ? "Saving…" : "Set password"}</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Referrer Portal ── */}
       {(isReferrerPortalPage || (isReferrerLoginPage && referrerSession)) && referrerSession && (() => {
@@ -14880,15 +15037,21 @@ function App() {
               };
 
               const handleRequestUpdate = (ref: string) => {
+                setIsSendingRequestUpdate(true);
                 fetch("/api/referrer-request-update", {
                   method: "POST",
                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
-                  body: JSON.stringify({ reference: ref }),
+                  body: JSON.stringify({ reference: ref, message: requestUpdateText.trim() }),
                 }).then((r) => r.json()).then((res: unknown) => {
                   const r = res as { success: boolean; error?: string; message?: string };
-                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? r.message || "\u2713 Update requested \u2014 firm notified." : r.error || "Failed." }));
-                  setTimeout(() => setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; }), 5000);
-                }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })));
+                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? r.message || "\u2713 Message sent." : r.error || "Failed." }));
+                  if (r.success) {
+                    setRequestUpdateOpen(null);
+                    setRequestUpdateText("");
+                    setTimeout(() => setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; }), 8000);
+                  }
+                }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })))
+                  .finally(() => setIsSendingRequestUpdate(false));
               };
 
               const handleRequestAllocation = (enquiryId: number, ref: string) => {
@@ -14999,7 +15162,11 @@ function App() {
                                   )}
                                   {isActive && (
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
-                                      onClick={() => handleRequestUpdate(ref)}>Request update</button>
+                                      onClick={() => {
+                                        setRequestUpdateText("");
+                                        setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; });
+                                        setRequestUpdateOpen(requestUpdateOpen === ref ? null : ref);
+                                      }}>{requestUpdateOpen === ref ? "Cancel update request" : "Request update"}</button>
                                   )}
                                   {!enq.allocated_at && !enq.successor_reference && (
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
@@ -15037,6 +15204,33 @@ function App() {
                                   )}
                                 </div>
                               </div>
+
+                              {/* Request update: the referrer's message goes to the firm, ConveyQuote copied in */}
+                              {requestUpdateOpen === ref && (
+                                <form style={{ marginTop: "12px", background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px 14px" }}
+                                  onSubmit={(e) => { e.preventDefault(); handleRequestUpdate(ref); }}>
+                                  <label htmlFor={`req-${ref}`} style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>
+                                    What would you like to know?
+                                  </label>
+                                  <textarea id={`req-${ref}`} value={requestUpdateText} rows={3} maxLength={1000} required
+                                    onChange={(e) => setRequestUpdateText(e.target.value)}
+                                    placeholder="e.g. Has the mortgage offer arrived? The buyer is asking about a completion date."
+                                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", fontFamily: "inherit" }} />
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                      Sent to {String(enq.assigned_firm_name || "the solicitor")}, with ConveyQuote copied in. Replies come to you by email.
+                                    </span>
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                      <button type="button" className="muted-button" style={{ minHeight: 36, padding: "0 12px", fontSize: "13px" }}
+                                        onClick={() => { setRequestUpdateOpen(null); setRequestUpdateText(""); }}>Cancel</button>
+                                      <button type="submit" className="primary-button" style={{ minHeight: 36, padding: "0 14px", fontSize: "13px" }}
+                                        disabled={isSendingRequestUpdate || !requestUpdateText.trim()}>
+                                        {isSendingRequestUpdate ? "Sending…" : "Send message"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </form>
+                              )}
                             </div>
 
                             {/* View Case detail panel */}
