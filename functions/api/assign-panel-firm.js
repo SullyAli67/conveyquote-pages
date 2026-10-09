@@ -5,6 +5,7 @@ import {
   unauthorised,
 } from "../lib/auth.js";
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 
 const jsonResponse = (payload, status = 200) =>
   new Response(JSON.stringify(payload), {
@@ -48,6 +49,12 @@ export async function onRequestPost(context) {
 
     if (!reference || !firm_id || !firm_name) {
       return jsonResponse({ success: false, error: "Reference, firm id and firm name are required." }, 400);
+    }
+
+    // Sample cases must never be linked to a real panel firm (that would
+    // email the firm and the referrer).
+    if (isSampleReference(reference)) {
+      return jsonResponse({ success: false, error: "Sample cases can't be allocated to a panel firm." }, 409);
     }
 
     // Pattern B: a referrer can re-quote on an unallocated matter,

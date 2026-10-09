@@ -5,6 +5,7 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
+import { isSampleReference } from "../lib/sample-cases.js";
 
 const escapeHtml = (v) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -35,6 +36,14 @@ export async function onRequestPost(context) {
 
     if (!enquiry) {
       return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
+    }
+
+    // Sample cases show the confirmation but never email anyone.
+    if (isSampleReference(enquiry.reference)) {
+      return jsonResponse({
+        success: true,
+        message: "\u2713 Update requested \u2014 we'll be in touch.",
+      });
     }
 
     if (!enquiry.assigned_firm_id) {

@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
 
     const result = await env.DB.prepare(
       `SELECT id, referrer_name, contact_email, contact_phone,
-              referral_fee, marketing_fee, fee_markup, portal_email, portal_active, notes, created_at
+              referral_fee, remortgage_referral_fee, marketing_fee, fee_markup, portal_email, portal_active, notes, created_at
        FROM referrers ORDER BY referrer_name COLLATE NOCASE ASC`
     ).all();
 
@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const {
       id, referrer_name, contact_email, contact_phone,
-      referral_fee, marketing_fee, fee_markup, portal_email, portal_active, notes, password,
+      referral_fee, remortgage_referral_fee, marketing_fee, fee_markup, portal_email, portal_active, notes, password,
     } = body;
 
     if (!referrer_name || !String(referrer_name).trim()) {
@@ -59,13 +59,14 @@ export async function onRequestPost(context) {
       // Update
       const updateParts = [
         "referrer_name = ?", "contact_email = ?", "contact_phone = ?",
-        "referral_fee = ?", "marketing_fee = ?", "fee_markup = ?", "portal_email = ?", "portal_active = ?",
+        "referral_fee = ?", "remortgage_referral_fee = ?", "marketing_fee = ?", "fee_markup = ?", "portal_email = ?", "portal_active = ?",
         "notes = ?", "updated_at = datetime('now')",
       ];
       const binds = [
         String(referrer_name).trim(),
         contact_email || null, contact_phone || null,
         Number(referral_fee) || 0,
+        Number(remortgage_referral_fee) || 0,
         Number(marketing_fee) || 50,
         Number(fee_markup) || 0,
         portal_email ? String(portal_email).toLowerCase().trim() : null,
@@ -86,11 +87,12 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: true, id, mode: "updated" });
     } else {
       // Create
-      const cols = ["referrer_name", "contact_email", "contact_phone", "referral_fee", "marketing_fee", "fee_markup", "portal_email", "portal_active", "notes"];
+      const cols = ["referrer_name", "contact_email", "contact_phone", "referral_fee", "remortgage_referral_fee", "marketing_fee", "fee_markup", "portal_email", "portal_active", "notes"];
       const vals = [
         String(referrer_name).trim(),
         contact_email || null, contact_phone || null,
         Number(referral_fee) || 0,
+        Number(remortgage_referral_fee) || 0,
         Number(marketing_fee) || 50,
         Number(fee_markup) || 0,
         portal_email ? String(portal_email).toLowerCase().trim() : null,

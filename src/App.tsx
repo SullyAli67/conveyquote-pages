@@ -2028,7 +2028,7 @@ function App() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Referrer management state
-  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
+  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; remortgage_referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
   const [allReferrers, setAllReferrers] = useState<ReferrerRow[]>([]);
   const [isLoadingReferrers, setIsLoadingReferrers] = useState(false);
   const initialReferrerEditorState = {
@@ -2037,6 +2037,7 @@ function App() {
     contact_email: "",
     contact_phone: "",
     referral_fee: "",
+    remortgage_referral_fee: "",
     marketing_fee: "50",
     fee_markup: "",
     portal_email: "",
@@ -2044,7 +2045,7 @@ function App() {
     notes: "",
     password: "",
   };
-  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>(
+  const [referrerEditor, setReferrerEditor] = useState<{ id: number | null; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: string; remortgage_referral_fee: string; marketing_fee: string; fee_markup: string; portal_email: string; portal_active: boolean; notes: string; password: string }>(
     initialReferrerEditorState
   );
   // Baseline snapshot — refreshed when the editor loads an existing
@@ -2523,7 +2524,7 @@ function App() {
 
   // ── Referrer portal state ──────────────────────────────────────────────
   type ReferrerEnquiry = Record<string, unknown>;
-  type ReferrerInfo = { id: number; referrer_name: string; contact_email: string; referral_fee: number };
+  type ReferrerInfo = { id: number; referrer_name: string; contact_email: string; referral_fee: number; remortgage_referral_fee?: number };
 
   const [referrerEmail, setReferrerEmail] = useState("");
   const [referrerPassword, setReferrerPassword] = useState("");
@@ -4065,6 +4066,7 @@ function App() {
         body: JSON.stringify({
           ...referrerEditor,
           referral_fee: Number(referrerEditor.referral_fee) || 0,
+          remortgage_referral_fee: Number(referrerEditor.remortgage_referral_fee) || 0,
           marketing_fee: Number(referrerEditor.marketing_fee) || 50,
           fee_markup: referrerEditor.fee_markup ? Number(referrerEditor.fee_markup) : 0,
           password: referrerEditor.password || undefined,
@@ -12434,6 +12436,9 @@ function App() {
                               {Number(r.referral_fee) > 0 && (
                                 <div style={{ fontSize: "12px", color: "#7c3aed" }}>Referral fee: £{Number(r.referral_fee).toFixed(2)}</div>
                               )}
+                              {Number(r.remortgage_referral_fee) > 0 && (
+                                <div style={{ fontSize: "12px", color: "#7c3aed" }}>Remortgage / transfer fee: £{Number(r.remortgage_referral_fee).toFixed(2)}</div>
+                              )}
                               {Number(r.marketing_fee) > 0 && (
                                 <div style={{ fontSize: "12px", color: "#0369a1" }}>Marketing fee: £{Number(r.marketing_fee).toFixed(2)} + VAT</div>
                               )}
@@ -12449,7 +12454,8 @@ function App() {
                                   const loaded = {
                                     id: r.id, referrer_name: r.referrer_name,
                                     contact_email: r.contact_email || "", contact_phone: r.contact_phone || "",
-                                    referral_fee: String(r.referral_fee || ""), marketing_fee: String(r.marketing_fee ?? "50"),
+                                    referral_fee: String(r.referral_fee || ""), remortgage_referral_fee: String(r.remortgage_referral_fee || ""),
+                                    marketing_fee: String(r.marketing_fee ?? "50"),
                                     fee_markup: r.fee_markup ? String(r.fee_markup) : "",
                                     portal_email: r.portal_email || "",
                                     portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
@@ -12493,10 +12499,16 @@ function App() {
                             onChange={(e) => setReferrerEditor((p) => ({ ...p, contact_phone: e.target.value }))} />
                         </div>
                         <div className="field">
-                          <label>Referral fee (£)</label>
+                          <label>Referral fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Purchase, sale, sale &amp; purchase</span></label>
                           <input type="number" step="0.01" value={referrerEditor.referral_fee}
                             onChange={(e) => setReferrerEditor((p) => ({ ...p, referral_fee: e.target.value }))}
                             placeholder="e.g. 150.00" />
+                        </div>
+                        <div className="field">
+                          <label>Remortgage / transfer fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Remortgage, transfer of equity</span></label>
+                          <input type="number" step="0.01" min="0" value={referrerEditor.remortgage_referral_fee}
+                            onChange={(e) => setReferrerEditor((p) => ({ ...p, remortgage_referral_fee: e.target.value }))}
+                            placeholder="e.g. 40.00" />
                         </div>
                         <div className="field">
                           <label>Marketing fee (£ ex. VAT) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Fixed: £50 + VAT per matter</span></label>
@@ -14689,6 +14701,49 @@ function App() {
           return { bg: "#f3f4f6", col: "#6b7280" };
         };
 
+        // Badge text for a case. Before the firm sets a stage, a case is
+        // "Quote sent" once the client has its quote, otherwise "Pending".
+        const statusLabel = (enq: ReferrerEnquiry) =>
+          HUMAN_STATUS[String(enq.case_status || "")] ||
+          (enq.assigned_firm_name ? "Instructed" : String(enq.status || "") === "quote_sent" ? "Quote sent" : "Pending");
+
+        // Progress bar: every firm-side stage in order, so a case between
+        // milestones (e.g. "Searches ordered") still lights the dots it has passed.
+        const STAGE_ORDER = [
+          "accepted", "client_care_sent", "id_requested", "id_received", "searches_ordered",
+          "searches_received", "enquiries_raised", "enquiries_replied", "report_on_title",
+          "exchange_ready", "exchanged", "completion_ready", "completed",
+        ];
+        const MILESTONES = ["id_received", "searches_received", "exchanged", "completed"];
+        const milestoneIndex = (caseStatus: unknown) => {
+          const pos = STAGE_ORDER.indexOf(String(caseStatus || ""));
+          return MILESTONES.reduce((idx, m, i) => (pos >= 0 && STAGE_ORDER.indexOf(m) <= pos ? i : idx), -1);
+        };
+
+        // Sample (demo) cases are seeded with a SAMPLE- reference.
+        const sampleBadge = (enq: ReferrerEnquiry) =>
+          String(enq.reference || "").startsWith("SAMPLE-") ? (
+            <span title="Sample case for demonstration" style={{ display: "inline-block", marginLeft: "8px", padding: "1px 7px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, background: "#f3f4f6", color: "#6b7280", border: "1px solid #d1d5db", verticalAlign: "middle" }}>
+              Sample
+            </span>
+          ) : null;
+
+        // Referral fee payment state. A referrer_fee_payments row means paid.
+        const feeStatus = (enq: ReferrerEnquiry) => {
+          if (enq.fee_paid_at) {
+            const paidOn = new Date(String(enq.fee_paid_at)).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+            return { label: `Paid ${paidOn}`, bg: "#d1fae5", col: "#065f46" };
+          }
+          if (enq.case_status === "completed") return { label: "Completed \u2014 fee due", bg: "#e0f2fe", col: "#075985" };
+          return { label: "Pending completion", bg: "#fef3c7", col: "#92400e" };
+        };
+
+        const formatFee = (n: number) => (Number.isInteger(n) ? `\u00a3${n}` : `\u00a3${n.toFixed(2)}`);
+        const feeRates = [
+          Number(referrer?.referral_fee) > 0 && `${formatFee(Number(referrer?.referral_fee))} per completed purchase or sale`,
+          Number(referrer?.remortgage_referral_fee) > 0 && `${formatFee(Number(referrer?.remortgage_referral_fee))} per completed remortgage or transfer of equity`,
+        ].filter(Boolean).join(", ");
+
         const refreshPortal = () => {
           fetch("/api/referrer-portal-data", { headers: { Authorization: `Bearer ${referrerToken}` } })
             .then((r) => r.json()).then((d: unknown) => { if ((d as { success: boolean }).success) setReferrerPortalData?.(d as { referrer: { id: number; referrer_name: string; contact_email: string; referral_fee: number }; enquiries: Record<string, unknown>[] }); });
@@ -14702,7 +14757,7 @@ function App() {
         ];
 
         return (
-          <div className="public-page" style={{ maxWidth: 1000 }}>
+          <div className="public-page" style={{ maxWidth: 1000, width: "100%", boxSizing: "border-box" /* .page is a flex column and .public-page has auto margins, so without a set width the Payments table stretches the portal past a phone's width */ }}>
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
               <div>
@@ -14780,7 +14835,7 @@ function App() {
                         return (
                           <div key={String(enq.reference)} style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "10px", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                             <div>
-                              <div style={{ fontWeight: 600, color: "var(--navy)", fontSize: "15px" }}>{String(enq.property_address || enq.reference)}</div>
+                              <div style={{ fontWeight: 600, color: "var(--navy)", fontSize: "15px" }}>{String(enq.property_address || enq.reference)}{sampleBadge(enq)}</div>
                               <div style={{ fontSize: "13px", color: "var(--muted)" }}>{String(enq.client_name || enq.client_email || "")} · {String(enq.transaction_type || "").replace(/_/g, " ")}</div>
                               {enq.negotiator_name && <div style={{ fontSize: "12px", color: "var(--muted)" }}>via {String(enq.negotiator_name)}</div>}
                             </div>
@@ -14791,7 +14846,7 @@ function App() {
                                 </div>
                               )}
                               <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: 600, background: sc.bg, color: sc.col }}>
-                                {HUMAN_STATUS[String(enq.case_status || "")] || (enq.assigned_firm_name ? "Instructed" : "Pending assignment")}
+                                {statusLabel(enq)}
                               </span>
                             </div>
                           </div>
@@ -14830,8 +14885,8 @@ function App() {
                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
                   body: JSON.stringify({ reference: ref }),
                 }).then((r) => r.json()).then((res: unknown) => {
-                  const r = res as { success: boolean; error?: string };
-                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? "\u2713 Update requested \u2014 firm notified." : r.error || "Failed." }));
+                  const r = res as { success: boolean; error?: string; message?: string };
+                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? r.message || "\u2713 Update requested \u2014 firm notified." : r.error || "Failed." }));
                   setTimeout(() => setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; }), 5000);
                 }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })));
               };
@@ -14872,8 +14927,7 @@ function App() {
                         const sc = statusColour(enq.case_status);
                         const isActive = Boolean(enq.assigned_firm_name) && enq.case_status !== "completed" && enq.case_status !== "withdrawn" && enq.case_status !== "fallen_through";
                         const isDraft = !enq.assigned_firm_name && (!enq.case_status || enq.case_status === "new");
-                        const MILESTONES = ["id_received", "searches_received", "exchanged", "completed"];
-                        const currentIdx = MILESTONES.indexOf(String(enq.case_status || ""));
+                        const currentIdx = milestoneIndex(enq.case_status);
                         const caseOpen = openCase === ref;
                         return (
                           <div key={ref} style={{ background: "#fff", border: `1px solid ${caseOpen ? "var(--navy)" : "var(--border)"}`, borderRadius: "12px", overflow: "hidden" }}>
@@ -14881,7 +14935,7 @@ function App() {
                             <div style={{ padding: "18px 20px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", marginBottom: "10px" }}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 700, fontSize: "16px", color: "var(--navy)" }}>{String(enq.property_address || enq.reference)}</div>
+                                  <div style={{ fontWeight: 700, fontSize: "16px", color: "var(--navy)" }}>{String(enq.property_address || enq.reference)}{sampleBadge(enq)}</div>
                                   <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "2px" }}>
                                     {String(enq.client_name || enq.client_email || "")}
                                     {enq.price ? ` \u00b7 \u00a3${Number(enq.price).toLocaleString("en-GB")}` : ""}
@@ -14898,7 +14952,7 @@ function App() {
                                   </div>
                                 </div>
                                 <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: "12px", fontSize: "13px", fontWeight: 600, background: sc.bg, color: sc.col, whiteSpace: "nowrap", flexShrink: 0 }}>
-                                  {HUMAN_STATUS[String(enq.case_status || "")] || (enq.assigned_firm_name ? "Instructed" : "Pending")}
+                                  {statusLabel(enq)}
                                 </span>
                               </div>
 
@@ -14933,7 +14987,7 @@ function App() {
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
                                 <div style={{ fontSize: "12px", color: "var(--muted)" }}>
                                   {enq.target_completion_date && enq.case_status !== "completed"
-                                    ? <span style={{ color: "#5b21b6", fontWeight: 600 }}>\ud83d\udcc5 Completion: {new Date(String(enq.target_completion_date)).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
+                                    ? <span style={{ color: "#5b21b6", fontWeight: 600 }}>📅 Completion: {new Date(String(enq.target_completion_date)).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
                                     : enq.eta_date && enq.case_status !== "completed"
                                       ? `Est. completion: ${new Date(String(enq.eta_date)).toLocaleDateString("en-GB")}`
                                       : null
@@ -15031,7 +15085,7 @@ function App() {
                                     <div>
                                       <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Case status</div>
                                       <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: "10px", fontSize: "12px", fontWeight: 600, background: sc.bg, color: sc.col }}>
-                                        {HUMAN_STATUS[String(enq.case_status || "")] || "Pending"}
+                                        {statusLabel(enq)}
                                       </span>
                                     </div>
                                     {enq.assigned_firm_name && (
@@ -15088,8 +15142,8 @@ function App() {
                                       </div>
                                       <div>
                                         <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Payment status</div>
-                                        <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: "10px", fontSize: "12px", fontWeight: 600, background: enq.case_status === "completed" ? "#d1fae5" : "#fef3c7", color: enq.case_status === "completed" ? "#065f46" : "#92400e" }}>
-                                          {enq.case_status === "completed" ? "Completed \u2014 fee due" : "Pending completion"}
+                                        <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: "10px", fontSize: "12px", fontWeight: 600, background: feeStatus(enq).bg, color: feeStatus(enq).col }}>
+                                          {feeStatus(enq).label}
                                         </span>
                                       </div>
                                     </div>
@@ -15167,9 +15221,9 @@ function App() {
             {/* ── PAYMENTS ── */}
             {referrerPortalTab === "payments" && (
               <div>
-                {referrer && referrer.referral_fee > 0 && (
+                {feeRates && (
                   <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "10px", padding: "12px 16px", marginBottom: "20px" }}>
-                    <strong style={{ color: "#15803d" }}>Your referral fee: £{Number(referrer.referral_fee).toFixed(2)} per completed matter</strong>
+                    <strong style={{ color: "#15803d" }}>Your referral fees: {feeRates}</strong>
                   </div>
                 )}
                 {enquiries.filter((e) => e.referral_fee_payable).length === 0 ? (
@@ -15187,16 +15241,16 @@ function App() {
                         </thead>
                         <tbody>
                           {enquiries.filter((e) => e.referral_fee_payable).map((enq, i) => {
-                            const isPaid = enq.case_status === "completed";
+                            const fs = feeStatus(enq);
                             return (
                               <tr key={String(enq.reference)} style={{ background: i % 2 === 0 ? "#f9fafb" : "#fff", borderBottom: "1px solid var(--border)" }}>
-                                <td style={{ padding: "10px 14px", fontWeight: 600 }}>{String(enq.property_address || enq.reference)}</td>
+                                <td style={{ padding: "10px 14px", fontWeight: 600 }}>{String(enq.property_address || enq.reference)}{sampleBadge(enq)}</td>
                                 <td style={{ padding: "10px 14px", color: "var(--muted)" }}>{String(enq.client_name || enq.client_email || "—")}</td>
-                                <td style={{ padding: "10px 14px" }}>{HUMAN_STATUS[String(enq.case_status || "")] || "In progress"}</td>
+                                <td style={{ padding: "10px 14px" }}>{statusLabel(enq)}</td>
                                 <td style={{ padding: "10px 14px", fontWeight: 600 }}>£{Number(enq.referral_fee_amount || 0).toFixed(2)}</td>
                                 <td style={{ padding: "10px 14px" }}>
-                                  <span style={{ padding: "2px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, background: isPaid ? "#d1fae5" : "#fef3c7", color: isPaid ? "#065f46" : "#92400e" }}>
-                                    {isPaid ? "Completed — fee due" : "Pending completion"}
+                                  <span style={{ padding: "2px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, background: fs.bg, color: fs.col, whiteSpace: "nowrap" }}>
+                                    {fs.label}
                                   </span>
                                 </td>
                               </tr>
@@ -15208,6 +15262,12 @@ function App() {
                             <td colSpan={3} style={{ padding: "10px 14px" }}>Total fees on completed matters</td>
                             <td colSpan={2} style={{ padding: "10px 14px", color: "var(--navy)" }}>
                               £{enquiries.filter((e) => e.case_status === "completed" && e.referral_fee_payable).reduce((s, e) => s + Number(e.referral_fee_amount || 0), 0).toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr style={{ background: "#f0fdf4", fontWeight: 700 }}>
+                            <td colSpan={3} style={{ padding: "10px 14px" }}>Paid to you so far</td>
+                            <td colSpan={2} style={{ padding: "10px 14px", color: "#065f46" }}>
+                              £{enquiries.filter((e) => e.fee_paid_at).reduce((s, e) => s + Number(e.fee_paid_amount || 0), 0).toFixed(2)}
                             </td>
                           </tr>
                         </tfoot>
