@@ -2566,6 +2566,10 @@ function App() {
   const [openCase, setOpenCase] = useState<string | null>(null);
   const [archiveMsg, setArchiveMsg] = useState<Record<string, string>>({});
   const [requestMsg, setRequestMsg] = useState<Record<string, string>>({});
+  // "Request update" message box: which case it is open on, and the draft.
+  const [requestUpdateOpen, setRequestUpdateOpen] = useState<string | null>(null);
+  const [requestUpdateText, setRequestUpdateText] = useState("");
+  const [isSendingRequestUpdate, setIsSendingRequestUpdate] = useState(false);
   // Re-quote (Pattern B) — keyed by the parent matter's reference. When
   // set, the matching matter card renders an inline ReferrerSimpleForm
   // pre-filled with the parent's inputs.
@@ -15033,15 +15037,21 @@ function App() {
               };
 
               const handleRequestUpdate = (ref: string) => {
+                setIsSendingRequestUpdate(true);
                 fetch("/api/referrer-request-update", {
                   method: "POST",
                   headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
-                  body: JSON.stringify({ reference: ref }),
+                  body: JSON.stringify({ reference: ref, message: requestUpdateText.trim() }),
                 }).then((r) => r.json()).then((res: unknown) => {
                   const r = res as { success: boolean; error?: string; message?: string };
-                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? r.message || "\u2713 Update requested \u2014 firm notified." : r.error || "Failed." }));
-                  setTimeout(() => setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; }), 5000);
-                }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })));
+                  setRequestMsg((p) => ({ ...p, [ref]: r.success ? r.message || "\u2713 Message sent." : r.error || "Failed." }));
+                  if (r.success) {
+                    setRequestUpdateOpen(null);
+                    setRequestUpdateText("");
+                    setTimeout(() => setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; }), 8000);
+                  }
+                }).catch(() => setRequestMsg((p) => ({ ...p, [ref]: "Something went wrong." })))
+                  .finally(() => setIsSendingRequestUpdate(false));
               };
 
               const handleRequestAllocation = (enquiryId: number, ref: string) => {
@@ -15152,7 +15162,11 @@ function App() {
                                   )}
                                   {isActive && (
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
-                                      onClick={() => handleRequestUpdate(ref)}>Request update</button>
+                                      onClick={() => {
+                                        setRequestUpdateText("");
+                                        setRequestMsg((p) => { const n = { ...p }; delete n[ref]; return n; });
+                                        setRequestUpdateOpen(requestUpdateOpen === ref ? null : ref);
+                                      }}>{requestUpdateOpen === ref ? "Cancel update request" : "Request update"}</button>
                                   )}
                                   {!enq.allocated_at && !enq.successor_reference && (
                                     <button type="button" className="muted-button" style={{ minHeight: 30, padding: "0 10px", fontSize: "12px" }}
@@ -15190,6 +15204,33 @@ function App() {
                                   )}
                                 </div>
                               </div>
+
+                              {/* Request update: the referrer's message goes to the firm, ConveyQuote copied in */}
+                              {requestUpdateOpen === ref && (
+                                <form style={{ marginTop: "12px", background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px 14px" }}
+                                  onSubmit={(e) => { e.preventDefault(); handleRequestUpdate(ref); }}>
+                                  <label htmlFor={`req-${ref}`} style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>
+                                    What would you like to know?
+                                  </label>
+                                  <textarea id={`req-${ref}`} value={requestUpdateText} rows={3} maxLength={1000} required
+                                    onChange={(e) => setRequestUpdateText(e.target.value)}
+                                    placeholder="e.g. Has the mortgage offer arrived? The buyer is asking about a completion date."
+                                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", fontFamily: "inherit" }} />
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                      Sent to {String(enq.assigned_firm_name || "the solicitor")}, with ConveyQuote copied in. Replies come to you by email.
+                                    </span>
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                      <button type="button" className="muted-button" style={{ minHeight: 36, padding: "0 12px", fontSize: "13px" }}
+                                        onClick={() => { setRequestUpdateOpen(null); setRequestUpdateText(""); }}>Cancel</button>
+                                      <button type="submit" className="primary-button" style={{ minHeight: 36, padding: "0 14px", fontSize: "13px" }}
+                                        disabled={isSendingRequestUpdate || !requestUpdateText.trim()}>
+                                        {isSendingRequestUpdate ? "Sending…" : "Send message"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </form>
+                              )}
                             </div>
 
                             {/* View Case detail panel */}
