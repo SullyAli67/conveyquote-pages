@@ -79,18 +79,27 @@ export async function onRequestPost(context) {
     // Calculate fees
     let lineItems = [];
 
-    const hasReferrer = !!enquiry.referrer_id && !!enquiry.referrer_fee;
-    const referrerFee = hasReferrer ? Number(enquiry.referrer_fee || 0) : 0;
+    // The referrer's fee is the one recorded on this case (set from the
+    // referrer's rate for the matter type — e.g. £75 purchase, £40
+    // remortgage — and adjustable on the allocation screen), not the
+    // referrer's main rate. A referred case is billed as referred when the
+    // referrer has a main rate (as before) or the case itself carries a fee.
+    const hasReferrer = !!enquiry.referrer_id && (!!enquiry.referrer_fee || Number(enquiry.referral_fee_amount) > 0);
+    const referrerFee =
+      hasReferrer && Number(enquiry.referral_fee_payable) === 1 ? Number(enquiry.referral_fee_amount || 0) : 0;
     const referrerName = enquiry.referrer_name || "";
 
     if (hasReferrer) {
-      // Referrer fee (passed through at cost, no markup)
-      lineItems.push({
-        label: `Referral fee — ${referrerName}`,
-        net: referrerFee,
-        vat: Number((referrerFee * VAT_RATE).toFixed(2)),
-        gross: Number((referrerFee * (1 + VAT_RATE)).toFixed(2)),
-      });
+      // Referrer fee (passed through at cost, no markup). Omitted when the
+      // case carries no referrer fee (e.g. a matter type with no automatic fee).
+      if (referrerFee > 0) {
+        lineItems.push({
+          label: `Referral fee — ${referrerName}`,
+          net: referrerFee,
+          vat: Number((referrerFee * VAT_RATE).toFixed(2)),
+          gross: Number((referrerFee * (1 + VAT_RATE)).toFixed(2)),
+        });
+      }
       // ConveyQuote marketing fee
       const mktFee = 50;
       lineItems.push({
