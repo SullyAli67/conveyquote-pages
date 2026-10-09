@@ -850,6 +850,33 @@ export async function onRequestPost(context) {
     // permanently stamped "quote_sent" for emails the customer never
     // actually received. We now send first; the D1 write only happens
     // when Resend confirms acceptance.
+    //
+    // Referred enquiries copy in the referrer, looked up server-side from
+    // the enquiry so the address can't be supplied by the request body.
+    //
+    // References are CQ-<date>-<4 random digits> with no uniqueness check,
+    // so two enquiries can share one. Copy the referrer in only when exactly
+    // one enquiry matches; otherwise we can't be sure whose referrer it is,
+    // so the quote goes out with info@ only. LIMIT 2 is enough to tell.
+    const ccAddresses = ["info@conveyquote.uk"];
+    const { results: matches = [] } = await env.DB.prepare(
+      `SELECT r.contact_email, r.portal_email
+         FROM enquiries e
+         LEFT JOIN referrers r ON r.id = e.referrer_id
+        WHERE e.reference = ?
+        LIMIT 2`
+    ).bind(quoteReference).all();
+    if (matches.length > 1) {
+      console.warn(
+        `send-approved-quote: reference ${quoteReference} matches more than one enquiry; referrer not copied in`
+      );
+    }
+    const referrerRow = matches.length === 1 ? matches[0] : null;
+    const referrerEmail = safe(referrerRow?.contact_email || referrerRow?.portal_email).trim();
+    if (referrerEmail && referrerEmail.toLowerCase() !== safe(email).trim().toLowerCase()) {
+      ccAddresses.push(referrerEmail);
+    }
+
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -859,7 +886,7 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         from: "ConveyQuote <quotes@conveyquote.uk>",
         to: [email],
-        cc: ["info@conveyquote.uk"],
+        cc: ccAddresses,
         reply_to: "info@conveyquote.uk",
         subject: emailSubject,
         html: clientHtml,
