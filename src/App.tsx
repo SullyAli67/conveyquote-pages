@@ -610,6 +610,14 @@ type LoadedEnquiry = {
   parent_enquiry_id?: number | null;
 };
 
+// Ticked by admin in the Send preview before an approved quote can go out.
+const SEND_CHECKS = [
+  { id: "client", label: "Client name and email address look genuine." },
+  { id: "matter", label: "Transaction type, tenure and price match what was submitted." },
+  { id: "extras", label: "Anything that adds work (leasehold, shared ownership, new build, solar panels, unregistered title and so on) is priced in." },
+  { id: "total", label: "The total looks right for this matter." },
+];
+
 type AdminTab = "dashboard" | "enquiries" | "firms" | "lenders" | "quote" | "settings" | "referrers" | "invoices" | "pipeline" | "audit";
 
 const ADMIN_TABS = [
@@ -2569,6 +2577,9 @@ function App() {
 
   // Confirm-before-send preview for the customer email.
   const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  // Pre-send checklist ticks, keyed by SEND_CHECKS id. Reset every time
+  // the preview opens so each quote is checked afresh.
+  const [sendChecks, setSendChecks] = useState<Record<string, boolean>>({});
   const [isSendingApprovedQuote, setIsSendingApprovedQuote] = useState(false);
   const [dashboardEnquiries, setDashboardEnquiries] = useState<
     DashboardEnquiry[]
@@ -5748,6 +5759,7 @@ function App() {
   const handleApprovedQuoteSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Form submit is the trigger to open the preview, not to send.
+    setSendChecks({});
     setEmailPreviewOpen(true);
   };
 
@@ -14209,6 +14221,12 @@ function App() {
                           {approvedQuote.clientEmail || "—"}
                         </p>
                         <p className="form-note" style={{ marginTop: "4px" }}>
+                          <strong>Cc:</strong> info@conveyquote.uk
+                          {loadedEnquiry?.referrer_id
+                            ? ` and the referrer (${loadedEnquiry.referrer_name || "referrer"})`
+                            : ""}
+                        </p>
+                        <p className="form-note" style={{ marginTop: "4px" }}>
                           <strong>Subject:</strong> {previewSubject}
                         </p>
                         <div
@@ -14339,6 +14357,40 @@ function App() {
                         </div>
                         <div
                           style={{
+                            marginTop: "14px",
+                            background: "#ffffff",
+                            border: "1px solid #d9e2ec",
+                            borderRadius: "12px",
+                            padding: "14px 16px",
+                          }}
+                        >
+                          <strong style={{ color: "var(--navy)", fontSize: "14px" }}>
+                            Check before sending
+                          </strong>
+                          {loadedEnquiry?.referrer_note && (
+                            <p className="form-note" style={{ margin: "6px 0 0" }}>
+                              <strong>Referrer note:</strong> {loadedEnquiry.referrer_note}
+                            </p>
+                          )}
+                          {SEND_CHECKS.map((check) => (
+                            <label
+                              key={check.id}
+                              style={{ display: "flex", gap: "8px", alignItems: "flex-start", marginTop: "8px", fontSize: "13px", cursor: "pointer" }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={Boolean(sendChecks[check.id])}
+                                onChange={(e) =>
+                                  setSendChecks((prev) => ({ ...prev, [check.id]: e.target.checked }))
+                                }
+                                style={{ marginTop: "2px" }}
+                              />
+                              <span>{check.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div
+                          style={{
                             display: "flex",
                             gap: "10px",
                             marginTop: "14px",
@@ -14358,7 +14410,10 @@ function App() {
                             type="button"
                             className="primary-button"
                             onClick={() => void handleConfirmSendApprovedQuote()}
-                            disabled={isSendingApprovedQuote}
+                            disabled={
+                              isSendingApprovedQuote ||
+                              !SEND_CHECKS.every((check) => sendChecks[check.id])
+                            }
                           >
                             {isSendingApprovedQuote ? "Sending…" : "Send"}
                           </button>
@@ -15050,7 +15105,7 @@ function App() {
                                     <ReferrerSimpleForm
                                       referrerToken={referrerToken ?? ""}
                                       parentEnquiryId={Number(enq.id)}
-                                      submitLabel="Send new quote"
+                                      submitLabel="Submit re-quote for checking"
                                       onCancel={() => setRequoteOpen(null)}
                                       onSuccess={() => { setRequoteOpen(null); refreshPortal(); }}
                                       initialValues={{
@@ -16538,10 +16593,8 @@ function ReferrerSimpleForm({
     ...(initialValues || {}),
   });
   const [preview, setPreview] = useState<import("./buildQuoteData").BuiltQuoteData | null>(null);
-  const [sendToClient, setSendToClient] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [resultRef, setResultRef] = useState("");
-  const [clientEmailed, setClientEmailed] = useState(false);
   const [error, setError] = useState("");
 
   const set = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
@@ -16573,14 +16626,12 @@ function ReferrerSimpleForm({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${referrerToken}` },
         body: JSON.stringify({
           ...form,
-          send_to_client: sendToClient,
           referrerNote: form.referrerNote.trim(),
           parent_enquiry_id: parentEnquiryId ?? undefined,
         }),
       });
-      const result = await res.json() as { success: boolean; reference?: string; error?: string; client_emailed?: boolean };
+      const result = await res.json() as { success: boolean; reference?: string; error?: string };
       if (result.success && result.reference) {
-        setClientEmailed(Boolean(result.client_emailed));
         setResultRef(result.reference);
         setStep("done");
         setTimeout(onSuccess, 3500);
@@ -16601,12 +16652,9 @@ function ReferrerSimpleForm({
         <div style={{ fontSize: "52px", marginBottom: "16px" }}>✅</div>
         <h3 style={{ color: "var(--navy)", margin: "0 0 8px" }}>Referral submitted</h3>
         <p style={{ color: "var(--muted)", margin: "0 0 4px" }}>Reference: <strong>{resultRef}</strong></p>
-        {sendToClient && clientEmailed && (
-          <p style={{ color: "var(--muted)", fontSize: "14px" }}>Quote emailed to your client.</p>
-        )}
-        {sendToClient && !clientEmailed && (
-          <p style={{ color: "#b45309", fontSize: "14px" }}>Referral saved, but the client email was not sent.</p>
-        )}
+        <p style={{ color: "var(--muted)", fontSize: "14px" }}>
+          ConveyQuote will check the quote and email it to your client, copying you in.
+        </p>
         <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "12px" }}>Returning to your dashboard…</p>
       </div>
     );
@@ -16685,15 +16733,10 @@ function ReferrerSimpleForm({
         <SpecialistQuoteBlocks quote={preview} />
 
         <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
-            <input type="checkbox" checked={sendToClient} onChange={(e) => setSendToClient(e.target.checked)} style={{ marginTop: "2px" }} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: "14px" }}>Email quote to client</div>
-              <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "2px" }}>
-                Send this quote to <strong>{form.email}</strong>. Untick if you'd prefer to share it yourself.
-              </div>
-            </div>
-          </label>
+          <div style={{ fontWeight: 600, fontSize: "14px" }}>What happens next</div>
+          <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "2px" }}>
+            This is an indicative quote. ConveyQuote checks every referral before the quote goes to <strong>{form.email}</strong>, and you will be copied in when it is sent.
+          </div>
         </div>
 
         {error && <p style={{ color: "#dc2626", fontSize: "14px", marginBottom: "12px" }}>{error}</p>}
@@ -16707,7 +16750,7 @@ function ReferrerSimpleForm({
           )}
           <button type="button" className="primary-button" disabled={submitting} onClick={() => void handleSubmit()}
             style={{ flex: 1, minHeight: 48, fontSize: "15px" }}>
-            {submitting ? "Submitting…" : submitLabel ? submitLabel : sendToClient ? "Confirm & Send Quote to Client" : "Confirm & Save Referral"}
+            {submitting ? "Submitting…" : submitLabel ? submitLabel : "Submit Referral for Checking"}
           </button>
         </div>
       </div>

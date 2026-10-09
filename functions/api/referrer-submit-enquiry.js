@@ -5,9 +5,16 @@
 // Optional referrer note
 // ----------------------
 // Referrers can attach a free-text note (≤ 500 chars) when submitting.
-// Persisted to enquiries.referrer_note, included as a muted block above
-// the firm signature in the client quote email, and shown read-only on
-// the referrer's My Referrals expanded matter card.
+// Persisted to referrer_workflow.referrer_note, included in the admin
+// notification email, and shown read-only on the referrer's My Referrals
+// expanded matter card.
+//
+// No direct client email
+// ----------------------
+// Referrers cannot email a quote to the client from here. Every referral
+// lands in the admin Quote Review queue (status 'new') and the client only
+// receives a quote once admin approves it via send-approved-quote.js,
+// which copies the referrer in.
 //
 // Re-quote (Pattern B)
 // --------------------
@@ -186,7 +193,6 @@ export async function onRequestPost(context) {
       rightToBuy,
       saleMortgage, managementCompany, tenanted, numberOfSellers,
       additionalBorrowing, remortgageTransfer, transferMortgage, ownersChanging,
-      send_to_client,
       referrerNote,
       parent_enquiry_id,
     } = body;
@@ -403,6 +409,7 @@ export async function onRequestPost(context) {
                     <tr><td style="padding:7px 0;color:#6b7280;">Client</td><td style="padding:7px 0;">${escapeHtml(name || email)}</td></tr>
                     <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(transactionLabel)}</td></tr>
                     <tr><td style="padding:7px 0;color:#6b7280;">Property value</td><td style="padding:7px 0;">${formatMoney(price)}</td></tr>
+                    ${trimmedNote ? `<tr><td style="padding:7px 0;color:#6b7280;">Referrer note</td><td style="padding:7px 0;">${escapeHtml(trimmedNote)}</td></tr>` : ""}
                     ${Number(referrer.referral_fee) > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${Number(referrer.referral_fee).toFixed(2)}</td></tr>` : ""}
                   </table>
                   <div style="margin-top:16px;">
@@ -428,367 +435,13 @@ export async function onRequestPost(context) {
       }
     }
 
-    // Optionally email the calculated quote directly to the client
-    let clientEmailed = false;
-    if (send_to_client && email && env.RESEND_API_KEY) {
-      const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(reference)}`;
-      const fmt = (v) => `£${Number(v || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-      // ── Helpers ──────────────────────────────────────────────────────────
-      const prettifyTenure = (t) => t === "leasehold" ? "Leasehold" : t === "freehold" ? "Freehold" : (t || "Not provided");
-      const prettifyType = (t) => {
-        if (t === "purchase") return "Purchase";
-        if (t === "sale") return "Sale";
-        if (t === "sale_purchase") return "Sale &amp; Purchase";
-        if (t === "remortgage") return "Remortgage";
-        if (t === "transfer") return "Transfer of Equity";
-        return t || "Conveyancing";
-      };
-      const prettifyMortgage = (m) => m === "mortgage" ? "Yes" : m === "cash" ? "No (cash)" : (m || "Not provided");
-
-      // ── Fee rows ─────────────────────────────────────────────────────────
-      const legalFeeRows = (quote.legalFees || []).map((f) =>
-        `<tr>
-          <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#374151;">${escapeHtml(f.label || "Legal fee")}</td>
-          <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;text-align:right;">${fmt(f.amount)}</td>
-        </tr>`
-      ).join("");
-
-      const vatRow = quote.vat > 0
-        ? `<tr>
-            <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#374151;">VAT (20%)</td>
-            <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;text-align:right;">${fmt(quote.vat)}</td>
-          </tr>`
-        : "";
-
-      const legalTotalRow = `<tr>
-        <td style="padding:9px 0;border-bottom:2px solid #e5e7eb;font-size:14px;color:#0f2747;font-weight:700;">Total legal fees (inc. VAT)</td>
-        <td style="padding:9px 0;border-bottom:2px solid #e5e7eb;font-size:14px;color:#0f2747;font-weight:700;text-align:right;">${fmt(quote.legalTotalInclVat)}</td>
-      </tr>`;
-
-      const disbursementRows = (quote.disbursements || []).map((d) =>
-        `<tr>
-          <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#6b7280;">${escapeHtml(d.label || "Disbursement")}${d.note ? ` <span style="font-size:12px;">(${escapeHtml(d.note)})</span>` : ""}</td>
-          <td style="padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#374151;font-weight:600;text-align:right;">${fmt(d.amount)}</td>
-        </tr>`
-      ).join("");
-
-      const disbTotalRow = quote.disbursementTotal > 0
-        ? `<tr>
-            <td style="padding:9px 0;border-bottom:2px solid #e5e7eb;font-size:14px;color:#0f2747;font-weight:700;">Total disbursements</td>
-            <td style="padding:9px 0;border-bottom:2px solid #e5e7eb;font-size:14px;color:#0f2747;font-weight:700;text-align:right;">${fmt(quote.disbursementTotal)}</td>
-          </tr>`
-        : "";
-
-      const sdltRow = typeof quote.sdltAmount === "number"
-        ? `<tr>
-            <td style="padding:9px 0;font-size:14px;color:#374151;">Estimated Stamp Duty (SDLT) <span style="font-size:12px;color:#9ca3af;">— paid to HMRC</span></td>
-            <td style="padding:9px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${fmt(quote.sdltAmount)}</td>
-          </tr>`
-        : (quote.sdltNote
-          ? `<tr>
-              <td style="padding:9px 0;font-size:14px;color:#374151;">Stamp Duty (SDLT)</td>
-              <td style="padding:9px 0;font-size:14px;color:#6b7280;text-align:right;">${escapeHtml(quote.sdltNote)}</td>
-            </tr>`
-          : "");
-
-      const grandTotal = quote.totalIncludingSdlt ?? quote.grandTotal ?? 0;
-
-      const clientHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Your Conveyancing Quote</title>
-</head>
-<body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#222;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f4f7;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
-
-          <!-- Logo -->
-          <tr>
-            <td align="center" style="padding:0 0 16px 0;">
-              <img src="https://conveyquote.uk/logo.png" alt="ConveyQuote" width="100"
-                style="display:block;width:100px;height:auto;border:0;" />
-            </td>
-          </tr>
-
-          <!-- Card -->
-          <tr>
-            <td style="background:#ffffff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-
-                <!-- Header -->
-                <tr>
-                  <td style="background:#0f2747;padding:28px 32px;">
-                    <div style="font-size:12px;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);">ConveyQuote</div>
-                    <h1 style="color:#ffffff;margin:8px 0 6px;font-size:26px;line-height:1.2;">Your Conveyancing Estimate</h1>
-                    <p style="color:rgba(255,255,255,0.8);margin:0;font-size:14px;">Prepared by ${escapeHtml(referrer.referrer_name)} via ConveyQuote</p>
-                  </td>
-                </tr>
-
-                <!-- Greeting -->
-                <tr>
-                  <td style="padding:24px 32px 0 32px;">
-                    <p style="margin:0 0 10px;font-size:15px;color:#222;">Dear ${escapeHtml(name || "Client")},</p>
-                    <p style="margin:0;font-size:14px;line-height:1.7;color:#4b5563;">
-                      Thank you for your enquiry. Please find your conveyancing estimate below.
-                      This estimate is based on the information currently available and may be subject
-                      to change if further details come to light.
-                    </p>
-                  </td>
-                </tr>
-
-                <!-- Matter Summary -->
-                <tr>
-                  <td style="padding:20px 32px 0 32px;">
-                    <h2 style="margin:0 0 12px;font-size:16px;color:#0f2747;border-bottom:2px solid #0f2747;padding-bottom:6px;">Matter Summary</h2>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-                      ${property_address ? `<tr>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#6b7280;width:40%;">Property address</td>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;">${escapeHtml(property_address)}</td>
-                      </tr>` : ""}
-                      <tr>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#6b7280;">Transaction type</td>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;">${prettifyType(type)}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#6b7280;">Tenure</td>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;">${prettifyTenure(tenure)}</td>
-                      </tr>
-                      ${price ? `<tr>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#6b7280;">Property price / value</td>
-                        <td style="padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:14px;color:#111827;font-weight:600;">${fmt(price)}</td>
-                      </tr>` : ""}
-                      ${(type === "purchase" || type === "sale_purchase") ? `<tr>
-                        <td style="padding:8px 0;font-size:14px;color:#6b7280;">Mortgage</td>
-                        <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${prettifyMortgage(mortgage)}</td>
-                      </tr>` : ""}
-                    </table>
-                  </td>
-                </tr>
-
-                <!-- Total highlight -->
-                <tr>
-                  <td style="padding:20px 32px 0 32px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                      style="background:#f8fafc;border:1px solid #d9e2ec;border-radius:8px;">
-                      <tr>
-                        <td style="padding:18px 20px;text-align:center;">
-                          <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.4px;color:#486581;margin-bottom:6px;">Total Estimated Cost</div>
-                          <div style="font-size:32px;font-weight:700;color:#0f2747;">${fmt(grandTotal)}</div>
-                          <div style="font-size:13px;color:#52606d;margin-top:6px;">
-                            ${typeof quote.sdltAmount === "number" ? "Including VAT, disbursements and estimated SDLT" : "Including VAT and disbursements"}
-                          </div>
-                          <div style="font-size:13px;color:#52606d;margin-top:4px;">Reference: <strong>${escapeHtml(reference)}</strong></div>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-
-                <!-- Legal Fees -->
-                <tr>
-                  <td style="padding:20px 32px 0 32px;">
-                    <h2 style="margin:0 0 12px;font-size:16px;color:#0f2747;border-bottom:2px solid #0f2747;padding-bottom:6px;">Legal Fees</h2>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      ${legalFeeRows}
-                      ${vatRow}
-                      ${legalTotalRow}
-                    </table>
-                  </td>
-                </tr>
-
-                <!-- Disbursements -->
-                ${disbursementRows ? `<tr>
-                  <td style="padding:20px 32px 0 32px;">
-                    <h2 style="margin:0 0 6px;font-size:16px;color:#0f2747;border-bottom:2px solid #0f2747;padding-bottom:6px;">Disbursements</h2>
-                    <p style="margin:0 0 10px;font-size:12px;color:#9ca3af;">Third-party costs paid during the transaction.</p>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      ${disbursementRows}
-                      ${disbTotalRow}
-                    </table>
-                  </td>
-                </tr>` : ""}
-
-                <!-- SDLT -->
-                ${sdltRow ? `<tr>
-                  <td style="padding:16px 32px 0 32px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      ${sdltRow}
-                    </table>
-                  </td>
-                </tr>` : ""}
-
-                <!-- Grand total summary box -->
-                <tr>
-                  <td style="padding:20px 32px 0 32px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                      style="background:#0f2747;border-radius:8px;">
-                      <tr>
-                        <td style="padding:14px 20px;font-size:15px;color:#ffffff;font-weight:700;">Total Estimated Cost</td>
-                        <td style="padding:14px 20px;font-size:18px;color:#ffffff;font-weight:700;text-align:right;">${fmt(grandTotal)}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-
-                <!-- Optional note from the referrer -->
-                ${trimmedNote ? `<tr>
-                  <td style="padding:16px 32px 0 32px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                      style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;">
-                      <tr>
-                        <td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#334155;">
-                          <strong>Note from ${escapeHtml(referrer.referrer_name)}:</strong> ${escapeHtml(trimmedNote)}
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>` : ""}
-
-                <!-- Important note -->
-                <tr>
-                  <td style="padding:16px 32px 0 32px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                      style="background:#fff8e6;border:1px solid #e2c275;border-radius:8px;">
-                      <tr>
-                        <td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#7a4b00;">
-                          <strong>Important:</strong> This is an indicative estimate based on the information currently provided.
-                          Final costs will be confirmed by the instructed solicitor. If the matter proves more complex than anticipated,
-                          any change in costs will be discussed with you before that additional work is carried out.
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-
-                <!-- Accept button -->
-                <tr>
-                  <td align="center" style="padding:28px 32px 12px 32px;">
-                    <a href="${acceptUrl}"
-                      style="display:inline-block;background:#0f2747;color:#ffffff;text-decoration:none;
-                             padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;">
-                      Accept This Quote
-                    </a>
-                  </td>
-                </tr>
-
-                <!-- Contact -->
-                <tr>
-                  <td style="padding:0 32px 28px 32px;text-align:center;font-size:13px;color:#6b7280;">
-                    Questions? Contact us at
-                    <a href="mailto:info@conveyquote.uk" style="color:#0f2747;font-weight:600;">info@conveyquote.uk</a>
-                  </td>
-                </tr>
-
-                <!-- Footer -->
-                <tr>
-                  <td style="padding:16px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;
-                             font-size:11px;color:#9ca3af;text-align:center;line-height:1.7;">
-                    This estimate does not create a solicitor-client relationship until you are formally onboarded
-                    and we confirm instructions. ConveyQuote is a trading name of Essentially Law Limited.
-                  </td>
-                </tr>
-
-              </table>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-      // Risk 1 — client quote email already checked response.ok but
-      // failure was logged only. We now also record the outcome on the
-      // enquiry's email-tracking columns: sent_at + message_id on
-      // success, last_error on failure. The enquiry row still exists
-      // either way — the referrer's submission was the user-facing
-      // action and must not roll back on a Resend hiccup.
-      let clientEmailError = null;
-      let clientEmailMessageId = null;
-      try {
-        const resendResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${env.RESEND_API_KEY}`,
-          },
-          body: JSON.stringify({
-            from: "ConveyQuote <quotes@conveyquote.uk>",
-            to: [email],
-            reply_to: "info@conveyquote.uk",
-            subject: `Your Conveyancing Quote — ${reference}`,
-            html: clientHtml,
-          }),
-        });
-
-        if (!resendResponse.ok) {
-          const resendErrorText = await resendResponse.text().catch(() => "");
-          clientEmailError = `HTTP ${resendResponse.status} ${resendErrorText}`.slice(0, 240);
-          console.error(
-            `referrer-submit-enquiry: client quote email failed for ref=${reference}: ${clientEmailError}`
-          );
-        } else {
-          const okJson = await resendResponse.json().catch(() => ({}));
-          clientEmailMessageId = okJson?.id || null;
-          clientEmailed = true;
-        }
-      } catch (sendErr) {
-        clientEmailError = String(sendErr instanceof Error ? sendErr.message : sendErr).slice(0, 240);
-        console.error(
-          `referrer-submit-enquiry: client quote email threw for ref=${reference}:`,
-          sendErr
-        );
-      }
-
-      try {
-        await env.DB.prepare(
-          `UPDATE enquiries
-              SET notification_email_sent_at    = COALESCE(?, notification_email_sent_at),
-                  notification_email_message_id = COALESCE(?, notification_email_message_id),
-                  notification_email_last_error = ?
-            WHERE reference = ?`
-        )
-          .bind(
-            clientEmailed ? new Date().toISOString() : null,
-            clientEmailMessageId,
-            clientEmailError,
-            reference
-          )
-          .run();
-      } catch (writeErr) {
-        console.error(
-          `referrer-submit-enquiry: failed to record client email outcome on enquiry ref=${reference}:`,
-          writeErr
-        );
-      }
-
-      // Surface client-email failure to the caller so the referrer's
-      // UI can show "enquiry saved — quote email failed, please retry"
-      // instead of "quote sent" when it wasn't.
-      if (clientEmailError) {
-        return jsonResponse({
-          success: true,
-          reference,
-          quote,
-          client_emailed: false,
-          client_email_error: clientEmailError,
-          admin_email_error: adminEmailError,
-        });
-      }
-    }
-
+    // The quote is NOT emailed to the client from here. It waits in the
+    // admin Quote Review queue (status 'new') and only goes out when
+    // admin presses Send Approved Quote — see send-approved-quote.js.
     return jsonResponse({
       success: true,
       reference,
       quote,
-      client_emailed: clientEmailed,
       admin_email_error: adminEmailError,
     });
   } catch (error) {
