@@ -853,14 +853,25 @@ export async function onRequestPost(context) {
     //
     // Referred enquiries copy in the referrer, looked up server-side from
     // the enquiry so the address can't be supplied by the request body.
+    //
+    // References are CQ-<date>-<4 random digits> with no uniqueness check,
+    // so two enquiries can share one. Copy the referrer in only when exactly
+    // one enquiry matches; otherwise we can't be sure whose referrer it is,
+    // so the quote goes out with info@ only. LIMIT 2 is enough to tell.
     const ccAddresses = ["info@conveyquote.uk"];
-    const referrerRow = await env.DB.prepare(
+    const { results: matches = [] } = await env.DB.prepare(
       `SELECT r.contact_email, r.portal_email
          FROM enquiries e
-         JOIN referrers r ON r.id = e.referrer_id
+         LEFT JOIN referrers r ON r.id = e.referrer_id
         WHERE e.reference = ?
-        LIMIT 1`
-    ).bind(quoteReference).first();
+        LIMIT 2`
+    ).bind(quoteReference).all();
+    if (matches.length > 1) {
+      console.warn(
+        `send-approved-quote: reference ${quoteReference} matches more than one enquiry; referrer not copied in`
+      );
+    }
+    const referrerRow = matches.length === 1 ? matches[0] : null;
     const referrerEmail = safe(referrerRow?.contact_email || referrerRow?.portal_email).trim();
     if (referrerEmail && referrerEmail.toLowerCase() !== safe(email).trim().toLowerCase()) {
       ccAddresses.push(referrerEmail);
