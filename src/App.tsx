@@ -644,6 +644,19 @@ type LenderEditorState = {
   notes: string;
 };
 
+// Ready-made questions on the referrer portal's Request update box. Tapping
+// one adds it to the message (tapping again takes it out).
+const REQUEST_UPDATE_QUESTIONS = [
+  "Can you give me a general update on progress?",
+  "Has the client's ID check been completed?",
+  "Have the searches come back yet?",
+  "Has the mortgage offer been received?",
+  "Have enquiries been raised, and are any still outstanding?",
+  "Is anything needed from my client?",
+  "Is there a target exchange date?",
+  "Is there a target completion date?",
+];
+
 // Referrer portal tabs. "client_email" is shown on demo accounts only.
 type ReferrerPortalTab = "dashboard" | "my_referrals" | "new_referral" | "payments" | "client_email";
 
@@ -16401,15 +16414,36 @@ function App() {
                               {requestUpdateOpen === ref && (
                                 <form style={{ marginTop: "12px", background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px 14px" }}
                                   onSubmit={(e) => { e.preventDefault(); handleRequestUpdate(ref); }}>
-                                  <label htmlFor={`req-${ref}`} style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>
-                                    What would you like to know?
+                                  <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>
+                                    Tap a question to add it, or write your own
+                                  </div>
+                                  <div role="group" aria-label="Common questions" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+                                    {REQUEST_UPDATE_QUESTIONS.map((q) => {
+                                      const lines = requestUpdateText.split("\n").map((l) => l.trim());
+                                      const chosen = lines.includes(q);
+                                      return (
+                                        <button key={q} type="button" aria-pressed={chosen}
+                                          onClick={() => setRequestUpdateText((t) => {
+                                            const current = t.split("\n").map((l) => l.trim()).filter(Boolean);
+                                            const next = current.includes(q) ? current.filter((l) => l !== q) : [...current, q];
+                                            return next.join("\n").slice(0, 1000);
+                                          })}
+                                          style={{ minHeight: 38, padding: "6px 12px", fontSize: "14px", borderRadius: "999px", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                                            border: chosen ? "2px solid var(--navy)" : "1.5px solid #cbd5e1", background: chosen ? "var(--navy)" : "#fff", color: chosen ? "#fff" : "var(--navy)" }}>
+                                          {chosen ? "✓ " : "+ "}{q}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <label htmlFor={`req-${ref}`} style={{ display: "block", fontSize: "15px", fontWeight: 600, color: "var(--navy)", marginBottom: "6px" }}>
+                                    Your message to {String(enq.assigned_firm_name || "the solicitor")}
                                   </label>
-                                  <textarea id={`req-${ref}`} value={requestUpdateText} rows={3} maxLength={1000} required
+                                  <textarea id={`req-${ref}`} value={requestUpdateText} rows={4} maxLength={1000} required autoFocus
                                     onChange={(e) => setRequestUpdateText(e.target.value)}
                                     placeholder="e.g. Has the mortgage offer arrived? The buyer is asking about a completion date."
                                     style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "16px", fontFamily: "inherit" }} />
                                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-                                    <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                                    <span style={{ fontSize: "13px", color: "#4b5563" }}>
                                       Sent to {String(enq.assigned_firm_name || "the solicitor")}, with ConveyQuote copied in. Replies come to you by email.
                                     </span>
                                     <div style={{ display: "flex", gap: "8px" }}>
