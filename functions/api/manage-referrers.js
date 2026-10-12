@@ -30,6 +30,9 @@ export async function onRequestGet(context) {
               (SELECT MAX(s.expires_at) FROM sessions s
                 WHERE s.user_type = 'referrer_setup' AND s.user_id = r.id
                   AND datetime(s.expires_at) > datetime('now')) AS invite_expires_at,
+              (SELECT MAX(s.expires_at) FROM sessions s
+                WHERE s.user_type = 'referrer_demo_link' AND s.user_id = r.id
+                  AND datetime(s.expires_at) > datetime('now')) AS demo_link_expires_at,
               (SELECT MAX(a.created_at) FROM audit_log a
                 WHERE a.action = 'referrer_login' AND a.actor = 'referrer:' || r.id) AS last_login_at,
               CASE WHEN EXISTS (SELECT 1 FROM referrer_demo_accounts d WHERE d.referrer_id = r.id) THEN 1 ELSE 0 END AS is_demo,

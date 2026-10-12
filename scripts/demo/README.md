@@ -64,7 +64,21 @@ nothing can be submitted or sent. No password is needed.
 **4. Cases** lists their cases with stage and fee (owed / paid), plus
 **Open in Pipeline**, which filters the Pipeline tab to that referrer.
 
-## Demo accounts
+## Demo accounts — the quick way
+
+1. **+ New demo account** → type the name shown in the portal and the
+   prospect's email → **Create demo account**.
+2. On its **2. Portal access** tab press **Email demo access**. The
+   prospect gets a button that opens the demo straight away — **no
+   password** — with a five-step guided tour: dashboard, instant quote,
+   the quote email their client receives (they can add their logo to see
+   a co-branded version; it isn't saved), tracking cases, and getting
+   paid. The link works for 14 days and can be reused.
+3. **Copy a link instead** gives you the link to paste into your own
+   email, text or WhatsApp. Making a new link cancels the old one;
+   **Turn off access** cancels it too.
+
+## Demo accounts — details
 
 **+ New demo account** creates a ready-made login (£150 / £100 fees) with
 the five sample cases already loaded. Type the name shown in the portal
