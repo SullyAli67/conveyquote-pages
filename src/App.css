@@ -407,6 +407,18 @@ textarea {
   line-height: 1.55;
 }
 
+/* The open list of a dropdown is drawn by the browser. Chrome on Windows
+   takes its text size from the options, not the box, and without this it
+   can draw them tiny. */
+select option,
+select optgroup {
+  font-size: 16px;
+  line-height: 1.5;
+  font-family: Arial, sans-serif;
+  color: var(--text);
+  background: #fff;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: #98a2b3;
