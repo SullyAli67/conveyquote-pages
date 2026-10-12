@@ -28,7 +28,7 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
-import { referrerFeeFor } from "../lib/referrer-fee.js";
+import { referrerFeeFor, firmDefaultFeeFor } from "../lib/referrer-fee.js";
 import { isSampleReference } from "../lib/sample-cases.js";
 
 const ADMIN_EMAIL = "info@conveyquote.uk";
@@ -44,7 +44,7 @@ async function loadCase(db, reference) {
             e.assigned_firm_id, e.assigned_firm_name,
             e.referral_fee_payable, e.referral_fee_amount,
             c.amount AS referrer_case_fee,
-            f.default_referral_fee AS firm_default_fee,
+            f.default_referral_fee, f.remortgage_referral_fee AS firm_remortgage_fee,
             r.referrer_name, r.referral_fee, r.remortgage_referral_fee, r.contact_email, r.portal_email,
             p.amount AS paid_amount, p.paid_at, p.payment_note
        FROM enquiries e
@@ -74,7 +74,10 @@ function describe(row) {
     case_status: row.case_status || "",
     allocated: Boolean(row.assigned_firm_id),
     firm_name: row.assigned_firm_name || "",
-    firm_default_fee: Number(row.firm_default_fee) || 0,
+    firm_default_fee: firmDefaultFeeFor(
+      { default_referral_fee: row.default_referral_fee, remortgage_referral_fee: row.firm_remortgage_fee },
+      row.transaction_type
+    ),
     firm_fee: firmFee,
     referrer_fee: referrerFee,
     marketing_fee: marketingFee,

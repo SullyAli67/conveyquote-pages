@@ -32,6 +32,7 @@ export async function onRequestPost(context) {
       handles_company_buyers,
       notes,
       default_referral_fee,
+      remortgage_referral_fee,
       suspended,
     } = body;
 
@@ -69,6 +70,7 @@ export async function onRequestPost(context) {
           handles_company_buyers = ?,
           notes = ?,
           default_referral_fee = ?,
+          remortgage_referral_fee = ?,
           suspended = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -93,6 +95,7 @@ export async function onRequestPost(context) {
           toFlag(handles_company_buyers),
           notes || "",
           Number(default_referral_fee || 0),
+          Number(remortgage_referral_fee || 0),
           toFlag(suspended),
           id
         )
@@ -120,9 +123,10 @@ export async function onRequestPost(context) {
         handles_company_buyers,
         notes,
         default_referral_fee,
+        remortgage_referral_fee,
         suspended
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
       .bind(
@@ -142,6 +146,7 @@ export async function onRequestPost(context) {
         toFlag(handles_company_buyers),
         notes || "",
         Number(default_referral_fee || 0),
+        Number(remortgage_referral_fee || 0),
         toFlag(suspended)
       )
       .run();

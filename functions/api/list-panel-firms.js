@@ -14,6 +14,9 @@ export async function onRequestGet(context) {
     if (!session) return unauthorised();
 
 
+    // The fees and the suspended flag must be listed: the Firms edit form
+    // saves back whatever it loaded, and the allocation screen pre-fills
+    // the firm fee from these defaults.
     const result = await env.DB.prepare(`
       SELECT
         pf.id,
@@ -32,6 +35,9 @@ export async function onRequestGet(context) {
         pf.handles_new_build,
         pf.handles_company_buyers,
         pf.notes,
+        pf.default_referral_fee,
+        pf.remortgage_referral_fee,
+        pf.suspended,
         pf.portal_email,
         pf.portal_active,
         pf.created_at,
@@ -57,6 +63,9 @@ export async function onRequestGet(context) {
         pf.handles_new_build,
         pf.handles_company_buyers,
         pf.notes,
+        pf.default_referral_fee,
+        pf.remortgage_referral_fee,
+        pf.suspended,
         pf.portal_email,
         pf.portal_active,
         pf.created_at,

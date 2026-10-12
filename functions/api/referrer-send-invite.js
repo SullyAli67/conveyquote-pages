@@ -3,8 +3,9 @@
 // Admin "Send invite / reset link" button on the Edit Referrer form.
 // Emails the referrer a fresh set-password link (4 days if they have no
 // password yet, 7 days otherwise), cancelling any earlier unused one.
-// Requires portal access to be ticked and saved, so the link the
-// referrer receives actually lets them log in.
+// Sending it also switches portal access on, so the link the referrer
+// receives actually lets them log in — one click instead of tick, save,
+// then send.
 
 import {
   getTokenFromRequest,
@@ -32,15 +33,24 @@ export async function onRequestPost(context) {
     if (!referrer.portal_email) {
       return jsonResponse({ success: false, error: "Add a portal login email and save first." }, 400);
     }
+    let accessSwitchedOn = false;
     if (!referrer.portal_active) {
-      return jsonResponse({ success: false, error: "Tick \"Portal access active\" and save first." }, 400);
+      await env.DB.prepare(
+        `UPDATE referrers SET portal_active = 1, updated_at = datetime('now') WHERE id = ?`
+      ).bind(referrer.id).run();
+      accessSwitchedOn = true;
     }
 
     const result = await issueSetupLink(env, referrer, referrer.portal_password_hash ? "reset" : "welcome");
     if (!result.sent) {
       return jsonResponse({ success: false, error: `Email could not be sent: ${result.error}` }, 502);
     }
-    return jsonResponse({ success: true, sent_to: referrer.portal_email, days: result.days });
+    return jsonResponse({
+      success: true,
+      sent_to: referrer.portal_email,
+      days: result.days,
+      access_switched_on: accessSwitchedOn,
+    });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
   }

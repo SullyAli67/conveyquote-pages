@@ -17,3 +17,15 @@ export function referrerFeeFor(referrer, transactionType) {
   if (REMORTGAGE_FEE_TYPES.has(type)) return Number(referrer?.remortgage_referral_fee) || 0;
   return 0;
 }
+
+// The default FIRM fee (what the panel firm pays ConveyQuote) for a case,
+// from the firm's record: panel_firms.remortgage_referral_fee for the
+// remortgage / transfer types when it is set (migration 0022), otherwise
+// panel_firms.default_referral_fee. It only pre-fills the allocation and
+// Fees boxes; the figure saved on the case is whatever admin confirms.
+export function firmDefaultFeeFor(firm, transactionType) {
+  const type = String(transactionType || "");
+  const remortgageDefault = Number(firm?.remortgage_referral_fee) || 0;
+  if (REMORTGAGE_FEE_TYPES.has(type) && remortgageDefault > 0) return remortgageDefault;
+  return Number(firm?.default_referral_fee) || 0;
+}

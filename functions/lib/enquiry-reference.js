@@ -22,6 +22,9 @@ const randomDigits = (count) => {
   return String(min + Math.floor(Math.random() * 9 * min));
 };
 
+// Demo-account referrals get "SAMPLE-" in front (SAMPLE-CQ-20261009-4821)
+// so every guard that checks isSampleReference() treats them as samples.
+
 async function referenceIsTaken(db, reference) {
   const row = await db
     .prepare(`SELECT 1 AS taken FROM enquiries WHERE reference = ? LIMIT 1`)
@@ -30,14 +33,14 @@ async function referenceIsTaken(db, reference) {
   return Boolean(row);
 }
 
-export async function generateUniqueReference(db, now = new Date()) {
+export async function generateUniqueReference(db, now = new Date(), prefix = "") {
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
   const plan = [
     ...Array(FOUR_DIGIT_TRIES).fill(4),
     ...Array(SIX_DIGIT_TRIES).fill(6),
   ];
   for (const digits of plan) {
-    const reference = `CQ-${date}-${randomDigits(digits)}`;
+    const reference = `${prefix}CQ-${date}-${randomDigits(digits)}`;
     if (!(await referenceIsTaken(db, reference))) return reference;
   }
   throw new Error("Could not allocate a unique enquiry reference.");
@@ -50,9 +53,9 @@ const isUniqueReferenceError = (err) =>
 
 // insertRow(db, row) does the actual INSERT; each endpoint keeps its own
 // column-filtering insert helper. Returns the reference that was saved.
-export async function insertEnquiryWithUniqueReference(db, row, insertRow) {
+export async function insertEnquiryWithUniqueReference(db, row, insertRow, { prefix = "" } = {}) {
   for (let attempt = 1; ; attempt++) {
-    const reference = await generateUniqueReference(db);
+    const reference = await generateUniqueReference(db, new Date(), prefix);
     try {
       await insertRow(db, { ...row, reference });
       return reference;

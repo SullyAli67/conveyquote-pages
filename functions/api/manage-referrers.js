@@ -10,7 +10,11 @@ import { issueSetupLink } from "../lib/referrer-setup-link.js";
 
 const toFlag = (v) => (v ? 1 : 0);
 
-// GET — list all referrers
+// GET — list all referrers, with what the admin list needs to show their
+// status: whether a password is set (yes/no only — never the hash), the
+// expiry of any unused set-password link, the last login (logged to
+// audit_log by referrer-login.js), demo flag, case counts, and which
+// matter types have custom pricing.
 export async function onRequestGet(context) {
   try {
     const { request, env } = context;
@@ -19,9 +23,22 @@ export async function onRequestGet(context) {
     if (!session) return unauthorised();
 
     const result = await env.DB.prepare(
-      `SELECT id, referrer_name, contact_email, contact_phone,
-              referral_fee, remortgage_referral_fee, marketing_fee, fee_markup, portal_email, portal_active, notes, created_at
-       FROM referrers ORDER BY referrer_name COLLATE NOCASE ASC`
+      `SELECT r.id, r.referrer_name, r.contact_email, r.contact_phone,
+              r.referral_fee, r.remortgage_referral_fee, r.marketing_fee, r.fee_markup,
+              r.portal_email, r.portal_active, r.notes, r.created_at,
+              CASE WHEN r.portal_password_hash IS NOT NULL AND r.portal_password_hash <> '' THEN 1 ELSE 0 END AS has_password,
+              (SELECT MAX(s.expires_at) FROM sessions s
+                WHERE s.user_type = 'referrer_setup' AND s.user_id = r.id
+                  AND datetime(s.expires_at) > datetime('now')) AS invite_expires_at,
+              (SELECT MAX(a.created_at) FROM audit_log a
+                WHERE a.action = 'referrer_login' AND a.actor = 'referrer:' || r.id) AS last_login_at,
+              CASE WHEN EXISTS (SELECT 1 FROM referrer_demo_accounts d WHERE d.referrer_id = r.id) THEN 1 ELSE 0 END AS is_demo,
+              (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) <> 'SAMPLE-') AS case_count,
+              (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) <> 'SAMPLE-' AND e.case_status = 'completed') AS completed_count,
+              (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) = 'SAMPLE-') AS sample_count,
+              (SELECT GROUP_CONCAT(DISTINCT f.transaction_type) FROM referrer_fee_configs f WHERE f.referrer_id = r.id) AS custom_pricing_types
+         FROM referrers r
+        ORDER BY r.referrer_name COLLATE NOCASE ASC`
     ).all();
 
     return jsonResponse({ success: true, referrers: result.results || [] });
@@ -48,6 +65,21 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Referrer name is required." }, 400);
     }
 
+    // Login finds the referrer by portal email, so two accounts must
+    // never share one.
+    const loginEmail = portal_email ? String(portal_email).toLowerCase().trim() : "";
+    if (loginEmail) {
+      const clash = await env.DB.prepare(
+        `SELECT id, referrer_name FROM referrers WHERE portal_email = ? AND id <> ? LIMIT 1`
+      ).bind(loginEmail, Number(id) || 0).first();
+      if (clash) {
+        return jsonResponse(
+          { success: false, error: `${clash.referrer_name} already uses ${loginEmail} as its login email.` },
+          409
+        );
+      }
+    }
+
     let passwordHash = undefined;
     if (password) {
       if (password.length < 8) {
@@ -60,7 +92,7 @@ export async function onRequestPost(context) {
       // Update
       const updateParts = [
         "referrer_name = ?", "contact_email = ?", "contact_phone = ?",
-        "referral_fee = ?", "remortgage_referral_fee = ?", "marketing_fee = ?", "fee_markup = ?", "portal_email = ?", "portal_active = ?",
+        "referral_fee = ?", "remortgage_referral_fee = ?", "marketing_fee = ?", "fee_markup = ?", "portal_email = ?",
         "notes = ?", "updated_at = datetime('now')",
       ];
       const binds = [
@@ -71,9 +103,16 @@ export async function onRequestPost(context) {
         Number(marketing_fee) || 50,
         Number(fee_markup) || 0,
         portal_email ? String(portal_email).toLowerCase().trim() : null,
-        toFlag(portal_active),
         notes || "",
       ];
+
+      // Portal access is switched on and off from the Portal access tab
+      // (admin-referrer-access.js / Send invite); a details save that
+      // doesn't send the flag leaves it as it is.
+      if (portal_active !== undefined) {
+        updateParts.push("portal_active = ?");
+        binds.push(toFlag(portal_active));
+      }
 
       if (passwordHash) {
         updateParts.push("portal_password_hash = ?");

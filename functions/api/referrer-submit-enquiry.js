@@ -41,7 +41,7 @@ import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { calculateReferrerQuote } from "../lib/calculate-referrer-quote-core.js";
 import { insertEnquiryWithUniqueReference } from "../lib/enquiry-reference.js";
 import { referrerFeeFor } from "../lib/referrer-fee.js";
-import { isSampleReference } from "../lib/sample-cases.js";
+import { isSampleReference, isDemoReferrer, SAMPLE_REFERENCE_PREFIX } from "../lib/sample-cases.js";
 import {
   getTokenFromRequest,
   validateSession,
@@ -178,6 +178,10 @@ export async function onRequestPost(context) {
 
     const referrerId = session.user_id;
     const body = await request.json();
+    // Demo accounts (migration 0022): the referral is saved as a SAMPLE-
+    // case, shown to them as quoted straight away, and nothing is emailed
+    // or added to the admin Quote Review queue.
+    const isDemo = await isDemoReferrer(env.DB, referrerId);
 
     const {
       name, email, phone,
@@ -355,13 +359,19 @@ export async function onRequestPost(context) {
       transfer_mortgage: transferMortgage || null,
       owners_changing: ownersChanging || null,
       quote_json: JSON.stringify({ ...body, ...quote }),
-      status: "new",
+      status: isDemo ? "quote_sent" : "new",
+      ...(isDemo
+        ? {
+            approved_quote_json: JSON.stringify({ ...body, ...quote }),
+            approved_quote_amount: Number(quote?.grandTotal) || null,
+          }
+        : {}),
       referrer_id: referrerId,
       // enquiries.referral_fee_* is the FIRM fee, set when admin allocates
       // the case. The referrer's fee goes in referrer_case_fees below.
       referral_fee_payable: 0,
       referral_fee_amount: 0,
-    }, insertEnquiryRow);
+    }, insertEnquiryRow, { prefix: isDemo ? SAMPLE_REFERENCE_PREFIX : "" });
 
     const inserted = await env.DB.prepare(
       `SELECT id FROM enquiries WHERE reference = ? LIMIT 1`
@@ -400,7 +410,7 @@ export async function onRequestPost(context) {
     // failure is recorded as adminEmailError on the response and in
     // the tail log; it does not roll back the enquiry insert.
     let adminEmailError = null;
-    if (env.RESEND_API_KEY) {
+    if (env.RESEND_API_KEY && !isDemo) {
       try {
         const adminResp = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -454,6 +464,7 @@ export async function onRequestPost(context) {
       success: true,
       reference,
       quote,
+      demo: isDemo,
       admin_email_error: adminEmailError,
     });
   } catch (error) {

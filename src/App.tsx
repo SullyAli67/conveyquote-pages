@@ -328,6 +328,7 @@ type PanelFirm = {
   active?: number;
   suspended?: number;
   default_referral_fee?: number;
+  remortgage_referral_fee?: number;
 
   portal_active?: number;
   portal_email?: string | null;
@@ -643,6 +644,60 @@ type LenderEditorState = {
   notes: string;
 };
 
+// Matter types a referrer can have custom client pricing for (Referrers >
+// Client pricing), in the order the admin sees them.
+const REFERRER_MATTER_TYPES: [string, string][] = [
+  ["purchase", "Purchase"],
+  ["sale", "Sale"],
+  ["sale_purchase", "Sale and purchase"],
+  ["remortgage", "Remortgage"],
+  ["transfer", "Transfer of equity"],
+  ["remortgage_transfer", "Remortgage and transfer of equity"],
+  ["lease_extension_statutory", "Lease extension (statutory)"],
+  ["lease_extension_informal", "Lease extension (informal)"],
+  ["collective_enfranchisement", "Collective enfranchisement"],
+  ["staircasing", "Staircasing"],
+];
+
+// One case on Referrers > Cases (same rows as the referrer's own portal).
+type ReferrerCaseRow = {
+  reference: string;
+  client_name?: string | null;
+  transaction_type?: string | null;
+  status?: string | null;
+  case_status?: string | null;
+  assigned_firm_name?: string | null;
+  referrer_fee?: number | null;
+  fee_paid_at?: string | null;
+  fee_paid_amount?: number | null;
+};
+
+// "12 Oct" (or "12 Oct, 14:05") from an ISO timestamp or a D1
+// "YYYY-MM-DD HH:MM:SS" (UTC) value.
+const formatShortDate = (value: string, withTime = false) => {
+  const raw = String(value || "");
+  const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw) ? `${raw.replace(" ", "T")}Z` : raw;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleString("en-GB", {
+    day: "numeric", month: "short", timeZone: "Europe/London",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+  });
+};
+
+// Mirrors firmDefaultFeeFor in functions/lib/referrer-fee.js: a firm's
+// remortgage / transfer default (when set) for those matters, otherwise its
+// main default. Only pre-fills the Firm fee box at allocation.
+const FIRM_REMORTGAGE_FEE_TYPES = new Set(["remortgage", "transfer", "remortgage_transfer"]);
+const firmDefaultFeeFor = (
+  firm: { default_referral_fee?: number; remortgage_referral_fee?: number } | undefined,
+  transactionType: string | undefined
+) => {
+  const remortgageDefault = Number(firm?.remortgage_referral_fee) || 0;
+  if (FIRM_REMORTGAGE_FEE_TYPES.has(String(transactionType || "")) && remortgageDefault > 0) return remortgageDefault;
+  return Number(firm?.default_referral_fee) || 0;
+};
+
 // GET /api/admin-case-fees — the two fees on one case. The firm fee is what
 // the panel firm pays ConveyQuote (billed on its invoice); the referrer fee
 // is what ConveyQuote pays the referrer (shown only in their portal).
@@ -687,6 +742,7 @@ type FirmEditorState = {
   handles_company_buyers: boolean;
   notes: string;
   default_referral_fee: string;
+  remortgage_referral_fee: string;
 };
 
 type MembershipEditorState = {
@@ -1171,6 +1227,7 @@ const initialFirmEditorState: FirmEditorState = {
   handles_company_buyers: false,
   notes: "",
   default_referral_fee: "",
+  remortgage_referral_fee: "",
 };
 
 const initialMembershipEditorState: MembershipEditorState = {
@@ -2046,7 +2103,15 @@ function App() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Referrer management state
-  type ReferrerRow = { id: number; referrer_name: string; contact_email: string; contact_phone: string; referral_fee: number; remortgage_referral_fee: number; marketing_fee: number; fee_markup: number; portal_email: string; portal_active: number; notes: string; created_at: string };
+  type ReferrerRow = {
+    id: number; referrer_name: string; contact_email: string; contact_phone: string;
+    referral_fee: number; remortgage_referral_fee: number; marketing_fee: number; fee_markup: number;
+    portal_email: string; portal_active: number; notes: string; created_at: string;
+    // Status fields from manage-referrers.js GET.
+    has_password?: number; invite_expires_at?: string | null; last_login_at?: string | null;
+    is_demo?: number; case_count?: number; completed_count?: number; sample_count?: number;
+    custom_pricing_types?: string | null;
+  };
   const [allReferrers, setAllReferrers] = useState<ReferrerRow[]>([]);
   const [isLoadingReferrers, setIsLoadingReferrers] = useState(false);
   const initialReferrerEditorState = {
@@ -2075,6 +2140,19 @@ function App() {
   const [referrerInviteMessage, setReferrerInviteMessage] = useState("");
   const [isSendingReferrerInvite, setIsSendingReferrerInvite] = useState(false);
   const [isSavingReferrer, setIsSavingReferrer] = useState(false);
+  // Redesigned Referrers tab: one referrer at a time, four sub-tabs.
+  type ReferrerPanelTab = "details" | "access" | "pricing" | "cases";
+  const [referrerPanelTab, setReferrerPanelTab] = useState<ReferrerPanelTab>("details");
+  const [referrerPricingView, setReferrerPricingView] = useState<"overview" | "edit">("overview");
+  const [referrerAccessMessage, setReferrerAccessMessage] = useState("");
+  const [isReferrerAccessBusy, setIsReferrerAccessBusy] = useState(false);
+  const [referrerNewPassword, setReferrerNewPassword] = useState("");
+  const [referrerCases, setReferrerCases] = useState<ReferrerCaseRow[]>([]);
+  const [isLoadingReferrerCases, setIsLoadingReferrerCases] = useState(false);
+  const [demoForm, setDemoForm] = useState({ open: false, referrer_name: "Demo Estate Agents", portal_email: "", message: "", busy: false });
+  // Set when a switch (another referrer, matter type, back to overview)
+  // would lose unsaved changes; the Save / Discard / Cancel box runs it.
+  const [pendingReferrerSwitch, setPendingReferrerSwitch] = useState<null | (() => void)>(null);
 
   // Per-referrer pricing config (Pattern B). Mirrors the firm Fee
   // Settings state shape (FirmFeeItem) so the Pricing UI on the
@@ -2121,6 +2199,8 @@ function App() {
   const [pipeline, setPipeline] = useState<PipelineRow[]>([]);
   const [isLoadingPipeline, setIsLoadingPipeline] = useState(false);
   const [pipelineFilter, setPipelineFilter] = useState("all");
+  // "" = every referrer (and direct enquiries).
+  const [pipelineReferrerId, setPipelineReferrerId] = useState<number | "">("");
 
   // Firm fee config state — shared by the Fee Settings tab and the
   // Issue Quote rail. The legacy "My Quotes" rail (firm_quotes table)
@@ -2562,7 +2642,10 @@ function App() {
   const [isReferrerLoggingIn, setIsReferrerLoggingIn] = useState(false);
   const [referrerToken, setReferrerToken] = useState("");
   const [referrerSession, setReferrerSession] = useState<{ referrer_id: number; referrer_name: string } | null>(null);
-  const [referrerPortalData, setReferrerPortalData] = useState<{ referrer: ReferrerInfo; enquiries: ReferrerEnquiry[] } | null>(null);
+  const [referrerPortalData, setReferrerPortalData] = useState<{ referrer: ReferrerInfo; enquiries: ReferrerEnquiry[]; is_demo?: boolean; preview?: boolean } | null>(null);
+  // Admin's read-only "Preview their portal" (opened as /referrer-portal/#preview=<token>).
+  // The token is held in memory only — never saved — so it ends with the tab.
+  const [referrerPreview, setReferrerPreview] = useState(false);
   const [referrerPortalTab, setReferrerPortalTabRaw] = useState<"dashboard" | "my_referrals" | "new_referral" | "payments">(
     () => (localStorage.getItem("cq_referrer_tab") as "dashboard" | "my_referrals" | "new_referral" | "payments") || "dashboard"
   );
@@ -2918,6 +3001,7 @@ function App() {
     handles_company_buyers: Number(firm.handles_company_buyers) === 1,
     notes: firm.notes || "",
     default_referral_fee: firm.default_referral_fee ? String(firm.default_referral_fee) : "",
+    remortgage_referral_fee: firm.remortgage_referral_fee ? String(firm.remortgage_referral_fee) : "",
   });
 
   const startNewFirm = () => {
@@ -3320,7 +3404,7 @@ function App() {
     }
     if (name === "firm_id") {
       const firm = dashboardFirms.find((f) => f.id === Number(value));
-      const defaultFee = firm?.default_referral_fee ?? 0;
+      const defaultFee = firmDefaultFeeFor(firm, loadedEnquiry?.transaction_type);
       setPanelAssignment((prev) => ({
         ...prev,
         firm_id: value === "" ? "" : Number(value),
@@ -4205,8 +4289,11 @@ function App() {
       });
       const result = await res.json();
       setReferrerInviteMessage(
-        result.success ? `\u2713 Set-password link sent to ${result.sent_to}. It lasts ${result.days} days.` : result.error || "Failed to send."
+        result.success
+          ? `\u2713 ${result.access_switched_on ? "Portal access switched on. " : ""}Set-password link sent to ${result.sent_to}. It lasts ${result.days} days.`
+          : result.error || "Failed to send."
       );
+      if (result.success) await reloadReferrers();
     } catch {
       setReferrerInviteMessage("Something went wrong.");
     } finally {
@@ -4214,8 +4301,119 @@ function App() {
     }
   };
 
-  const handleSaveReferrer = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // The badge on each referrer in the list.
+  const referrerStatus = (r: ReferrerRow): { label: string; bg: string; fg: string; detail: string } => {
+    const active = Number(r.portal_active) === 1;
+    const hasPw = Number(r.has_password) === 1;
+    if (active && hasPw) {
+      return { label: "Active", bg: "#d1fae5", fg: "#065f46", detail: r.last_login_at ? `last login ${formatShortDate(r.last_login_at)}` : "not logged in yet" };
+    }
+    if (active && r.invite_expires_at) {
+      return { label: "Invite sent", bg: "#fef3c7", fg: "#92400e", detail: `link expires ${formatShortDate(r.invite_expires_at)}` };
+    }
+    if (active) return { label: "Invite expired", bg: "#fee2e2", fg: "#991b1b", detail: "send a new invite" };
+    if (hasPw) return { label: "Access off", bg: "#f3f4f6", fg: "#6b7280", detail: "" };
+    return { label: "Not invited", bg: "#f3f4f6", fg: "#6b7280", detail: "" };
+  };
+
+  const referrerDetailsDirty = () =>
+    JSON.stringify(referrerEditor) !== referrerEditorBaselineRef.current;
+  const referrerPricingDirty = () =>
+    referrerEditor.id !== null &&
+    referrerPricingView === "edit" &&
+    JSON.stringify(referrerPricingItems) !== referrerPricingBaselineRef.current;
+
+  // Runs `action` straight away, or — when the open referrer has unsaved
+  // details or pricing — asks Save / Discard / Cancel first.
+  const guardReferrerSwitch = (action: () => void) => {
+    if (referrerDetailsDirty() || referrerPricingDirty()) {
+      setPendingReferrerSwitch(() => action);
+      return;
+    }
+    action();
+  };
+
+  const resetReferrerPricing = () => {
+    setReferrerPricingItems([]);
+    referrerPricingBaselineRef.current = JSON.stringify([]);
+    setReferrerPricingMessage("");
+    setReferrerPricingType("purchase");
+    setReferrerPricingView("overview");
+    setReferrerPricingPickerOpen(false);
+  };
+
+  const editorFromRow = (r: ReferrerRow) => ({
+    id: r.id, referrer_name: r.referrer_name,
+    contact_email: r.contact_email || "", contact_phone: r.contact_phone || "",
+    referral_fee: r.referral_fee ? String(r.referral_fee) : "",
+    remortgage_referral_fee: r.remortgage_referral_fee ? String(r.remortgage_referral_fee) : "",
+    marketing_fee: String(r.marketing_fee ?? "50"),
+    fee_markup: r.fee_markup ? String(r.fee_markup) : "",
+    portal_email: r.portal_email || "",
+    portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
+  });
+
+  const loadReferrerCases = async (id: number) => {
+    setIsLoadingReferrerCases(true);
+    try {
+      const res = await adminFetch(`/api/admin-referrer-access?id=${id}`);
+      const result = await res.json();
+      setReferrerCases(result.success ? result.enquiries || [] : []);
+    } catch {
+      setReferrerCases([]);
+    } finally {
+      setIsLoadingReferrerCases(false);
+    }
+  };
+
+  const openReferrer = (r: ReferrerRow, tab: ReferrerPanelTab = "details") => {
+    const loaded = editorFromRow(r);
+    setReferrerEditor(loaded);
+    referrerEditorBaselineRef.current = JSON.stringify(loaded);
+    setReferrerSaveMessage("");
+    setReferrerInviteMessage("");
+    setReferrerAccessMessage("");
+    setReferrerNewPassword("");
+    resetReferrerPricing();
+    setReferrerCases([]);
+    setReferrerPanelTab(tab);
+    if (tab === "cases") void loadReferrerCases(r.id);
+  };
+
+  const startNewReferrer = () => {
+    setReferrerEditor(initialReferrerEditorState);
+    referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
+    setReferrerSaveMessage("");
+    setReferrerInviteMessage("");
+    setReferrerAccessMessage("");
+    setReferrerNewPassword("");
+    resetReferrerPricing();
+    setReferrerCases([]);
+    setReferrerPanelTab("details");
+  };
+
+  // Re-reads the list and keeps the open referrer's saved values in step.
+  const reloadReferrers = async (): Promise<ReferrerRow[]> => {
+    try {
+      const res = await adminFetch("/api/manage-referrers");
+      const result = await res.json();
+      if (result.success) {
+        const rows: ReferrerRow[] = result.referrers || [];
+        setAllReferrers(rows);
+        return rows;
+      }
+    } catch {}
+    return allReferrers;
+  };
+
+  // Saves Details & fees (and the quote markup). The referrer stays open;
+  // a new one opens on its set-up checklist. Never touches portal access
+  // or the password — those live on the Portal access tab.
+  const saveReferrerDetails = async (): Promise<boolean> => {
+    if (!referrerEditor.referrer_name.trim()) {
+      setReferrerSaveMessage("Enter the name / company.");
+      return false;
+    }
     setIsSavingReferrer(true);
     setReferrerSaveMessage("");
     try {
@@ -4223,35 +4421,140 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...referrerEditor,
+          id: referrerEditor.id,
+          referrer_name: referrerEditor.referrer_name,
+          contact_email: referrerEditor.contact_email,
+          contact_phone: referrerEditor.contact_phone,
           referral_fee: Number(referrerEditor.referral_fee) || 0,
           remortgage_referral_fee: Number(referrerEditor.remortgage_referral_fee) || 0,
-          marketing_fee: Number(referrerEditor.marketing_fee) || 50,
+          marketing_fee: 50,
           fee_markup: referrerEditor.fee_markup ? Number(referrerEditor.fee_markup) : 0,
-          password: referrerEditor.password || undefined,
+          portal_email: referrerEditor.portal_email,
+          notes: referrerEditor.notes,
+          // New referrers start with portal access off; nothing is emailed.
+          ...(referrerEditor.id ? {} : { portal_active: false }),
         }),
       });
       const result = await res.json();
-      if (result.success) {
-        setReferrerSaveMessage(
-          result.mode !== "created"
-            ? "Referrer updated."
-            : result.invite_sent
-            ? `Referrer created. Welcome email with a set-password link sent to ${referrerEditor.portal_email.trim()}.`
-            : result.invite_error
-            ? `Referrer created, but the welcome email failed (${result.invite_error}). Open the referrer and use "Send invite / reset link".`
-            : "Referrer created. No email sent — portal access is off."
-        );
-        setReferrerEditor(initialReferrerEditorState);
-        referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
-        await loadAllReferrers();
-      } else {
+      if (!result.success) {
         setReferrerSaveMessage(result.error || "Failed to save referrer.");
+        return false;
       }
+      const rows = await reloadReferrers();
+      const saved = rows.find((r) => r.id === Number(result.id));
+      if (saved) {
+        const loaded = editorFromRow(saved);
+        setReferrerEditor(loaded);
+        referrerEditorBaselineRef.current = JSON.stringify(loaded);
+      }
+      setReferrerSaveMessage(
+        result.mode === "created"
+          ? "Referrer created. Nothing has been sent — finish the steps below."
+          : "Saved."
+      );
+      return true;
     } catch {
       setReferrerSaveMessage("Something went wrong.");
+      return false;
     } finally {
       setIsSavingReferrer(false);
+    }
+  };
+
+  const handleSaveReferrer = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await saveReferrerDetails();
+  };
+
+  const postReferrerAccess = async (payload: Record<string, unknown>, success: string) => {
+    if (!referrerEditor.id) return false;
+    setIsReferrerAccessBusy(true);
+    setReferrerAccessMessage("");
+    try {
+      const res = await adminFetch("/api/admin-referrer-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: referrerEditor.id, ...payload }),
+      });
+      const result = await res.json();
+      setReferrerAccessMessage(result.success ? `✓ ${success}` : result.error || "Failed.");
+      if (result.success) {
+        await reloadReferrers();
+        if (referrerPanelTab === "cases") void loadReferrerCases(referrerEditor.id);
+      }
+      return Boolean(result.success);
+    } catch {
+      setReferrerAccessMessage("Something went wrong.");
+      return false;
+    } finally {
+      setIsReferrerAccessBusy(false);
+    }
+  };
+
+  const handleSetReferrerPassword = async () => {
+    if (referrerNewPassword.length < 8) {
+      setReferrerAccessMessage("The password must be at least 8 characters.");
+      return;
+    }
+    const ok = await postReferrerAccess(
+      { action: "set_password", password: referrerNewPassword },
+      "Password set. It has not been emailed — give it to them by phone. They have been logged out of any open sessions."
+    );
+    if (ok) setReferrerNewPassword("");
+  };
+
+  // Opens the read-only preview in a new tab. The tab is opened before the
+  // request so pop-up blockers allow it, then pointed at the portal.
+  const handlePreviewReferrerPortal = async () => {
+    if (!referrerEditor.id) return;
+    const win = window.open("about:blank", "_blank");
+    try {
+      const res = await adminFetch("/api/admin-referrer-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: referrerEditor.id, action: "preview" }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        win?.close();
+        setReferrerAccessMessage(result.error || "Could not open the preview.");
+        return;
+      }
+      const url = `/referrer-portal/#preview=${result.token}`;
+      if (win) win.location.href = url;
+      else window.location.href = url;
+    } catch {
+      win?.close();
+      setReferrerAccessMessage("Could not open the preview.");
+    }
+  };
+
+  const handleCreateDemoAccount = async () => {
+    setDemoForm((p) => ({ ...p, busy: true, message: "" }));
+    try {
+      const res = await adminFetch("/api/admin-referrer-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_demo",
+          referrer_name: demoForm.referrer_name,
+          portal_email: demoForm.portal_email,
+        }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        setDemoForm((p) => ({ ...p, busy: false, message: result.error || "Could not create the demo account." }));
+        return;
+      }
+      const rows = await reloadReferrers();
+      const created = rows.find((r) => r.id === Number(result.id));
+      setDemoForm({ open: false, referrer_name: "Demo Estate Agents", portal_email: "", message: "", busy: false });
+      if (created) {
+        openReferrer(created, "access");
+        setReferrerAccessMessage("✓ Demo account created with five sample cases. Press Send invite to email the login link.");
+      }
+    } catch {
+      setDemoForm((p) => ({ ...p, busy: false, message: "Something went wrong." }));
     }
   };
 
@@ -4271,15 +4574,36 @@ function App() {
 
   // ── Pipeline ──────────────────────────────────────────────────────────────
 
-  const loadPipeline = async () => {
+  const loadPipeline = async (status = pipelineFilter, referrerId: number | "" = pipelineReferrerId) => {
     setIsLoadingPipeline(true);
     try {
-      const res = await adminFetch("/api/list-enquiries?assigned=1");
+      const params = new URLSearchParams({ assigned: "1" });
+      if (status && status !== "all") params.set("status", status);
+      if (referrerId) params.set("referrer_id", String(referrerId));
+      const res = await adminFetch(`/api/list-enquiries?${params.toString()}`);
       const result = await res.json();
       if (result.success) setPipeline(result.enquiries || []);
     } catch {}
     finally { setIsLoadingPipeline(false); }
   };
+
+  // Tabs with their own data load it when clicked. When the admin page
+  // opens already on one of them (it remembers the last tab), load it here
+  // too — otherwise, for example, Referrers shows "No referrers yet".
+  useEffect(() => {
+    if (!adminToken) return;
+    if (adminTab === "referrers" && !adminReferrersLoaded) {
+      setAdminReferrersLoaded(true);
+      void loadAllReferrers();
+    } else if (adminTab === "invoices" && !adminInvoicesLoaded) {
+      setAdminInvoicesLoaded(true);
+      void loadAllInvoices();
+    } else if (adminTab === "pipeline" && !adminPipelineLoaded) {
+      setAdminPipelineLoaded(true);
+      void loadPipeline();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminToken, adminTab]);
 
   // ── Firm fee config ───────────────────────────────────────────────────────
 
@@ -4426,19 +4750,19 @@ function App() {
     }
   };
 
-  const handleSaveReferrerPricing = async () => {
+  const handleSaveReferrerPricing = async (itemsToSave = referrerPricingItems): Promise<boolean> => {
     if (!referrerEditor.id) {
       setReferrerPricingMessage("Save the referrer first, then configure pricing.");
-      return;
+      return false;
     }
     const seenKeys = new Set<string>();
-    for (const item of referrerPricingItems) {
+    for (const item of itemsToSave) {
       if (!item.supplement_key) continue;
       if (seenKeys.has(item.supplement_key)) {
         setReferrerPricingMessage(
           `Duplicate supplement: "${item.label}" is configured more than once. Remove the duplicate before saving.`
         );
-        return;
+        return false;
       }
       seenKeys.add(item.supplement_key);
     }
@@ -4450,19 +4774,23 @@ function App() {
         body: JSON.stringify({
           referrer_id: referrerEditor.id,
           transaction_type: referrerPricingType,
-          fees: referrerPricingItems,
+          fees: itemsToSave,
         }),
       });
       const result = await res.json();
       if (result.success) {
-        setReferrerPricingMessage("Pricing saved.");
+        setReferrerPricingMessage(itemsToSave.length ? "Pricing saved." : "Back on standard prices — saved.");
         // The just-saved items are now the clean baseline.
-        referrerPricingBaselineRef.current = JSON.stringify(referrerPricingItems);
-      } else {
-        setReferrerPricingMessage(result.error || "Failed to save.");
+        setReferrerPricingItems(itemsToSave);
+        referrerPricingBaselineRef.current = JSON.stringify(itemsToSave);
+        await reloadReferrers();
+        return true;
       }
+      setReferrerPricingMessage(result.error || "Failed to save.");
+      return false;
     } catch {
       setReferrerPricingMessage("Something went wrong.");
+      return false;
     } finally {
       setIsSavingReferrerPricing(false);
     }
@@ -6246,10 +6574,31 @@ function App() {
           });
       }
 
-      // Referrer session
-      const savedReferrerToken = localStorage.getItem("cq_referrer_token");
+      // Admin portal preview: /referrer-portal/#preview=<token>. Takes the
+      // place of any referrer login saved in this browser, for this tab only.
+      const previewMatch = window.location.hash.match(/^#preview=([0-9a-f]{64})$/);
+      const savedReferrerToken = previewMatch ? null : localStorage.getItem("cq_referrer_token");
       const savedReferrerSession = localStorage.getItem("cq_referrer_session");
-      if (savedReferrerToken && savedReferrerSession) {
+      if (previewMatch) {
+        const previewToken = previewMatch[1];
+        window.history.replaceState(null, "", window.location.pathname);
+        setReferrerPreview(true);
+        setReferrerToken(previewToken);
+        fetch("/api/referrer-portal-data", { headers: { Authorization: `Bearer ${previewToken}` } })
+          .then((r) => r.json())
+          .then((d: unknown) => {
+            const data = d as { success: boolean; preview?: boolean; referrer?: ReferrerInfo; enquiries?: ReferrerEnquiry[]; is_demo?: boolean };
+            if (data.success && data.preview && data.referrer) {
+              setReferrerSession({ referrer_id: Number(data.referrer.id), referrer_name: String(data.referrer.referrer_name) });
+              setReferrerPortalData({ referrer: data.referrer, enquiries: data.enquiries || [], is_demo: data.is_demo, preview: true });
+            } else {
+              setReferrerToken("");
+              setReferrerPreview(false);
+              window.alert("This preview link has expired. Open it again from the admin Referrers tab.");
+            }
+          })
+          .catch(() => {});
+      } else if (savedReferrerToken && savedReferrerSession) {
         const parsed = JSON.parse(savedReferrerSession) as { referrer_id: number; referrer_name: string };
         setReferrerToken(savedReferrerToken);
         setReferrerSession(parsed);
@@ -11906,8 +12255,8 @@ function App() {
                           />
                         </div>
 
-                        <div className="field field--full">
-                          <label htmlFor="default_referral_fee">Default referral fee (£)</label>
+                        <div className="field">
+                          <label htmlFor="default_referral_fee">Default referral fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Purchase, sale and all other matters</span></label>
                           <input
                             id="default_referral_fee"
                             type="number"
@@ -11916,7 +12265,21 @@ function App() {
                             name="default_referral_fee"
                             value={firmEditor.default_referral_fee}
                             onChange={handleFirmEditorTextChange}
-                            placeholder="e.g. 150.00 — auto-fills when assigning cases"
+                            placeholder="e.g. 250.00 — auto-fills when assigning cases"
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label htmlFor="remortgage_referral_fee">Remortgage / transfer fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Blank = use the default fee</span></label>
+                          <input
+                            id="remortgage_referral_fee"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            name="remortgage_referral_fee"
+                            value={firmEditor.remortgage_referral_fee}
+                            onChange={handleFirmEditorTextChange}
+                            placeholder="e.g. 200.00"
                           />
                         </div>
 
@@ -12462,16 +12825,32 @@ function App() {
                         style={{ minHeight: 32, padding: "0 12px", fontSize: "12px" }}
                         onClick={() => {
                           setPipelineFilter(s);
-                          void (s === "all"
-                            ? adminFetch("/api/list-enquiries?assigned=1").then((r) => r.json()).then((d) => { if (d.success) setPipeline(d.enquiries || []); })
-                            : adminFetch(`/api/list-enquiries?assigned=1&status=${s}`).then((r) => r.json()).then((d) => { if (d.success) setPipeline(d.enquiries || []); })
-                          );
+                          void loadPipeline(s);
                         }}>
                         {s === "all" ? "All" : s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       </button>
                     ))}
                     <button type="button" className="muted-button" style={{ minHeight: 32, padding: "0 12px", fontSize: "12px" }}
                       onClick={() => void loadPipeline()}>↻ Refresh</button>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "16px", alignItems: "center" }}>
+                    <label htmlFor="pipelineReferrer" style={{ fontSize: "13px", fontWeight: 600, color: "var(--navy)" }}>Referrer:</label>
+                    <select id="pipelineReferrer" value={pipelineReferrerId === "" ? "" : String(pipelineReferrerId)}
+                      onFocus={() => { if (allReferrers.length === 0) void loadAllReferrers(); }}
+                      onChange={(e) => {
+                        const next = e.target.value ? Number(e.target.value) : "";
+                        setPipelineReferrerId(next);
+                        void loadPipeline(pipelineFilter, next);
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
+                      <option value="">All referrers and direct enquiries</option>
+                      {pipelineReferrerId !== "" && !allReferrers.some((r) => r.id === pipelineReferrerId) && (
+                        <option value={String(pipelineReferrerId)}>Referrer #{pipelineReferrerId}</option>
+                      )}
+                      {allReferrers.map((r) => (
+                        <option key={r.id} value={String(r.id)}>{r.referrer_name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {isLoadingPipeline && <p className="form-note">Loading pipeline…</p>}
@@ -12573,272 +12952,401 @@ function App() {
             )}
 
             {/* ── Referrers tab ── */}
-            {adminTab === "referrers" && (
+            {adminTab === "referrers" && (() => {
+              const selected = referrerEditor.id ? allReferrers.find((r) => r.id === referrerEditor.id) || null : null;
+              const customTypes = new Set(String(selected?.custom_pricing_types || "").split(",").filter(Boolean));
+              const money = (n: number) => `£${Number(n || 0).toFixed(2)}`;
+              const setupDone = Boolean(selected && Number(selected.has_password) === 1);
+              const tabButton = (id: ReferrerPanelTab, label: string) => (
+                <button key={id} type="button"
+                  onClick={() => guardReferrerSwitch(() => {
+                    setReferrerPanelTab(id);
+                    setReferrerAccessMessage("");
+                    if (id === "cases" && referrerEditor.id) void loadReferrerCases(referrerEditor.id);
+                  })}
+                  disabled={!referrerEditor.id && id !== "details"}
+                  style={{ minHeight: 40, padding: "0 14px", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, border: "none", background: "none", cursor: !referrerEditor.id && id !== "details" ? "not-allowed" : "pointer", opacity: !referrerEditor.id && id !== "details" ? 0.45 : 1, color: referrerPanelTab === id ? "var(--teal)" : "var(--muted)", borderBottom: referrerPanelTab === id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px" }}>
+                  {label}
+                </button>
+              );
+              const step = (done: boolean, label: ReactNode, action?: ReactNode) => (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderBottom: "1px solid #eef2f7", flexWrap: "wrap" }}>
+                  <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, background: done ? "#d1fae5" : "#f1f5f9", color: done ? "#065f46" : "#94a3b8", border: done ? "none" : "1px solid #cbd5e1" }}>{done ? "✓" : ""}</span>
+                  <span style={{ flex: 1, minWidth: "180px", fontSize: "14px", color: "var(--navy)" }}>{label}</span>
+                  {action}
+                </div>
+              );
+              const smallBtn = { minHeight: 34, padding: "0 12px", fontSize: "13px" } as const;
+              const feeLine = (r: ReferrerRow) =>
+                `${money(r.referral_fee)} purchase / sale · ${money(r.remortgage_referral_fee)} remortgage / transfer`;
+              return (
               <div className="admin-two-col admin-two-col--wide-right" style={{ alignItems: "start", marginTop: "20px" }}>
 
                 {/* Left: referrer list */}
                 <div className="admin-stack">
-                  <SummaryCard title="Referrer Accounts">
-                    <div style={{ marginBottom: "12px" }}>
+                  <SummaryCard title="Referrers">
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
                       <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 16px", fontSize: "14px" }}
-                        onClick={() => {
-                          setReferrerEditor(initialReferrerEditorState);
-                          referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
-                          setReferrerSaveMessage("");
-                          setReferrerInviteMessage("");
-                          setReferrerPricingItems([]);
-                          referrerPricingBaselineRef.current = JSON.stringify([]);
-                          setReferrerPricingMessage("");
-                          setReferrerPricingType("purchase");
-                        }}>
+                        onClick={() => guardReferrerSwitch(startNewReferrer)}>
                         + Add Referrer
                       </button>
+                      <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px", fontSize: "14px" }}
+                        onClick={() => setDemoForm((p) => ({ ...p, open: !p.open, message: "" }))}>
+                        + New demo account
+                      </button>
                     </div>
+                    {demoForm.open && (
+                      <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "14px", padding: "14px", marginBottom: "14px" }}>
+                        <p style={{ margin: "0 0 10px", fontSize: "13px", color: "#4c1d95" }}>
+                          Creates a ready-made demo login with five sample cases (£150 / £100 fees). Anything they refer from it becomes a sample case: it is priced on screen and never emailed to anyone or sent to Quote Review. You then press <strong>Send invite</strong>.
+                        </p>
+                        <div className="field" style={{ marginBottom: "8px" }}>
+                          <label htmlFor="demoName">Name shown in the portal</label>
+                          <input id="demoName" type="text" value={demoForm.referrer_name}
+                            onChange={(e) => setDemoForm((p) => ({ ...p, referrer_name: e.target.value }))} />
+                        </div>
+                        <div className="field" style={{ marginBottom: "10px" }}>
+                          <label htmlFor="demoEmail">Login email (the person you are demoing to)</label>
+                          <input id="demoEmail" type="email" value={demoForm.portal_email} placeholder="name@agency.co.uk"
+                            onChange={(e) => setDemoForm((p) => ({ ...p, portal_email: e.target.value }))} />
+                        </div>
+                        {demoForm.message && <p className="form-note" style={{ color: "#dc2626", marginTop: 0 }}>{demoForm.message}</p>}
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <button type="button" className="primary-button" style={smallBtn} disabled={demoForm.busy}
+                            onClick={() => guardReferrerSwitch(() => void handleCreateDemoAccount())}>
+                            {demoForm.busy ? "Creating…" : "Create demo account"}
+                          </button>
+                          <button type="button" className="muted-button" style={smallBtn}
+                            onClick={() => setDemoForm((p) => ({ ...p, open: false, message: "" }))}>Cancel</button>
+                        </div>
+                      </div>
+                    )}
                     {isLoadingReferrers && <p className="form-note">Loading…</p>}
                     {!isLoadingReferrers && allReferrers.length === 0 && <p className="form-note">No referrers yet.</p>}
                     {!isLoadingReferrers && allReferrers.length > 0 && (
-                      <div className="detail-table">
-                        {allReferrers.map((r) => (
-                          <div key={r.id} className="detail-row"
-                            style={{ border: referrerEditor.id === r.id ? "2px solid var(--teal)" : undefined, borderRadius: "8px", padding: "6px" }}>
-                            <div className="detail-row__label">
-                              <strong>{r.referrer_name}</strong>
-                              <div style={{ fontSize: "12px", color: "var(--muted)" }}>{r.contact_email}</div>
-                              {Number(r.referral_fee) > 0 && (
-                                <div style={{ fontSize: "12px", color: "#7c3aed" }}>Referral fee: £{Number(r.referral_fee).toFixed(2)}</div>
-                              )}
-                              {Number(r.remortgage_referral_fee) > 0 && (
-                                <div style={{ fontSize: "12px", color: "#7c3aed" }}>Remortgage / transfer fee: £{Number(r.remortgage_referral_fee).toFixed(2)}</div>
-                              )}
-                              {Number(r.marketing_fee) > 0 && (
-                                <div style={{ fontSize: "12px", color: "#0369a1" }}>Marketing fee: £{Number(r.marketing_fee).toFixed(2)}</div>
-                              )}
-                              <div style={{ fontSize: "11px", marginTop: "2px" }}>
-                                <span style={{ background: Number(r.portal_active) === 1 ? "#d1fae5" : "#f3f4f6", color: Number(r.portal_active) === 1 ? "#065f46" : "#6b7280", padding: "1px 6px", borderRadius: "8px", fontSize: "11px" }}>
-                                  {Number(r.portal_active) === 1 ? "Portal active" : "No portal access"}
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {allReferrers.map((r) => {
+                          const status = referrerStatus(r);
+                          const isOpen = referrerEditor.id === r.id;
+                          return (
+                            <button key={r.id} type="button"
+                              onClick={() => { if (!isOpen) guardReferrerSwitch(() => openReferrer(r)); }}
+                              style={{ textAlign: "left", width: "100%", boxSizing: "border-box", cursor: "pointer", background: isOpen ? "#f0fdfa" : "#fff", border: isOpen ? "2px solid var(--teal)" : "1px solid #e5e7eb", borderRadius: "12px", padding: "10px 12px", font: "inherit" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" }}>
+                                <strong style={{ color: "var(--navy)" }}>{r.referrer_name}</strong>
+                                <span style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                  {Number(r.is_demo) === 1 && (
+                                    <span style={{ background: "#ede9fe", color: "#5b21b6", padding: "1px 7px", borderRadius: "8px", fontSize: "11px", fontWeight: 600 }}>Demo</span>
+                                  )}
+                                  <span style={{ background: status.bg, color: status.fg, padding: "1px 7px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" }}>{status.label}</span>
                                 </span>
                               </div>
-                            </div>
-                            <div className="detail-row__value">
-                              <button type="button" className="muted-button" style={{ minHeight: 32, padding: "0 10px", fontSize: "12px" }}
-                                onClick={() => {
-                                  const loaded = {
-                                    id: r.id, referrer_name: r.referrer_name,
-                                    contact_email: r.contact_email || "", contact_phone: r.contact_phone || "",
-                                    referral_fee: String(r.referral_fee || ""), remortgage_referral_fee: String(r.remortgage_referral_fee || ""),
-                                    marketing_fee: String(r.marketing_fee ?? "50"),
-                                    fee_markup: r.fee_markup ? String(r.fee_markup) : "",
-                                    portal_email: r.portal_email || "",
-                                    portal_active: Number(r.portal_active) === 1, notes: r.notes || "", password: "",
-                                  };
-                                  setReferrerEditor(loaded);
-                                  setReferrerInviteMessage("");
-                                  referrerEditorBaselineRef.current = JSON.stringify(loaded);
-                                  setReferrerSaveMessage("");
-                                  setReferrerPricingType("purchase");
-                                  setReferrerPricingMessage("");
-                                  setReferrerPricingPickerOpen(false);
-                                  void loadReferrerPricing(r.id, "purchase");
-                                }}>Edit</button>
-                            </div>
-                          </div>
-                        ))}
+                              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px", overflowWrap: "anywhere" }}>{r.portal_email || r.contact_email || "No email yet"}</div>
+                              <div style={{ fontSize: "12px", color: "#7c3aed", marginTop: "2px" }}>{feeLine(r)}</div>
+                              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px" }}>
+                                {Number(r.case_count) || 0} case{Number(r.case_count) === 1 ? "" : "s"}, {Number(r.completed_count) || 0} completed
+                                {Number(r.sample_count) > 0 ? ` · ${r.sample_count} sample` : ""}
+                                {status.detail ? ` · ${status.detail}` : ""}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </SummaryCard>
                 </div>
 
-                {/* Right: referrer editor */}
-                <div className="admin-stack">
-                  <SummaryCard title={referrerEditor.id ? "Edit Referrer" : "Add Referrer"}>
-                    <form onSubmit={(e) => void handleSaveReferrer(e)}>
-                      <div className="form-grid">
-                        <div className="field">
-                          <label>Name / Company</label>
-                          <input type="text" value={referrerEditor.referrer_name} required
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, referrer_name: e.target.value }))}
-                            placeholder="e.g. Smith Estate Agents" />
-                        </div>
-                        <div className="field">
-                          <label>Contact email</label>
-                          <input type="email" value={referrerEditor.contact_email}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, contact_email: e.target.value }))}
-                            placeholder="agent@example.com" />
-                        </div>
-                        <div className="field">
-                          <label>Contact phone</label>
-                          <input type="text" value={referrerEditor.contact_phone}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, contact_phone: e.target.value }))} />
-                        </div>
-                        <div className="field">
-                          <label>Referral fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Purchase, sale, sale &amp; purchase</span></label>
-                          <input type="number" step="0.01" value={referrerEditor.referral_fee}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, referral_fee: e.target.value }))}
-                            placeholder="e.g. 150.00" />
-                        </div>
-                        <div className="field">
-                          <label>Remortgage / transfer fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Remortgage, transfer of equity</span></label>
-                          <input type="number" step="0.01" min="0" value={referrerEditor.remortgage_referral_fee}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, remortgage_referral_fee: e.target.value }))}
-                            placeholder="e.g. 40.00" />
-                        </div>
-                        <div className="field">
-                          <label>Marketing fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Fixed: £50 per referred matter, no VAT</span></label>
-                          <input type="number" step="0.01" value={referrerEditor.marketing_fee}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, marketing_fee: e.target.value }))}
-                            placeholder="50.00" />
-                        </div>
-                        <div className="field">
-                          <label>Quote fee markup (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Added to client-facing legal fees</span></label>
-                          <input type="number" step="0.01" min="0" value={referrerEditor.fee_markup ?? ""}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, fee_markup: e.target.value }))}
-                            placeholder="0.00 — leave blank for none" />
-                        </div>
-                        <div className="field">
-                          <label>Portal login email</label>
-                          <input type="email" value={referrerEditor.portal_email}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, portal_email: e.target.value }))}
-                            placeholder="Login email for portal" />
-                        </div>
-                        <div className="field">
-                          <label>Portal password{referrerEditor.id ? " (leave blank to keep)" : ""}</label>
-                          <input type="password" value={referrerEditor.password}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, password: e.target.value }))}
-                            placeholder="Min 8 characters" />
-                        </div>
-                        <div className="field field--full">
-                          <CheckboxField
-                            label="Portal access active"
-                            checked={referrerEditor.portal_active}
-                            onChange={(v) => setReferrerEditor((p) => ({ ...p, portal_active: v }))} />
-                        </div>
-                        <div className="field field--full">
-                          <label>Notes</label>
-                          <textarea value={referrerEditor.notes} rows={3}
-                            onChange={(e) => setReferrerEditor((p) => ({ ...p, notes: e.target.value }))} />
-                        </div>
-                      </div>
-                      {referrerSaveMessage && (
-                        <p className="form-note" style={{ marginTop: "10px", color: referrerSaveMessage.includes("created") || referrerSaveMessage.includes("updated") ? "#065f46" : "#dc2626" }}>
-                          {referrerSaveMessage}
-                        </p>
-                      )}
-                      <div className="form-footer action-row" style={{ marginTop: "14px" }}>
-                        <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
-                          onClick={() => {
-                            setReferrerEditor(initialReferrerEditorState);
-                            referrerEditorBaselineRef.current = JSON.stringify(initialReferrerEditorState);
-                            setReferrerSaveMessage("");
-                            setReferrerInviteMessage("");
-                            setReferrerPricingItems([]);
-                            referrerPricingBaselineRef.current = JSON.stringify([]);
-                            setReferrerPricingMessage("");
-                            setReferrerPricingType("purchase");
-                          }}>
-                          Clear
+                {/* Right: one referrer. minWidth 0 lets the tab row scroll
+                    inside the card on a phone instead of widening the page. */}
+                <div className="admin-stack" style={{ minWidth: 0 }}>
+                  <div className="card admin-card-tight" style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "8px" }}>
+                      <h3 style={{ margin: 0 }}>{referrerEditor.id ? referrerEditor.referrer_name || "Referrer" : "New referrer"}</h3>
+                      {referrerEditor.id && (
+                        <button type="button" className="muted-button" style={smallBtn} onClick={() => void handlePreviewReferrerPortal()}>
+                          Preview their portal ↗
                         </button>
-                        {referrerEditor.id && (
-                          <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 16px" }}
-                            disabled={isSendingReferrerInvite}
-                            onClick={() => void handleSendReferrerInvite()}>
-                            {isSendingReferrerInvite ? "Sending…" : "Send invite / reset link"}
-                          </button>
-                        )}
-                        <button type="submit" className="primary-button" style={{ minHeight: 40, padding: "0 20px" }} disabled={isSavingReferrer}>
-                          {isSavingReferrer ? "Saving…" : referrerEditor.id ? "Update Referrer" : "Create Referrer"}
-                        </button>
-                      </div>
-                      {referrerInviteMessage && (
-                        <p className="form-note" style={{ marginTop: "10px", color: referrerInviteMessage.startsWith("\u2713") ? "#065f46" : "#dc2626" }}>
-                          {referrerInviteMessage}
-                        </p>
                       )}
-                    </form>
-                  </SummaryCard>
-
-                  {/* Pricing — per-referrer fee config (Pattern B) */}
-                  <SummaryCard title="Pricing">
-                    <p className="form-note" style={{ marginTop: 0, marginBottom: "16px" }}>
-                      Set the legal fees, disbursements, and supplements applied when this referrer issues a quote. These replace the global price book for matters submitted via the referrer portal.
-                    </p>
-
-                    {!referrerEditor.id && (
-                      <div
-                        style={{
-                          background: "#fef3c7",
-                          border: "1px solid #fde68a",
-                          color: "#92400e",
-                          borderRadius: "18px",
-                          padding: "12px 16px",
-                          fontSize: "13px",
-                          marginBottom: "16px",
-                        }}
-                      >
-                        Save the referrer first, then return here to configure their pricing.
-                      </div>
-                    )}
-
-                    <div style={{ marginBottom: "16px" }}>
-                      <label htmlFor="referrerPricingType" style={{ display: "block", marginBottom: "6px", fontWeight: 600, fontSize: "14px" }}>
-                        Transaction type
-                      </label>
-                      <select id="referrerPricingType" value={referrerPricingType}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setReferrerPricingType(next);
-                          setReferrerPricingMessage("");
-                          setReferrerPricingPickerOpen(false);
-                          if (referrerEditor.id) void loadReferrerPricing(referrerEditor.id, next);
-                          else setReferrerPricingItems([]);
-                        }}
-                        style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "16px" }}>
-                        <option value="purchase">Purchase</option>
-                        <option value="sale">Sale</option>
-                        <option value="remortgage">Remortgage</option>
-                        <option value="transfer">Transfer of Equity</option>
-                        <option value="sale_purchase">Sale and purchase</option>
-                        <option value="remortgage_transfer">Remortgage and transfer of equity</option>
-                        <option value="lease_extension_statutory">Lease extension (statutory)</option>
-                        <option value="lease_extension_informal">Lease extension (informal)</option>
-                        <option value="collective_enfranchisement">Collective enfranchisement</option>
-                        <option value="staircasing">Staircasing</option>
-                      </select>
+                    </div>
+                    <div role="tablist" style={{ display: "flex", gap: "2px", borderBottom: "2px solid #e5e7eb", marginBottom: "16px", overflowX: "auto", maxWidth: "100%" }}>
+                      {tabButton("details", "1. Details & fees")}
+                      {tabButton("access", "2. Portal access")}
+                      {tabButton("pricing", "3. Client pricing")}
+                      {tabButton("cases", "4. Cases")}
                     </div>
 
-                    {isLoadingReferrerPricing && (
-                      <p className="form-note">Loading pricing…</p>
+                    {/* ── 1. Details & fees ── */}
+                    {referrerPanelTab === "details" && (
+                      <form onSubmit={(e) => void handleSaveReferrer(e)}>
+                        <h4 style={{ margin: "0 0 10px", color: "var(--navy)" }}>Details</h4>
+                        <div className="form-grid">
+                          <div className="field">
+                            <label htmlFor="refName">Name / Company</label>
+                            <input id="refName" type="text" value={referrerEditor.referrer_name} required
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, referrer_name: e.target.value }))}
+                              placeholder="e.g. Smith Estate Agents" />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="refContactEmail">Contact email <span style={{ fontSize: "11px", color: "var(--muted)" }}>Copied into quotes they refer</span></label>
+                            <input id="refContactEmail" type="email" value={referrerEditor.contact_email}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setReferrerEditor((p) => ({
+                                  ...p,
+                                  contact_email: v,
+                                  // Keep the login email in step until it is set separately.
+                                  portal_email: !p.portal_email || p.portal_email === p.contact_email ? v : p.portal_email,
+                                }));
+                              }}
+                              placeholder="agent@example.com" />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="refPhone">Contact phone</label>
+                            <input id="refPhone" type="text" value={referrerEditor.contact_phone}
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, contact_phone: e.target.value }))} />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="refLoginEmail">Portal login email <span style={{ fontSize: "11px", color: "var(--muted)" }}>Follows the contact email unless changed</span></label>
+                            <input id="refLoginEmail" type="email" value={referrerEditor.portal_email}
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, portal_email: e.target.value }))} />
+                          </div>
+                        </div>
+                        <h4 style={{ margin: "18px 0 4px", color: "var(--navy)" }}>What you pay them</h4>
+                        <p className="form-note" style={{ marginTop: 0 }}>Their fee on each case. It fills in automatically when they refer, and you can change it on any case.</p>
+                        <div className="form-grid">
+                          <div className="field">
+                            <label htmlFor="refFeeMain">Purchase / sale fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Also sale &amp; purchase</span></label>
+                            <input id="refFeeMain" type="number" step="0.01" min="0" value={referrerEditor.referral_fee}
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, referral_fee: e.target.value }))}
+                              placeholder="e.g. 150.00" />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="refFeeRemo">Remortgage / transfer fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Remortgage, transfer of equity</span></label>
+                            <input id="refFeeRemo" type="number" step="0.01" min="0" value={referrerEditor.remortgage_referral_fee}
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, remortgage_referral_fee: e.target.value }))}
+                              placeholder="e.g. 100.00" />
+                          </div>
+                        </div>
+                        <p className="form-note" style={{ margin: "8px 0 0" }}>
+                          The panel firm is also invoiced a fixed £50 ConveyQuote marketing fee on every referred case. No VAT.
+                        </p>
+                        <div className="field field--full" style={{ marginTop: "14px" }}>
+                          <label htmlFor="refNotes">Notes</label>
+                          <textarea id="refNotes" value={referrerEditor.notes} rows={3}
+                            onChange={(e) => setReferrerEditor((p) => ({ ...p, notes: e.target.value }))} />
+                        </div>
+                        {referrerSaveMessage && (
+                          <p className="form-note" style={{ marginTop: "10px", color: /^(Saved|Referrer created)/.test(referrerSaveMessage) ? "#065f46" : "#dc2626" }}>
+                            {referrerSaveMessage}
+                          </p>
+                        )}
+                        <div className="form-footer action-row" style={{ marginTop: "14px" }}>
+                          {referrerDetailsDirty() && <span className="form-note" style={{ margin: 0, color: "#92400e" }}>Unsaved changes</span>}
+                          <button type="submit" className="primary-button" style={{ minHeight: 40, padding: "0 20px" }} disabled={isSavingReferrer}>
+                            {isSavingReferrer ? "Saving…" : referrerEditor.id ? "Save" : "Create referrer"}
+                          </button>
+                        </div>
+                        {!referrerEditor.id && (
+                          <p className="form-note" style={{ marginTop: "10px" }}>Creating a referrer sends nothing. Portal access stays off until you press <strong>Send invite</strong>.</p>
+                        )}
+
+                        {selected && !setupDone && (
+                          <div style={{ marginTop: "20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "12px 16px" }}>
+                            <h4 style={{ margin: "0 0 4px", color: "var(--navy)" }}>Set-up checklist</h4>
+                            {step(true, "Details saved")}
+                            {step(Number(selected.referral_fee) > 0 || Number(selected.remortgage_referral_fee) > 0,
+                              Number(selected.referral_fee) > 0 || Number(selected.remortgage_referral_fee) > 0 ? `Fees set: ${feeLine(selected)}` : "Set what you pay them (above)")}
+                            {step(true,
+                              customTypes.size ? `Client pricing: custom for ${customTypes.size} matter type${customTypes.size === 1 ? "" : "s"}` : "Client pricing: your standard prices (optional to change)",
+                              <button type="button" className="muted-button" style={smallBtn} onClick={() => guardReferrerSwitch(() => setReferrerPanelTab("pricing"))}>Pricing</button>)}
+                            {step(Number(selected.sample_count) > 0,
+                              Number(selected.sample_count) > 0 ? `Sample cases loaded (${selected.sample_count})` : "Sample cases (optional, for a demo)",
+                              <button type="button" className="muted-button" style={smallBtn} onClick={() => guardReferrerSwitch(() => setReferrerPanelTab("access"))}>Portal access</button>)}
+                            {step(Boolean(selected.invite_expires_at),
+                              selected.invite_expires_at ? `Invite sent — link expires ${formatShortDate(selected.invite_expires_at)}` : "Send the invite",
+                              <button type="button" className="primary-button" style={smallBtn} onClick={() => guardReferrerSwitch(() => setReferrerPanelTab("access"))}>Portal access</button>)}
+                          </div>
+                        )}
+                      </form>
                     )}
 
-                    {!isLoadingReferrerPricing && referrerPricingItems.length === 0 && (
-                      <div
-                        style={{
-                          background: "#f1f5f9",
-                          border: "1px solid #cbd5e1",
-                          color: "var(--navy)",
-                          borderRadius: "18px",
-                          padding: "14px 18px",
-                          fontSize: "13px",
-                          marginBottom: "16px",
-                          display: "flex",
-                          gap: "12px",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: "200px" }}>
-                          No pricing configured for {referrerPricingType.replace(/_/g, " ")} yet. Click <strong>Reset to Defaults</strong> to seed from the firm-portal defaults, then adjust each line and click Save Pricing.
+                    {/* ── 2. Portal access ── */}
+                    {referrerPanelTab === "access" && selected && (() => {
+                      const status = referrerStatus(selected);
+                      const active = Number(selected.portal_active) === 1;
+                      const hasPw = Number(selected.has_password) === 1;
+                      return (
+                        <div>
+                          <div className="detail-table" style={{ marginBottom: "16px" }}>
+                            <div className="detail-row"><div className="detail-row__label">Login email</div><div className="detail-row__value" style={{ overflowWrap: "anywhere" }}>{selected.portal_email || "Not set — add it on Details & fees"}</div></div>
+                            <div className="detail-row"><div className="detail-row__label">Status</div><div className="detail-row__value"><span style={{ background: status.bg, color: status.fg, padding: "2px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>{status.label}</span></div></div>
+                            <div className="detail-row"><div className="detail-row__label">Password</div><div className="detail-row__value">{hasPw ? "Set" : "Not set yet"}</div></div>
+                            <div className="detail-row"><div className="detail-row__label">Set-password link</div><div className="detail-row__value">{selected.invite_expires_at ? `Unused, expires ${formatShortDate(selected.invite_expires_at)}` : "None outstanding"}</div></div>
+                            <div className="detail-row"><div className="detail-row__label">Last login</div><div className="detail-row__value">{selected.last_login_at ? formatShortDate(selected.last_login_at, true) : "Never"}</div></div>
+                          </div>
+
+                          <h4 style={{ margin: "0 0 6px", color: "var(--navy)" }}>Invite and passwords</h4>
+                          <p className="form-note" style={{ marginTop: 0 }}>
+                            {hasPw
+                              ? "Sends a link so they choose a new password themselves (lasts 7 days). Their current password keeps working until they use it."
+                              : "Switches portal access on and emails a link to choose their password (lasts 4 days). No password is ever emailed."}
+                          </p>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px" }}>
+                            <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 16px" }}
+                              disabled={isSendingReferrerInvite || !selected.portal_email}
+                              onClick={() => void handleSendReferrerInvite()}>
+                              {isSendingReferrerInvite ? "Sending…" : hasPw ? "Send password reset link" : "Send invite"}
+                            </button>
+                          </div>
+                          {referrerInviteMessage && (
+                            <p className="form-note" style={{ marginTop: 0, color: referrerInviteMessage.startsWith("✓") ? "#065f46" : "#dc2626" }}>{referrerInviteMessage}</p>
+                          )}
+                          <div className="field" style={{ maxWidth: "420px" }}>
+                            <label htmlFor="refSetPassword">Or set a password for them <span style={{ fontSize: "11px", color: "var(--muted)" }}>Never emailed — tell them by phone</span></label>
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                              <input id="refSetPassword" type="password" autoComplete="new-password" value={referrerNewPassword} placeholder="At least 8 characters"
+                                onChange={(e) => setReferrerNewPassword(e.target.value)} style={{ flex: 1, minWidth: "180px" }} />
+                              <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }}
+                                disabled={isReferrerAccessBusy || referrerNewPassword.length < 8}
+                                onClick={() => void handleSetReferrerPassword()}>Set password</button>
+                            </div>
+                          </div>
+
+                          <h4 style={{ margin: "20px 0 6px", color: "var(--navy)" }}>Access</h4>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                            {active ? (
+                              <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px", color: "#b91c1c" }} disabled={isReferrerAccessBusy}
+                                onClick={() => {
+                                  if (window.confirm(`Turn off portal access for ${selected.referrer_name}? They are logged out straight away. Their cases and fees are kept.`)) {
+                                    void postReferrerAccess({ action: "set_active", active: false }, "Portal access turned off. They have been logged out.");
+                                  }
+                                }}>Turn off access</button>
+                            ) : (
+                              <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }} disabled={isReferrerAccessBusy || !selected.portal_email}
+                                onClick={() => void postReferrerAccess({ action: "set_active", active: true }, hasPw ? "Portal access turned on. They can log in with their password." : "Portal access turned on. Send the invite so they can choose a password.")}>
+                                Turn on access (no email)
+                              </button>
+                            )}
+                          </div>
+
+                          <h4 style={{ margin: "20px 0 6px", color: "var(--navy)" }}>Demo and sample cases</h4>
+                          <p className="form-note" style={{ marginTop: 0 }}>
+                            Sample cases are fictional, carry a grey Sample badge and never send an email. On a <strong>demo account</strong>, anything they refer is also saved as a sample case, priced on screen, and never emailed or sent to Quote Review.
+                          </p>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            {Number(selected.sample_count) > 0 ? (
+                              <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }} disabled={isReferrerAccessBusy}
+                                onClick={() => {
+                                  if (window.confirm(`Remove all ${selected.sample_count} sample cases from ${selected.referrer_name}? Real cases are not touched.`)) {
+                                    void postReferrerAccess({ action: "remove_samples" }, "Sample cases removed.");
+                                  }
+                                }}>Remove sample cases ({selected.sample_count})</button>
+                            ) : (
+                              <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }} disabled={isReferrerAccessBusy}
+                                onClick={() => void postReferrerAccess({ action: "load_samples" }, "Five sample cases added. Preview their portal to see them.")}>
+                                Load sample cases
+                              </button>
+                            )}
+                            <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "14px", padding: "0 6px" }}>
+                              <input type="checkbox" checked={Number(selected.is_demo) === 1} disabled={isReferrerAccessBusy}
+                                onChange={(e) => {
+                                  const on = e.target.checked;
+                                  if (on && Number(selected.case_count) > 0 && !window.confirm(`${selected.referrer_name} has real cases. On a demo account, new referrals they make are NOT sent to clients or to you. Make it a demo account?`)) return;
+                                  void postReferrerAccess({ action: "set_demo", demo: on }, on ? "This is now a demo account. New referrals become sample cases." : "Demo mode off. New referrals go to Quote Review as normal.");
+                                }} />
+                              Demo account
+                            </label>
+                          </div>
+                          {referrerAccessMessage && (
+                            <p className="form-note" style={{ marginTop: "12px", color: referrerAccessMessage.startsWith("✓") ? "#065f46" : "#dc2626" }}>{referrerAccessMessage}</p>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          className="primary-button"
-                          style={{ fontSize: "13px", minHeight: 36, padding: "0 14px" }}
-                          onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}
-                        >
-                          Reset to Defaults
-                        </button>
+                      );
+                    })()}
+
+                    {/* ── 3. Client pricing ── */}
+                    {referrerPanelTab === "pricing" && selected && referrerPricingView === "overview" && (
+                      <div>
+                        <p className="form-note" style={{ marginTop: 0 }}>
+                          What their clients are quoted. <strong>Standard</strong> uses your public price book (the legal fee scales with the property price) plus the markup below. <strong>Custom</strong> uses fixed fees you set for this referrer.
+                        </p>
+                        <div className="detail-table" style={{ marginBottom: "16px" }}>
+                          {REFERRER_MATTER_TYPES.map(([value, label]) => {
+                            const custom = customTypes.has(value);
+                            return (
+                              <div key={value} className="detail-row">
+                                <div className="detail-row__label">
+                                  <strong style={{ color: "var(--navy)" }}>{label}</strong>{" "}
+                                  <span style={{ background: custom ? "#ede9fe" : "#f1f5f9", color: custom ? "#5b21b6" : "#475569", padding: "1px 7px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, marginLeft: "4px" }}>
+                                    {custom ? "Custom prices" : "Standard prices"}
+                                  </span>
+                                </div>
+                                <div className="detail-row__value">
+                                  <button type="button" className="muted-button" style={smallBtn}
+                                    onClick={() => {
+                                      setReferrerPricingType(value);
+                                      setReferrerPricingMessage("");
+                                      setReferrerPricingPickerOpen(false);
+                                      setReferrerPricingView("edit");
+                                      void loadReferrerPricing(selected.id, value);
+                                    }}>
+                                    {custom ? "Edit" : "Customise"}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="field" style={{ maxWidth: "360px" }}>
+                          <label htmlFor="refMarkup">Quote markup (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Added to the client's legal fee on standard prices</span></label>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <input id="refMarkup" type="number" step="0.01" min="0" value={referrerEditor.fee_markup ?? ""} placeholder="0.00 — none"
+                              onChange={(e) => setReferrerEditor((p) => ({ ...p, fee_markup: e.target.value }))} style={{ flex: 1 }} />
+                            <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 14px" }}
+                              disabled={isSavingReferrer || !referrerDetailsDirty()} onClick={() => void saveReferrerDetails()}>
+                              {isSavingReferrer ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                        {referrerSaveMessage && (
+                          <p className="form-note" style={{ color: /^Saved/.test(referrerSaveMessage) ? "#065f46" : "#dc2626" }}>{referrerSaveMessage}</p>
+                        )}
                       </div>
                     )}
 
+                    {referrerPanelTab === "pricing" && selected && referrerPricingView === "edit" && (() => {
+                      const typeLabel = (REFERRER_MATTER_TYPES.find(([v]) => v === referrerPricingType) || ["", referrerPricingType])[1];
+                      const isCustom = customTypes.has(referrerPricingType);
+                      const dirty = referrerPricingDirty();
+                      return (
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" }}>
+                            <button type="button" className="muted-button" style={smallBtn}
+                              onClick={() => guardReferrerSwitch(() => {
+                                setReferrerPricingView("overview");
+                                setReferrerPricingItems([]);
+                                referrerPricingBaselineRef.current = JSON.stringify([]);
+                                setReferrerPricingMessage("");
+                              })}>← All matter types</button>
+                            <strong style={{ color: "var(--navy)" }}>{typeLabel}: {isCustom ? "custom prices" : "standard prices"}</strong>
+                          </div>
+
+                          {isLoadingReferrerPricing && <p className="form-note">Loading pricing…</p>}
+
+                          {!isLoadingReferrerPricing && referrerPricingItems.length === 0 && (
+                            <div style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "var(--navy)", borderRadius: "14px", padding: "14px 18px", fontSize: "13px", marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                              <div style={{ flex: 1, minWidth: "200px" }}>
+                                {typeLabel} quotes for this referrer use your <strong>standard prices</strong>. To set fixed fees instead, start from the suggested figures, adjust them, then press Save.
+                              </div>
+                              <button type="button" className="primary-button" style={{ fontSize: "13px", minHeight: 36, padding: "0 14px" }}
+                                onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}>
+                                Start custom prices
+                              </button>
+                            </div>
+                          )}
+
+                          {!isLoadingReferrerPricing && referrerPricingItems.length > 0 && (
+                            <>
                     <h4 style={{ color: "#0f2747", marginBottom: "8px" }}>Legal Fees</h4>
                     <div className="detail-table" style={{ marginBottom: "12px" }}>
                       {referrerPricingItems
@@ -12995,26 +13503,159 @@ function App() {
                       );
                     })()}
 
-                    {referrerPricingMessage && (
-                      <p className="form-note" style={{ color: referrerPricingMessage.includes("saved") ? "#065f46" : "#dc2626" }}>
-                        {referrerPricingMessage}
-                      </p>
-                    )}
+                            </>
+                          )}
 
-                    <div className="form-footer action-row" style={{ marginTop: "14px" }}>
-                      <button type="button" className="muted-button"
-                        onClick={() => setReferrerPricingItems(getDefaultFeeItems(referrerPricingType, "referrer").map((f) => ({ ...f, supplement_key: null })))}>
-                        Reset to Defaults
-                      </button>
-                      <button type="button" className="primary-button" disabled={isSavingReferrerPricing || !referrerEditor.id}
-                        onClick={() => void handleSaveReferrerPricing()}>
-                        {isSavingReferrerPricing ? "Saving…" : "Save Pricing"}
-                      </button>
-                    </div>
-                  </SummaryCard>
+                          {referrerPricingMessage && (
+                            <p className="form-note" style={{ color: /saved/i.test(referrerPricingMessage) ? "#065f46" : "#dc2626" }}>
+                              {referrerPricingMessage}
+                            </p>
+                          )}
+
+                          <div className="form-footer action-row" style={{ marginTop: "14px" }}>
+                            {dirty && <span className="form-note" style={{ margin: 0, color: "#92400e" }}>Unsaved changes</span>}
+                            {isCustom && (
+                              <button type="button" className="muted-button" disabled={isSavingReferrerPricing}
+                                onClick={() => {
+                                  if (window.confirm(`Go back to standard prices for ${typeLabel}? The custom fees for this matter type are deleted.`)) {
+                                    void handleSaveReferrerPricing([]);
+                                  }
+                                }}>
+                                Use standard prices
+                              </button>
+                            )}
+                            {dirty && (
+                              <button type="button" className="muted-button" disabled={isSavingReferrerPricing}
+                                onClick={() => { void loadReferrerPricing(selected.id, referrerPricingType); setReferrerPricingMessage(""); }}>
+                                Undo changes
+                              </button>
+                            )}
+                            <button type="button" className="primary-button" disabled={isSavingReferrerPricing || !dirty || referrerPricingItems.length === 0}
+                              onClick={() => void handleSaveReferrerPricing()}>
+                              {isSavingReferrerPricing ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── 4. Cases ── */}
+                    {referrerPanelTab === "cases" && selected && (() => {
+                      const real = referrerCases.filter((c) => !String(c.reference || "").startsWith("SAMPLE-"));
+                      const completed = real.filter((c) => c.case_status === "completed");
+                      const owed = completed.filter((c) => !c.fee_paid_at).reduce((t, c) => t + (Number(c.referrer_fee) || 0), 0);
+                      const paid = real.reduce((t, c) => t + (c.fee_paid_at ? Number(c.fee_paid_amount) || 0 : 0), 0);
+                      const instructed = real.filter((c) => c.case_status && !["withdrawn", "fallen_through"].includes(String(c.case_status)));
+                      const counters: [string, string][] = [
+                        ["Referrals", String(real.length)],
+                        ["Quoted", String(real.filter((c) => c.status === "quote_sent" || c.status === "accepted").length)],
+                        ["Instructed", String(instructed.length)],
+                        ["Completed", String(completed.length)],
+                        ["Fees owed", money(owed)],
+                        ["Fees paid", money(paid)],
+                      ];
+                      return (
+                        <div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px", marginBottom: "16px" }}>
+                            {counters.map(([label, value]) => (
+                              <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "10px 12px" }}>
+                                <div style={{ fontSize: "12px", color: "var(--muted)" }}>{label}</div>
+                                <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--navy)" }}>{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+                            <button type="button" className="muted-button" style={smallBtn}
+                              onClick={() => {
+                                if (!setAdminTab("pipeline")) return;
+                                setPipelineReferrerId(selected.id);
+                                setPipelineFilter("all");
+                                setAdminPipelineLoaded(true);
+                                void loadPipeline("all", selected.id);
+                              }}>Open in Pipeline</button>
+                            <button type="button" className="muted-button" style={smallBtn} onClick={() => void loadReferrerCases(selected.id)}>↻ Refresh</button>
+                          </div>
+                          {isLoadingReferrerCases && <p className="form-note">Loading cases…</p>}
+                          {!isLoadingReferrerCases && referrerCases.length === 0 && <p className="form-note">No cases yet.</p>}
+                          {!isLoadingReferrerCases && referrerCases.length > 0 && (
+                            <div className="detail-table">
+                              {referrerCases.map((c) => {
+                                const sample = String(c.reference || "").startsWith("SAMPLE-");
+                                const stage = c.case_status ? String(c.case_status).replace(/_/g, " ") : c.status === "new" ? "awaiting your review" : String(c.status || "").replace(/_/g, " ");
+                                const feeText = c.fee_paid_at
+                                  ? `${money(Number(c.fee_paid_amount))} paid ${formatShortDate(c.fee_paid_at)}`
+                                  : c.referrer_fee !== null && c.referrer_fee !== undefined
+                                  ? `${money(Number(c.referrer_fee))} ${c.case_status === "completed" ? "owed" : "on completion"}`
+                                  : "—";
+                                return (
+                                  <div key={c.reference} className="detail-row">
+                                    <div className="detail-row__label">
+                                      {sample ? (
+                                        <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{c.reference}</strong>
+                                      ) : (
+                                        <button type="button" onClick={() => void handleOpenDashboardEnquiry(c.reference)}
+                                          style={{ background: "none", border: "none", padding: 0, font: "inherit", fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "var(--teal-dark)", cursor: "pointer", textDecoration: "underline" }}>
+                                          {c.reference}
+                                        </button>
+                                      )}
+                                      {sample && <span style={{ marginLeft: "6px", background: "#e5e7eb", color: "#374151", padding: "1px 6px", borderRadius: "8px", fontSize: "11px" }}>Sample</span>}
+                                      <div style={{ fontSize: "13px" }}>{c.client_name || "—"} · {String(c.transaction_type || "").replace(/_/g, " ")}</div>
+                                      {c.assigned_firm_name && <div style={{ fontSize: "12px", color: "var(--muted)" }}>{c.assigned_firm_name}</div>}
+                                    </div>
+                                    <div className="detail-row__value" style={{ textAlign: "right" }}>
+                                      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--navy)", textTransform: "capitalize" }}>{stage}</div>
+                                      <div style={{ fontSize: "12px", color: "#7c3aed" }}>{feeText}</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
+
+                {pendingReferrerSwitch && (
+                  <div role="dialog" aria-modal="true" aria-labelledby="refUnsavedTitle"
+                    style={{ position: "fixed", inset: 0, background: "rgba(15,39,71,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
+                    <div className="card" style={{ maxWidth: "420px", width: "100%" }}>
+                      <h3 id="refUnsavedTitle" style={{ marginTop: 0 }}>Unsaved changes</h3>
+                      <p style={{ fontSize: "14px" }}>
+                        {referrerPricingDirty() ? "The prices you were editing have not been saved." : `Changes to ${referrerEditor.referrer_name || "this referrer"} have not been saved.`}
+                      </p>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button type="button" className="muted-button" onClick={() => setPendingReferrerSwitch(null)}>Cancel</button>
+                        <button type="button" className="muted-button"
+                          onClick={() => {
+                            const next = pendingReferrerSwitch;
+                            setPendingReferrerSwitch(null);
+                            // Put back the last saved values, then carry on.
+                            const savedEditor = selected ? editorFromRow(selected) : initialReferrerEditorState;
+                            setReferrerEditor(savedEditor);
+                            referrerEditorBaselineRef.current = JSON.stringify(savedEditor);
+                            setReferrerPricingItems(JSON.parse(referrerPricingBaselineRef.current));
+                            next();
+                          }}>Discard</button>
+                        <button type="button" className="primary-button"
+                          onClick={async () => {
+                            const next = pendingReferrerSwitch;
+                            const pricingDirty = referrerPricingDirty();
+                            const detailsDirty = referrerDetailsDirty();
+                            setPendingReferrerSwitch(null);
+                            // On a failed save, stay put: the message shows why.
+                            if (pricingDirty && !(await handleSaveReferrerPricing())) return;
+                            if (detailsDirty && !(await saveReferrerDetails())) return;
+                            next();
+                          }}>Save</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+              );
+            })()}
 
             {/* ── Invoices tab ── */}
             {adminTab === "invoices" && (
@@ -15197,6 +15838,10 @@ function App() {
                 <h2 style={{ color: "var(--navy)", margin: 0 }}>{referrerSession.referrer_name}</h2>
                 <p style={{ color: "var(--muted)", margin: "2px 0 0", fontSize: "14px" }}>Referrer Portal</p>
               </div>
+              {referrerPreview ? (
+                <button type="button" className="muted-button" style={{ minHeight: 38, padding: "0 16px" }}
+                  onClick={() => { window.close(); window.location.href = "/admin/"; }}>Close preview</button>
+              ) : (
               <button type="button" className="muted-button" style={{ minHeight: 38, padding: "0 16px" }}
                 onClick={() => {
                   fetch("/api/referrer-logout", { method: "POST", headers: { Authorization: `Bearer ${referrerToken}` } }).catch(() => {});
@@ -15206,7 +15851,19 @@ function App() {
                   localStorage.removeItem("cq_referrer_tab");
                   window.history.pushState({}, "", "/referrer-login/");
                 }}>Log out</button>
+              )}
             </div>
+
+            {referrerPreview && (
+              <div role="status" style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", fontSize: "14px", color: "#1e3a8a" }}>
+                <strong>Admin preview.</strong> This is exactly what {referrerSession.referrer_name} sees. It is read-only: nothing can be submitted or sent from here, and the preview ends after 30 minutes.
+              </div>
+            )}
+            {referrerPortalData?.is_demo && (
+              <div role="status" style={{ background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", fontSize: "14px", color: "#4c1d95" }}>
+                <strong>Demo account.</strong> The cases here are samples. Referrals you make are priced on screen and saved as samples — nothing is sent to your clients or anyone else.
+              </div>
+            )}
 
             {/* Urgent alert: cases due to complete within 14 days */}
             {dueToComplete.length > 0 && (
@@ -15432,6 +16089,8 @@ function App() {
                                       : null
                                   }
                                 </div>
+                                {/* A preview can't act, so its buttons show but are disabled. */}
+                                <fieldset disabled={referrerPreview} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
                                 <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                                   {requestMsg[ref] && (
                                     <span style={{ fontSize: "12px", color: requestMsg[ref].startsWith("\u2713") ? "#065f46" : "#dc2626" }}>{requestMsg[ref]}</span>
@@ -15479,6 +16138,7 @@ function App() {
                                     <span style={{ fontSize: "12px", color: "#dc2626" }}>{archiveMsg[ref]}</span>
                                   )}
                                 </div>
+                                </fieldset>
                               </div>
 
                               {/* Request update: the referrer's message goes to the firm, ConveyQuote copied in */}
@@ -15682,10 +16342,18 @@ function App() {
 
             {/* ── NEW REFERRAL ── */}
             {referrerPortalTab === "new_referral" && (
-              <ReferrerSimpleForm
-                referrerToken={referrerToken ?? ""}
-                onSuccess={() => { setReferrerPortalTab?.("my_referrals"); refreshPortal(); }}
-              />
+              <>
+                {referrerPreview && (
+                  <p className="form-note" style={{ marginTop: 0 }}>This is the referral form {referrerSession.referrer_name} uses. It can't be submitted from a preview.</p>
+                )}
+                <fieldset disabled={referrerPreview} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+                  <ReferrerSimpleForm
+                    referrerToken={referrerToken ?? ""}
+                    demo={Boolean(referrerPortalData?.is_demo)}
+                    onSuccess={() => { setReferrerPortalTab?.("my_referrals"); refreshPortal(); }}
+                  />
+                </fieldset>
+              </>
             )}
 
             {/* ── PAYMENTS ── */}
@@ -17108,9 +17776,12 @@ function ReferrerSimpleForm({
   parentEnquiryId,
   submitLabel,
   onCancel,
+  demo = false,
 }: {
   referrerToken: string;
   onSuccess: () => void;
+  // Demo account: the referral is saved as a sample case and nothing is sent.
+  demo?: boolean;
   initialValues?: Partial<ReferrerFormState>;
   parentEnquiryId?: number;
   submitLabel?: string;
@@ -17180,10 +17851,12 @@ function ReferrerSimpleForm({
     return (
       <div style={{ textAlign: "center", padding: "48px 24px" }}>
         <div style={{ fontSize: "52px", marginBottom: "16px" }}>✅</div>
-        <h3 style={{ color: "var(--navy)", margin: "0 0 8px" }}>Referral submitted</h3>
+        <h3 style={{ color: "var(--navy)", margin: "0 0 8px" }}>{demo ? "Sample quote saved" : "Referral submitted"}</h3>
         <p style={{ color: "var(--muted)", margin: "0 0 4px" }}>Reference: <strong>{resultRef}</strong></p>
         <p style={{ color: "var(--muted)", fontSize: "14px" }}>
-          ConveyQuote will check the quote and email it to your client, copying you in.
+          {demo
+            ? "This is a demo account, so nothing has been sent to anyone. You'll find the quote under My Referrals."
+            : "ConveyQuote will check the quote and email it to your client, copying you in."}
         </p>
         <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "12px" }}>Returning to your dashboard…</p>
       </div>
@@ -17265,7 +17938,9 @@ function ReferrerSimpleForm({
         <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
           <div style={{ fontWeight: 600, fontSize: "14px" }}>What happens next</div>
           <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "2px" }}>
-            This is an indicative quote. ConveyQuote checks every referral before the quote goes to <strong>{form.email}</strong>, and you will be copied in when it is sent.
+            {demo
+              ? <>This is a demo account. Submitting saves this as a sample quote in My Referrals; nothing is sent to <strong>{form.email}</strong> or anyone else.</>
+              : <>This is an indicative quote. ConveyQuote checks every referral before the quote goes to <strong>{form.email}</strong>, and you will be copied in when it is sent.</>}
           </div>
         </div>
 
