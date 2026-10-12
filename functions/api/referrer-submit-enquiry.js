@@ -357,17 +357,28 @@ export async function onRequestPost(context) {
       quote_json: JSON.stringify({ ...body, ...quote }),
       status: "new",
       referrer_id: referrerId,
-      referral_fee_payable: referrerFee > 0 ? 1 : 0,
-      referral_fee_amount: referrerFee,
+      // enquiries.referral_fee_* is the FIRM fee, set when admin allocates
+      // the case. The referrer's fee goes in referrer_case_fees below.
+      referral_fee_payable: 0,
+      referral_fee_amount: 0,
     }, insertEnquiryRow);
+
+    const inserted = await env.DB.prepare(
+      `SELECT id FROM enquiries WHERE reference = ? LIMIT 1`
+    ).bind(reference).first();
+
+    // The referrer's fee for this case (their rate for the matter type).
+    if (inserted?.id) {
+      await env.DB.prepare(
+        `INSERT INTO referrer_case_fees (enquiry_id, amount) VALUES (?, ?)
+         ON CONFLICT (enquiry_id) DO UPDATE SET amount = excluded.amount`
+      ).bind(inserted.id, referrerFee).run();
+    }
 
     // Persist workflow fields (referrer_note, parent_enquiry_id) in the
     // referrer_workflow side-table — they used to live on enquiries but
     // that table hit the D1 100-column cap. See migration 0013.
     if (trimmedNote || validatedParentId != null) {
-      const inserted = await env.DB.prepare(
-        `SELECT id FROM enquiries WHERE reference = ? LIMIT 1`
-      ).bind(reference).first();
       if (inserted?.id) {
         await env.DB.prepare(
           `INSERT INTO referrer_workflow (enquiry_id, referrer_note, parent_enquiry_id)
@@ -411,7 +422,7 @@ export async function onRequestPost(context) {
                     <tr><td style="padding:7px 0;color:#6b7280;">Transaction</td><td style="padding:7px 0;">${escapeHtml(transactionLabel)}</td></tr>
                     <tr><td style="padding:7px 0;color:#6b7280;">Property value</td><td style="padding:7px 0;">${formatMoney(price)}</td></tr>
                     ${trimmedNote ? `<tr><td style="padding:7px 0;color:#6b7280;">Referrer note</td><td style="padding:7px 0;">${escapeHtml(trimmedNote)}</td></tr>` : ""}
-                    ${referrerFee > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referral fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${referrerFee.toFixed(2)}</td></tr>` : ""}
+                    ${referrerFee > 0 ? `<tr><td style="padding:7px 0;color:#6b7280;">Referrer fee</td><td style="padding:7px 0;color:#7c3aed;font-weight:600;">£${referrerFee.toFixed(2)}</td></tr>` : ""}
                   </table>
                   <div style="margin-top:16px;">
                     <a href="${adminUrl}" style="background:#0f2747;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">

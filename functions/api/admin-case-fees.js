@@ -1,20 +1,26 @@
-// functions/api/admin-referrer-fee.js
+// functions/api/admin-case-fees.js
 //
-// Admin view of the referrer's fee on one case, and recording that it has
-// been paid.
+// The two fees on a case, for the admin case view:
 //
-//   GET  ?ref=CQ-…   → the case's referrer fee, the referrer's two rates,
-//                      the rate that applies to this matter type, and any
-//                      recorded payment. Used to pre-fill the allocation
-//                      screen and to show the "Referrer fee" panel.
-//   POST { reference, action: "mark_paid", amount, paid_at, note, notify }
+//   firm fee     — what the panel firm pays ConveyQuote. Stored on
+//                  enquiries.referral_fee_payable / referral_fee_amount.
+//                  Billed on the firm invoice. Set at allocation.
+//   referrer fee — what ConveyQuote pays the referrer out of it. Stored in
+//                  referrer_case_fees (migration 0021). Shown only in the
+//                  referrer portal. Set from the referrer's rate when the
+//                  referral is submitted; adjustable at allocation.
+//
+// Referred cases also carry the fixed £50 ConveyQuote marketing fee on the
+// firm invoice. "ConveyQuote keeps" = firm fee + marketing fee − referrer fee.
+//
+//   GET  ?ref=CQ-…   → both fees, the referrer's rates, the rate for this
+//                      matter type, what ConveyQuote keeps, and any payment.
+//   POST { reference, action: "save_fees", firm_fee, referrer_fee }
+//        { reference, action: "mark_paid", amount, paid_at, note, notify }
 //        { reference, action: "undo" }
-//                    → records (or removes) a row in referrer_fee_payments.
-//                      With notify, emails the referrer to confirm payment,
-//                      ConveyQuote copied in.
 //
-// A fee can only be marked paid once the case is completed. Sample
-// (SAMPLE-) cases are managed by script and are refused here.
+// Paying the referrer requires the case to be completed. Sample (SAMPLE-)
+// cases are managed by script and are refused for every change.
 
 import {
   getTokenFromRequest,
@@ -27,6 +33,7 @@ import { isSampleReference } from "../lib/sample-cases.js";
 
 const ADMIN_EMAIL = "info@conveyquote.uk";
 const NOTE_MAX_LENGTH = 200;
+const MARKETING_FEE = 50;
 
 const escapeHtml = (v) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -34,11 +41,16 @@ const escapeHtml = (v) =>
 async function loadCase(db, reference) {
   return db.prepare(
     `SELECT e.id, e.reference, e.referrer_id, e.transaction_type, e.case_status, e.property_address,
+            e.assigned_firm_id, e.assigned_firm_name,
             e.referral_fee_payable, e.referral_fee_amount,
+            c.amount AS referrer_case_fee,
+            f.default_referral_fee AS firm_default_fee,
             r.referrer_name, r.referral_fee, r.remortgage_referral_fee, r.contact_email, r.portal_email,
             p.amount AS paid_amount, p.paid_at, p.payment_note
        FROM enquiries e
        LEFT JOIN referrers r ON r.id = e.referrer_id
+       LEFT JOIN referrer_case_fees c ON c.enquiry_id = e.id
+       LEFT JOIN panel_firms f ON f.id = e.assigned_firm_id
        LEFT JOIN referrer_fee_payments p ON p.enquiry_id = e.id
       WHERE e.reference = ?
       LIMIT 1`
@@ -46,19 +58,32 @@ async function loadCase(db, reference) {
 }
 
 function describe(row) {
+  const referred = Boolean(row.referrer_id);
+  const firmFee = Number(row.referral_fee_payable) === 1 && Number(row.referral_fee_amount) > 0
+    ? Number(row.referral_fee_amount)
+    : null;
+  const referrerFee = referred && row.referrer_case_fee !== null && row.referrer_case_fee !== undefined
+    ? Number(row.referrer_case_fee)
+    : null;
+  const marketingFee = referred ? MARKETING_FEE : 0;
   return {
     reference: row.reference,
-    referred: Boolean(row.referrer_id),
+    referred,
     referrer_name: row.referrer_name || "",
     transaction_type: row.transaction_type || "",
     case_status: row.case_status || "",
-    fee_payable: Number(row.referral_fee_payable) === 1,
-    fee_amount: Number(row.referral_fee_amount) || 0,
+    allocated: Boolean(row.assigned_firm_id),
+    firm_name: row.assigned_firm_name || "",
+    firm_default_fee: Number(row.firm_default_fee) || 0,
+    firm_fee: firmFee,
+    referrer_fee: referrerFee,
+    marketing_fee: marketingFee,
+    conveyquote_keeps: firmFee === null ? null : firmFee + marketingFee - (referrerFee || 0),
     rates: {
       main: Number(row.referral_fee) || 0,
       remortgage: Number(row.remortgage_referral_fee) || 0,
     },
-    rate_for_this_matter: row.referrer_id ? referrerFeeFor(row, row.transaction_type) : 0,
+    rate_for_this_matter: referred ? referrerFeeFor(row, row.transaction_type) : 0,
     payment: row.paid_at
       ? { amount: Number(row.paid_amount) || 0, paid_at: row.paid_at, note: row.payment_note || "" }
       : null,
@@ -103,13 +128,39 @@ export async function onRequestPost(context) {
 
     const row = await loadCase(env.DB, reference);
     if (!row) return jsonResponse({ success: false, error: "Case not found." }, 404);
+    const fresh = async () => describe(await loadCase(env.DB, reference));
+
+    if (action === "save_fees") {
+      if (!row.assigned_firm_id) {
+        return jsonResponse({ success: false, error: "Set the fees on the allocation form when you allocate the case." }, 400);
+      }
+      const firmFee = Number(body.firm_fee);
+      if (!Number.isFinite(firmFee) || firmFee <= 0) {
+        return jsonResponse({ success: false, error: "Enter the firm fee." }, 400);
+      }
+      const referrerFee = Number(body.referrer_fee);
+      if (row.referrer_id && (body.referrer_fee === "" || body.referrer_fee === undefined || body.referrer_fee === null || !Number.isFinite(referrerFee) || referrerFee < 0)) {
+        return jsonResponse({ success: false, error: "Enter the referrer fee (0 if none is due)." }, 400);
+      }
+      await env.DB.prepare(
+        `UPDATE enquiries SET referral_fee_payable = 1, referral_fee_amount = ?, updated_at = datetime('now') WHERE id = ?`
+      ).bind(firmFee, row.id).run();
+      if (row.referrer_id) {
+        await env.DB.prepare(
+          `INSERT INTO referrer_case_fees (enquiry_id, amount, updated_at) VALUES (?, ?, datetime('now'))
+           ON CONFLICT (enquiry_id) DO UPDATE SET amount = excluded.amount, updated_at = excluded.updated_at`
+        ).bind(row.id, referrerFee).run();
+      }
+      return jsonResponse({ success: true, ...(await fresh()) });
+    }
+
     if (!row.referrer_id) {
       return jsonResponse({ success: false, error: "This case did not come from a referrer." }, 400);
     }
 
     if (action === "undo") {
       await env.DB.prepare(`DELETE FROM referrer_fee_payments WHERE enquiry_id = ?`).bind(row.id).run();
-      return jsonResponse({ success: true, ...describe(await loadCase(env.DB, reference)) });
+      return jsonResponse({ success: true, ...(await fresh()) });
     }
 
     if (action !== "mark_paid") {
@@ -145,7 +196,8 @@ export async function onRequestPost(context) {
          payment_note = excluded.payment_note`
     ).bind(row.id, amount, paidAt, note || null).run();
 
-    // Optional confirmation email to the referrer.
+    // Optional confirmation email to the referrer. It names only the
+    // referrer's own fee — never the firm fee.
     let emailed = false;
     let emailError;
     const to = String(row.contact_email || row.portal_email || "").trim();
@@ -186,17 +238,12 @@ export async function onRequestPost(context) {
           emailed = true;
         } else {
           emailError = `Email failed (HTTP ${resp.status}).`;
-          console.error(`admin-referrer-fee: confirmation email failed for ${reference}: ${await resp.text().catch(() => "")}`);
+          console.error(`admin-case-fees: confirmation email failed for ${reference}: ${await resp.text().catch(() => "")}`);
         }
       }
     }
 
-    return jsonResponse({
-      success: true,
-      emailed,
-      email_error: emailError,
-      ...describe(await loadCase(env.DB, reference)),
-    });
+    return jsonResponse({ success: true, emailed, email_error: emailError, ...(await fresh()) });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
   }

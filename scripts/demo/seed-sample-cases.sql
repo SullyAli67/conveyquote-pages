@@ -10,15 +10,18 @@
 --   SAMPLE-0004  Exchanged             Sale         main fee   (completes in 10 days)
 --   SAMPLE-0005  Completed, fee paid   Purchase     main fee   (paid 5 days ago)
 --
--- The fees are read from the referrer's own record (referral_fee and
--- remortgage_referral_fee), so they always match what is set in the admin
--- Referrers tab — for Trusted Conveyancers, £150 and £100.
+-- The referrer fees are read from the referrer's own record (referral_fee
+-- and remortgage_referral_fee), so they always match what is set in the
+-- admin Referrers tab — for Trusted Conveyancers, £150 and £100. They are
+-- stored in referrer_case_fees (migration 0021). The samples carry no firm
+-- fee: they are never allocated to a panel firm.
 --
 -- How the sample rows are identified
 -- ----------------------------------
 --   enquiries              reference starts with "SAMPLE-"
 --   referrer_workflow      enquiry_id belongs to a SAMPLE- enquiry
 --   referrer_fee_payments  enquiry_id belongs to a SAMPLE- enquiry
+--   referrer_case_fees     enquiry_id belongs to a SAMPLE- enquiry
 -- The portal shows a grey "Sample" badge on every SAMPLE- case.
 -- scripts/demo/remove-sample-cases.sql deletes exactly these rows.
 --
@@ -39,7 +42,7 @@
 --
 -- How to apply (Cloudflare dashboard → D1 → conveyquote-db → Console)
 -- -------------------------------------------------------------------
--- Prerequisites: migration 0020 applied, and the Trusted Conveyancers
+-- Prerequisites: migrations 0020 and 0021 applied, and the Trusted Conveyancers
 -- referrer created in the admin Referrers tab with portal email
 -- info@trustedconveyancers.co.uk, referral fee 150 and remortgage /
 -- transfer fee 100.
@@ -73,7 +76,7 @@ INSERT INTO enquiries (
 SELECT
   'SAMPLE-0001', 'Sample Buyer One', 'sample.buyer.one@example.com', '07700 900101', 'purchase',
   'freehold', 285000, 'DT1 1AA', '1 Example Street, Demo Town', 'Sample Negotiator', 'mortgage',
-  'quote_sent', r.id, 1, r.referral_fee,
+  'quote_sent', r.id, 0, 0,
   datetime('now', '-3 days'), datetime('now', '-3 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -91,7 +94,7 @@ SELECT
   'SAMPLE-0002', 'Sample Seller Two', 'sample.seller.two@example.com', '07700 900102', 'sale',
   'freehold', 240000, 'DT1 2BB', '2 Example Road, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'accepted', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-9 days'), date('now', '+55 days'), r.id, 1, r.referral_fee,
+  datetime('now', '-9 days'), date('now', '+55 days'), r.id, 0, 0,
   datetime('now', '-12 days'), datetime('now', '-9 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -109,7 +112,7 @@ SELECT
   'SAMPLE-0003', 'Sample Owner Three', 'sample.owner.three@example.com', '07700 900103', 'remortgage',
   'leasehold', 320000, 'DT2 3CC', 'Flat 3, Example Court, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'searches_ordered', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-24 days'), date('now', '+20 days'), r.id, 1, r.remortgage_referral_fee,
+  datetime('now', '-24 days'), date('now', '+20 days'), r.id, 0, 0,
   datetime('now', '-26 days'), datetime('now', '-4 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -127,7 +130,7 @@ SELECT
   'SAMPLE-0004', 'Sample Seller Four', 'sample.seller.four@example.com', '07700 900104', 'sale',
   'freehold', 195000, 'DT3 4DD', '4 Example Avenue, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'exchanged', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-42 days'), date('now', '+10 days'), date('now', '+10 days'), r.id, 1, r.referral_fee,
+  datetime('now', '-42 days'), date('now', '+10 days'), date('now', '+10 days'), r.id, 0, 0,
   datetime('now', '-45 days'), datetime('now', '-2 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -145,13 +148,13 @@ SELECT
   'SAMPLE-0005', 'Sample Buyer Five', 'sample.buyer.five@example.com', '07700 900105', 'purchase',
   'freehold', 310000, 'DT4 5EE', '5 Example Close, Demo Town', 'Sample Negotiator', 'mortgage',
   'accepted', 'panel_referred', 'completed', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-72 days'), r.id, 1, r.referral_fee,
+  datetime('now', '-72 days'), r.id, 0, 0,
   datetime('now', '-75 days'), datetime('now', '-12 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
   AND (SELECT COUNT(*) FROM referrers WHERE portal_email = 'info@trustedconveyancers.co.uk') = 1;
 
--- ── STEP 3 — workflow and payment rows ────────────────────────────
+-- ── STEP 3 — workflow, referrer fee and payment rows ──────────────
 
 -- (3a) Mark SAMPLE-0002 to 0005 as allocated (hides Re-quote / Request
 -- allocation on them, as for a real allocated case).
@@ -160,19 +163,31 @@ SELECT id, strftime('%Y-%m-%dT%H:%M:%SZ', referred_at)
 FROM enquiries
 WHERE reference IN ('SAMPLE-0002', 'SAMPLE-0003', 'SAMPLE-0004', 'SAMPLE-0005');
 
--- (3b) Record the fee on SAMPLE-0005 as paid 5 days ago.
+-- (3b) The referrer's fee on each sample: their remortgage / transfer rate
+-- for SAMPLE-0003, their main rate for the rest.
+INSERT INTO referrer_case_fees (enquiry_id, amount)
+SELECT e.id,
+       CASE WHEN e.transaction_type IN ('remortgage', 'transfer', 'remortgage_transfer')
+            THEN r.remortgage_referral_fee ELSE r.referral_fee END
+FROM enquiries e
+JOIN referrers r ON r.id = e.referrer_id
+WHERE substr(e.reference, 1, 7) = 'SAMPLE-';
+
+-- (3c) Record the fee on SAMPLE-0005 as paid 5 days ago.
 INSERT INTO referrer_fee_payments (enquiry_id, amount, paid_at, payment_note)
-SELECT id, referral_fee_amount, date('now', '-5 days'), 'Sample payment'
-FROM enquiries
-WHERE reference = 'SAMPLE-0005';
+SELECT e.id, c.amount, date('now', '-5 days'), 'Sample payment'
+FROM enquiries e
+JOIN referrer_case_fees c ON c.enquiry_id = e.id
+WHERE e.reference = 'SAMPLE-0005';
 
 -- ── STEP 4 — confirm ──────────────────────────────────────────────
 
 -- Expect 5 rows: stages as listed at the top, fees 150/150/100/150/150,
 -- allocated on 0002–0005, paid only on 0005.
 SELECT e.reference, e.transaction_type, e.status, e.case_status,
-       e.referral_fee_amount, w.allocated_at, p.paid_at
+       c.amount AS referrer_fee, w.allocated_at, p.paid_at
 FROM enquiries e
+LEFT JOIN referrer_case_fees c ON c.enquiry_id = e.id
 LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
 LEFT JOIN referrer_fee_payments p ON p.enquiry_id = e.id
 WHERE substr(e.reference, 1, 7) = 'SAMPLE-'

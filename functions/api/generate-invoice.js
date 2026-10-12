@@ -74,51 +74,25 @@ export async function onRequestPost(context) {
       "Bank: [Please contact info@conveyquote.uk for payment details]";
 
     const invoiceRef = generateInvoiceRef();
-    const VAT_RATE = 0.2;
+    // ConveyQuote is not VAT registered: no VAT on any line. Each line keeps
+    // net / vat / gross so existing invoice screens read it unchanged.
+    const line = (label, amount) => ({ label, net: amount, vat: 0, gross: amount });
 
-    // Calculate fees
-    let lineItems = [];
-
-    // The referrer's fee is the one recorded on this case (set from the
-    // referrer's rate for the matter type — e.g. £75 purchase, £40
-    // remortgage — and adjustable on the allocation screen), not the
-    // referrer's main rate. A referred case is billed as referred when the
-    // referrer has a main rate (as before) or the case itself carries a fee.
-    const hasReferrer = !!enquiry.referrer_id && (!!enquiry.referrer_fee || Number(enquiry.referral_fee_amount) > 0);
-    const referrerFee =
-      hasReferrer && Number(enquiry.referral_fee_payable) === 1 ? Number(enquiry.referral_fee_amount || 0) : 0;
-    const referrerName = enquiry.referrer_name || "";
-
-    if (hasReferrer) {
-      // Referrer fee (passed through at cost, no markup). Omitted when the
-      // case carries no referrer fee (e.g. a matter type with no automatic fee).
-      if (referrerFee > 0) {
-        lineItems.push({
-          label: `Referral fee — ${referrerName}`,
-          net: referrerFee,
-          vat: Number((referrerFee * VAT_RATE).toFixed(2)),
-          gross: Number((referrerFee * (1 + VAT_RATE)).toFixed(2)),
-        });
-      }
-      // ConveyQuote marketing fee
-      const mktFee = 50;
-      lineItems.push({
-        label: "ConveyQuote marketing fee",
-        net: mktFee,
-        vat: Number((mktFee * VAT_RATE).toFixed(2)),
-        gross: Number((mktFee * (1 + VAT_RATE)).toFixed(2)),
-      });
-    } else {
-      // Public enquiry — use admin-set referral_fee_amount if provided, otherwise default to £250
-      const adminSetFee = Number(enquiry.referral_fee_amount || 0);
-      const fee = adminSetFee > 0 ? adminSetFee : 250;
-      lineItems.push({
-        label: "ConveyQuote referral fee",
-        net: fee,
-        vat: Number((fee * VAT_RATE).toFixed(2)),
-        gross: Number((fee * (1 + VAT_RATE)).toFixed(2)),
-      });
+    // The firm fee — what the panel firm pays ConveyQuote — is set on the
+    // case at allocation (enquiries.referral_fee_amount) and billed on every
+    // case, referred or not. The referrer's fee is paid by ConveyQuote out
+    // of it and never appears here.
+    const firmFee = Number(enquiry.referral_fee_payable) === 1 ? Number(enquiry.referral_fee_amount || 0) : 0;
+    if (!(firmFee > 0)) {
+      return jsonResponse(
+        { success: false, error: "No referral fee has been set on this case yet. Please contact ConveyQuote." },
+        400
+      );
     }
+
+    const lineItems = [line(`ConveyQuote referral fee — ${reference}`, firmFee)];
+    // Referred cases also carry the fixed £50 ConveyQuote marketing fee.
+    if (enquiry.referrer_id) lineItems.push(line("ConveyQuote marketing fee", 50));
 
     const totalNet = lineItems.reduce((s, i) => s + i.net, 0);
     const totalVat = lineItems.reduce((s, i) => s + i.vat, 0);
@@ -162,8 +136,6 @@ export async function onRequestPost(context) {
     const lineRows = lineItems.map((l) => `
       <tr>
         <td style="padding:10px 14px;border:1px solid #e5e7eb;">${escapeHtml(l.label)}</td>
-        <td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">${formatMoney(l.net)}</td>
-        <td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">${formatMoney(l.vat)}</td>
         <td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">${formatMoney(l.gross)}</td>
       </tr>`).join("");
 
@@ -174,7 +146,7 @@ export async function onRequestPost(context) {
   <div style="max-width:680px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
     <div style="background:#0f2747;padding:28px 32px;display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <h1 style="color:#fff;margin:0;font-size:22px;">TAX INVOICE</h1>
+        <h1 style="color:#fff;margin:0;font-size:22px;">INVOICE</h1>
         <p style="color:#a0b4cc;margin:4px 0 0;font-size:13px;">ConveyQuote · Essentially Law Limited</p>
       </div>
       <div style="text-align:right;">
@@ -202,19 +174,18 @@ export async function onRequestPost(context) {
         <thead>
           <tr style="background:#f7f9fc;">
             <th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;">Description</th>
-            <th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">Net</th>
-            <th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">VAT</th>
-            <th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">Gross</th>
+            <th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;">Amount</th>
           </tr>
         </thead>
         <tbody>
           ${lineRows}
           <tr style="background:#0f2747;color:#fff;">
-            <td style="padding:12px 14px;font-weight:700;" colspan="3">Total Due</td>
+            <td style="padding:12px 14px;font-weight:700;">Total Due</td>
             <td style="padding:12px 14px;text-align:right;font-weight:700;">${formatMoney(totalGross)}</td>
           </tr>
         </tbody>
       </table>
+      <p style="margin:-8px 0 20px;font-size:12px;color:#6b7280;">Essentially Law Limited is not registered for VAT. No VAT is charged.</p>
 
       <div style="background:#f7f9fc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:20px;">
         <p style="margin:0 0 8px;font-weight:700;font-size:13px;">Payment Details</p>

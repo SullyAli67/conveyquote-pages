@@ -4,15 +4,17 @@ Plain-English steps to give David at Trusted Conveyancers a portal that
 already shows five fictional sample cases, then take a real referral end
 to end. Do the steps in order.
 
-## Part 1 — one-off database change (Cloudflare D1 console)
+## Part 1 — one-off database changes (Cloudflare D1 console)
 
-Do this **before** the pull request that adds referrer fee payments is
-merged. The new code reads the new table and column.
+Open Cloudflare → **D1** → **conveyquote-db** → **Console** and paste each
+statement on its own, in order.
 
-1. Open Cloudflare → **D1** → **conveyquote-db** → **Console**.
-2. Open `migrations/0020_referrer_fees.sql` and paste each statement on its
-   own, in order: STEP 1, STEP 2, then the two STEP 3 checks. The checks
-   should each return one row.
+1. `migrations/0020_referrer_fees.sql` (already applied): STEP 1, STEP 2,
+   then the two STEP 3 checks.
+2. `migrations/0021_referrer_case_fees.sql`: STEP 1 and STEP 2 **before**
+   the pull request that separates the firm fee from the referrer fee is
+   merged; STEP 2 again and STEP 3 straight after it is merged; then the
+   STEP 4 checks.
 
 ## Part 2 — create David's account with portal access OFF
 
@@ -36,7 +38,7 @@ merged. The new code reads the new table and column.
 2. Paste the two STEP 1 checks. The first must return exactly **one** row
    showing fees 150 and 100. The second must return **0**.
 3. Paste the five STEP 2 inserts, one at a time.
-4. Paste the two STEP 3 inserts.
+4. Paste the three STEP 3 inserts.
 5. Paste the STEP 4 check. It should list SAMPLE-0001 to SAMPLE-0005.
 
 The sample cases are fictional, carry a grey **Sample** badge in the

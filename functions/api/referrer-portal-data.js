@@ -27,6 +27,9 @@ export async function onRequestGet(context) {
     // live in the referrer_workflow side-table — see migration 0013.
     // Referral fee payouts to the referrer live in referrer_fee_payments
     // (migration 0020); a row there means the fee has been paid.
+    // The referrer's fee on each case comes from referrer_case_fees
+    // (migration 0021). enquiries.referral_fee_* is the firm fee and is
+    // deliberately NOT selected here — it must never reach the referrer.
     const enquiriesResult = await env.DB.prepare(
       `SELECT
          e.id, e.reference, e.client_name, e.client_email, e.client_phone,
@@ -35,7 +38,7 @@ export async function onRequestGet(context) {
          e.status, e.panel_status, e.case_status, e.eta_date,
          e.target_completion_date, e.fall_through_reason,
          e.assigned_firm_name, e.firm_response,
-         e.referred_at, e.created_at, e.referral_fee_payable, e.referral_fee_amount,
+         e.referred_at, e.created_at, c.amount AS referrer_fee,
          w.referrer_note,
          e.mortgage, e.lender, e.ownership_type, e.first_time_buyer, e.new_build,
          e.shared_ownership, e.help_to_buy, e.is_company, e.buy_to_let,
@@ -50,6 +53,7 @@ export async function onRequestGet(context) {
        FROM enquiries e
        LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
        LEFT JOIN referrer_fee_payments p ON p.enquiry_id = e.id
+       LEFT JOIN referrer_case_fees c ON c.enquiry_id = e.id
        WHERE e.referrer_id = ?
        ORDER BY e.created_at DESC`
     ).bind(referrerId).all();

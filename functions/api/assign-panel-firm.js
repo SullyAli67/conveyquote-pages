@@ -45,10 +45,22 @@ export async function onRequestPost(context) {
     if (!session) return unauthorised();
 
     const body = await request.json();
-    const { reference, firm_id, firm_name, referral_fee_payable, referral_fee_amount, admin_notes } = body;
+    const { reference, firm_id, firm_name, firm_fee, referrer_fee, admin_notes } = body;
 
     if (!reference || !firm_id || !firm_name) {
       return jsonResponse({ success: false, error: "Reference, firm id and firm name are required." }, 400);
+    }
+
+    // Two separate fees on every allocated case:
+    //   firm fee     — what the panel firm pays ConveyQuote; stored on
+    //                  enquiries.referral_fee_amount; billed on the firm invoice.
+    //   referrer fee — what ConveyQuote pays the referrer; stored in
+    //                  referrer_case_fees (migration 0021); shown only in
+    //                  the referrer portal.
+    // A case can't be allocated until both are set.
+    const firmFee = Number(firm_fee);
+    if (!Number.isFinite(firmFee) || firmFee <= 0) {
+      return jsonResponse({ success: false, error: "Enter the firm fee before allocating." }, 400);
     }
 
     // Sample cases must never be linked to a real panel firm (that would
@@ -80,6 +92,17 @@ export async function onRequestPost(context) {
       );
     }
 
+    const enquiryForWorkflow = await env.DB.prepare(
+      `SELECT id, referrer_id FROM enquiries WHERE reference = ? LIMIT 1`
+    ).bind(reference).first();
+    if (!enquiryForWorkflow) {
+      return jsonResponse({ success: false, error: "Enquiry not found." }, 404);
+    }
+    const referrerFee = Number(referrer_fee);
+    if (enquiryForWorkflow.referrer_id && (referrer_fee === undefined || referrer_fee === null || referrer_fee === "" || !Number.isFinite(referrerFee) || referrerFee < 0)) {
+      return jsonResponse({ success: false, error: "Enter the referrer fee before allocating (0 if none is due)." }, 400);
+    }
+
     const allocatedAt = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE enquiries
@@ -88,16 +111,17 @@ export async function onRequestPost(context) {
            referred_at=CURRENT_TIMESTAMP, admin_notes=COALESCE(?,admin_notes),
            updated_at=datetime('now')
        WHERE reference=?`
-    ).bind(firm_id, firm_name, toFlag(referral_fee_payable), Number(referral_fee_amount||0), admin_notes||null, reference).run();
+    ).bind(firm_id, firm_name, 1, firmFee, admin_notes||null, reference).run();
 
     // Stamp allocated_at into referrer_workflow when the enquiry has a
-    // referrer — this is the Pattern B "approve allocation" step.
-    // Non-referrer enquiries get no workflow row (allocated_at stays
-    // effectively NULL via LEFT JOIN).
-    const enquiryForWorkflow = await env.DB.prepare(
-      `SELECT id, referrer_id FROM enquiries WHERE reference = ? LIMIT 1`
-    ).bind(reference).first();
-    if (enquiryForWorkflow?.referrer_id) {
+    // referrer — this is the Pattern B "approve allocation" step — and
+    // record the referrer fee. Non-referrer enquiries get neither.
+    if (enquiryForWorkflow.referrer_id) {
+      await env.DB.prepare(
+        `INSERT INTO referrer_case_fees (enquiry_id, amount, updated_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT (enquiry_id) DO UPDATE SET amount = excluded.amount, updated_at = excluded.updated_at`
+      ).bind(enquiryForWorkflow.id, referrerFee).run();
       await env.DB.prepare(
         `INSERT INTO referrer_workflow (enquiry_id, allocated_at)
          VALUES (?, ?)
@@ -114,7 +138,7 @@ export async function onRequestPost(context) {
         reference,
         Number(firm_id),
         firm_name,
-        `Referral fee: £${Number(referral_fee_amount||0).toFixed(2)}, payable: ${referral_fee_payable ? 'yes' : 'no'}`
+        `Firm fee: £${firmFee.toFixed(2)}${enquiryForWorkflow.referrer_id ? `, referrer fee: £${referrerFee.toFixed(2)}` : ""}`
       ).run();
     } catch (e) { console.error("Audit log error:", e); }
 
@@ -224,7 +248,7 @@ export async function onRequestPost(context) {
                 <tr><td style="padding:8px 12px;border:1px solid #ddd;background:#f7f7f7;font-weight:bold;">Type</td><td style="padding:8px 12px;border:1px solid #ddd;">${escapeHtml(transactionLabel)}</td></tr>
                 <tr><td style="padding:8px 12px;border:1px solid #ddd;background:#f7f7f7;font-weight:bold;">Value</td><td style="padding:8px 12px;border:1px solid #ddd;">${escapeHtml(price)}</td></tr>
                 <tr><td style="padding:8px 12px;border:1px solid #ddd;background:#f7f7f7;font-weight:bold;">Postcode</td><td style="padding:8px 12px;border:1px solid #ddd;">${escapeHtml(enquiryRow?.postcode||"Not provided")}</td></tr>
-                ${referral_fee_payable ? `<tr><td style="padding:8px 12px;border:1px solid #ddd;background:#f7f7f7;font-weight:bold;">Referral fee</td><td style="padding:8px 12px;border:1px solid #ddd;">£${Number(referral_fee_amount||0).toFixed(2)}</td></tr>` : ""}
+                <tr><td style="padding:8px 12px;border:1px solid #ddd;background:#f7f7f7;font-weight:bold;">Referral fee</td><td style="padding:8px 12px;border:1px solid #ddd;">£${firmFee.toFixed(2)}</td></tr>
               </table>
               ${admin_notes ? `<p style="background:#fffbeb;border:1px solid #f59e0b;padding:12px;border-radius:4px;"><strong>Note:</strong> ${escapeHtml(admin_notes)}</p>` : ""}
               ${hasPortal
