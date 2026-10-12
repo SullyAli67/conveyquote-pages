@@ -1253,3 +1253,12 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* Referrer portal: much of it is set in 12–14px, which reads small on a
+   large monitor. Scale the whole portal up evenly on wide screens; phones
+   and laptops keep the normal size. */
+@media (min-width: 1280px) {
+  .referrer-portal-page {
+    zoom: 1.15;
+  }
+}

@@ -16057,7 +16057,7 @@ function App() {
         };
 
         return (
-          <div className="public-page" style={{ maxWidth: 1000, width: "100%", boxSizing: "border-box" /* .page is a flex column and .public-page has auto margins, so without a set width the Payments table stretches the portal past a phone's width */ }}>
+          <div className="public-page referrer-portal-page" style={{ maxWidth: 1000, width: "100%", boxSizing: "border-box" /* .page is a flex column and .public-page has auto margins, so without a set width the Payments table stretches the portal past a phone's width */ }}>
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
               <div>
@@ -18123,6 +18123,41 @@ function ClientEmailSample({
   );
 }
 
+// Big tap-buttons in place of a dropdown. Used on the referral form so no
+// choice depends on the browser's pop-up list, which some screens draw in
+// tiny text.
+function ChoiceButtons({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+  ariaLabel: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+      {options.map(([v, label]) => {
+        const on = value === v;
+        return (
+          <button key={v || "blank"} type="button" role="radio" aria-checked={on} onClick={() => onChange(v)}
+            style={{
+              minHeight: 44, padding: "0 16px", fontSize: "16px", fontWeight: 600, borderRadius: "10px", cursor: "pointer",
+              border: on ? "2px solid var(--navy)" : "1.5px solid #cbd5e1",
+              background: on ? "var(--navy)" : "#fff",
+              color: on ? "#fff" : "var(--navy)",
+              fontFamily: "inherit",
+            }}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ReferrerSimpleForm({
   referrerToken,
   onSuccess,
@@ -18342,22 +18377,12 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Transaction type</label>
-              <select style={inputStyle} value={form.type} onChange={(e) => set("type", e.target.value)}>
-                <option value="purchase">Purchase</option>
-                <option value="sale">Sale</option>
-                <option value="remortgage">Remortgage</option>
-                <option value="transfer">Transfer of Equity</option>
-                <option value="lease_extension_statutory">Lease Extension (statutory)</option>
-                <option value="lease_extension_informal">Lease Extension (informal)</option>
-              </select>
+              <ChoiceButtons ariaLabel="Transaction type" value={form.type} onChange={(v) => set("type", v)} options={[["purchase", "Purchase"], ["sale", "Sale"], ["remortgage", "Remortgage"], ["transfer", "Transfer of Equity"], ["lease_extension_statutory", "Lease Extension (statutory)"], ["lease_extension_informal", "Lease Extension (informal)"]]} />
             </div>
             {!isLeaseExtension && (
               <div style={fieldStyle}>
                 <label style={labelStyle}>Tenure</label>
-                <select style={inputStyle} value={form.tenure} onChange={(e) => set("tenure", e.target.value)}>
-                  <option value="freehold">Freehold</option>
-                  <option value="leasehold">Leasehold</option>
-                </select>
+                <ChoiceButtons ariaLabel="Tenure" value={form.tenure} onChange={(v) => set("tenure", v)} options={[["freehold", "Freehold"], ["leasehold", "Leasehold"]]} />
               </div>
             )}
             {!isLeaseExtension && (
@@ -18390,11 +18415,7 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Flat or house? <span style={{ color: "#dc2626" }}>*</span></label>
-              <select style={inputStyle} value={form.propertyType} onChange={(e) => set("propertyType", e.target.value)}>
-                <option value="">Please select</option>
-                <option value="flat">Flat</option>
-                <option value="house">House</option>
-              </select>
+              <ChoiceButtons ariaLabel="Flat or house?" value={form.propertyType} onChange={(v) => set("propertyType", v)} options={[["flat", "Flat"], ["house", "House"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Years left on the lease <span style={{ color: "#dc2626" }}>*</span></label>
@@ -18413,69 +18434,37 @@ function ReferrerSimpleForm({
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Is the landlord traceable?</label>
-              <select style={inputStyle} value={form.landlordIdentifiable} onChange={(e) => set("landlordIdentifiable", e.target.value)}>
-                <option value="">Please select</option>
-                <option value="yes">Yes</option>
-                <option value="no">No — cannot be traced</option>
-              </select>
+              <ChoiceButtons ariaLabel="Is the landlord traceable?" value={form.landlordIdentifiable} onChange={(v) => set("landlordIdentifiable", v)} options={[["yes", "Yes"], ["no", "No — cannot be traced"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Notice already served?</label>
-              <select style={inputStyle} value={form.noticeAlreadyServed} onChange={(e) => set("noticeAlreadyServed", e.target.value)}>
-                <option value="">Please select</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Notice already served?" value={form.noticeAlreadyServed} onChange={(v) => set("noticeAlreadyServed", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Shared ownership lease?</label>
-              <select style={inputStyle} value={form.sharedOwnership} onChange={(e) => set("sharedOwnership", e.target.value)}>
-                <option value="">Please select</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Shared ownership lease?" value={form.sharedOwnership} onChange={(v) => set("sharedOwnership", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             {form.sharedOwnership === "yes" && (
               <div style={fieldStyle}>
                 <label style={labelStyle}>Staircased to 100%?</label>
-                <select style={inputStyle} value={form.staircasedToFull} onChange={(e) => set("staircasedToFull", e.target.value)}>
-                  <option value="">Please select</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </select>
+                <ChoiceButtons ariaLabel="Staircased to 100%?" value={form.staircasedToFull} onChange={(v) => set("staircasedToFull", v)} options={[["yes", "Yes"], ["no", "No"]]} />
               </div>
             )}
             <div style={fieldStyle}>
               <label style={labelStyle}>Business tenancy?</label>
-              <select style={inputStyle} value={form.isBusinessTenancy} onChange={(e) => set("isBusinessTenancy", e.target.value)}>
-                <option value="">Please select</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Business tenancy?" value={form.isBusinessTenancy} onChange={(v) => set("isBusinessTenancy", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Unregistered title?</label>
-              <select style={inputStyle} value={form.unregisteredTitle} onChange={(e) => set("unregisteredTitle", e.target.value)}>
-                <option value="">Not sure</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Unregistered title?" value={form.unregisteredTitle} onChange={(v) => set("unregisteredTitle", v)} options={[["", "Not sure"], ["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Head lease / intermediate landlord?</label>
-              <select style={inputStyle} value={form.intermediateLandlord} onChange={(e) => set("intermediateLandlord", e.target.value)}>
-                <option value="">Not sure</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Head lease / intermediate landlord?" value={form.intermediateLandlord} onChange={(v) => set("intermediateLandlord", v)} options={[["", "Not sure"], ["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Lease lost or plan defective?</label>
-              <select style={inputStyle} value={form.missingLeaseDocuments} onChange={(e) => set("missingLeaseDocuments", e.target.value)}>
-                <option value="">Not sure</option>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Lease lost or plan defective?" value={form.missingLeaseDocuments} onChange={(v) => set("missingLeaseDocuments", v)} options={[["", "Not sure"], ["no", "No"], ["yes", "Yes"]]} />
             </div>
           </div>
         </div>
@@ -18488,10 +18477,7 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage or cash?</label>
-              <select style={inputStyle} value={form.mortgage} onChange={(e) => set("mortgage", e.target.value)}>
-                <option value="mortgage">Mortgage</option>
-                <option value="cash">Cash</option>
-              </select>
+              <ChoiceButtons ariaLabel="Mortgage or cash?" value={form.mortgage} onChange={(v) => set("mortgage", v)} options={[["mortgage", "Mortgage"], ["cash", "Cash"]]} />
             </div>
             {form.mortgage === "mortgage" && (
               <div style={fieldStyle}>
@@ -18502,87 +18488,51 @@ function ReferrerSimpleForm({
             )}
             <div style={fieldStyle}>
               <label style={labelStyle}>Ownership type</label>
-              <select style={inputStyle} value={form.ownershipType} onChange={(e) => set("ownershipType", e.target.value)}>
-                <option value="individual">Individual buyer</option>
-                <option value="joint">Joint buyers</option>
-              </select>
+              <ChoiceButtons ariaLabel="Ownership type" value={form.ownershipType} onChange={(v) => set("ownershipType", v)} options={[["individual", "Individual buyer"], ["joint", "Joint buyers"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>First time buyer?</label>
-              <select style={inputStyle} value={form.firstTimeBuyer} onChange={(e) => set("firstTimeBuyer", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="First time buyer?" value={form.firstTimeBuyer} onChange={(v) => set("firstTimeBuyer", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Additional property? (5% SDLT surcharge)</label>
-              <select style={inputStyle} value={form.additionalProperty} onChange={(e) => set("additionalProperty", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Additional property? (5% SDLT surcharge)" value={form.additionalProperty} onChange={(v) => set("additionalProperty", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>UK resident for SDLT?</label>
-              <select style={inputStyle} value={form.ukResidentForSdlt} onChange={(e) => set("ukResidentForSdlt", e.target.value)}>
-                <option value="yes">Yes</option>
-                <option value="no">No (2% surcharge)</option>
-              </select>
+              <ChoiceButtons ariaLabel="UK resident for SDLT?" value={form.ukResidentForSdlt} onChange={(v) => set("ukResidentForSdlt", v)} options={[["yes", "Yes"], ["no", "No (2% surcharge)"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>New build?</label>
-              <select style={inputStyle} value={form.newBuild} onChange={(e) => set("newBuild", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="New build?" value={form.newBuild} onChange={(v) => set("newBuild", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Gifted deposit?</label>
-              <select style={inputStyle} value={form.giftedDeposit} onChange={(e) => set("giftedDeposit", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Gifted deposit?" value={form.giftedDeposit} onChange={(v) => set("giftedDeposit", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Buy to let?</label>
-              <select style={inputStyle} value={form.buyToLet} onChange={(e) => set("buyToLet", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Buy to let?" value={form.buyToLet} onChange={(v) => set("buyToLet", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Shared ownership scheme?</label>
-              <select style={inputStyle} value={form.sharedOwnership} onChange={(e) => set("sharedOwnership", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Shared ownership scheme?" value={form.sharedOwnership} onChange={(v) => set("sharedOwnership", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Help to Buy / government scheme?</label>
-              <select style={inputStyle} value={form.helpToBuy} onChange={(e) => set("helpToBuy", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Help to Buy / government scheme?" value={form.helpToBuy} onChange={(v) => set("helpToBuy", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Lifetime ISA?</label>
-              <select style={inputStyle} value={form.lifetimeIsa} onChange={(e) => set("lifetimeIsa", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Lifetime ISA?" value={form.lifetimeIsa} onChange={(v) => set("lifetimeIsa", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Right to Buy?</label>
-              <select style={inputStyle} value={form.rightToBuy} onChange={(e) => set("rightToBuy", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Right to Buy?" value={form.rightToBuy} onChange={(v) => set("rightToBuy", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Buying via company?</label>
-              <select style={inputStyle} value={form.isCompany} onChange={(e) => set("isCompany", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Buying via company?" value={form.isCompany} onChange={(v) => set("isCompany", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
           </div>
         </div>
@@ -18595,32 +18545,19 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage to redeem on sale?</label>
-              <select style={inputStyle} value={form.saleMortgage} onChange={(e) => set("saleMortgage", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Mortgage to redeem on sale?" value={form.saleMortgage} onChange={(v) => set("saleMortgage", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Management company / service charge?</label>
-              <select style={inputStyle} value={form.managementCompany} onChange={(e) => set("managementCompany", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Management company / service charge?" value={form.managementCompany} onChange={(v) => set("managementCompany", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Property currently tenanted?</label>
-              <select style={inputStyle} value={form.tenanted} onChange={(e) => set("tenanted", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Property currently tenanted?" value={form.tenanted} onChange={(v) => set("tenanted", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Number of sellers</label>
-              <select style={inputStyle} value={form.numberOfSellers} onChange={(e) => set("numberOfSellers", e.target.value)}>
-                <option value="1">1 seller</option>
-                <option value="2">2 sellers</option>
-                <option value="3">3 or more</option>
-              </select>
+              <ChoiceButtons ariaLabel="Number of sellers" value={form.numberOfSellers} onChange={(v) => set("numberOfSellers", v)} options={[["1", "1 seller"], ["2", "2 sellers"], ["3", "3 or more"]]} />
             </div>
           </div>
         </div>
@@ -18633,10 +18570,7 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Ownership type</label>
-              <select style={inputStyle} value={form.ownershipType} onChange={(e) => set("ownershipType", e.target.value)}>
-                <option value="individual">Sole name</option>
-                <option value="joint">Joint names</option>
-              </select>
+              <ChoiceButtons ariaLabel="Ownership type" value={form.ownershipType} onChange={(v) => set("ownershipType", v)} options={[["individual", "Sole name"], ["joint", "Joint names"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Lender (new)</label>
@@ -18645,17 +18579,11 @@ function ReferrerSimpleForm({
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Additional borrowing?</label>
-              <select style={inputStyle} value={form.additionalBorrowing} onChange={(e) => set("additionalBorrowing", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Additional borrowing?" value={form.additionalBorrowing} onChange={(v) => set("additionalBorrowing", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Transfer of equity at same time?</label>
-              <select style={inputStyle} value={form.remortgageTransfer} onChange={(e) => set("remortgageTransfer", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Transfer of equity at same time?" value={form.remortgageTransfer} onChange={(v) => set("remortgageTransfer", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
           </div>
         </div>
@@ -18668,18 +18596,11 @@ function ReferrerSimpleForm({
           <div className="form-grid">
             <div style={fieldStyle}>
               <label style={labelStyle}>Mortgage on the property?</label>
-              <select style={inputStyle} value={form.transferMortgage} onChange={(e) => set("transferMortgage", e.target.value)}>
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <ChoiceButtons ariaLabel="Mortgage on the property?" value={form.transferMortgage} onChange={(v) => set("transferMortgage", v)} options={[["no", "No"], ["yes", "Yes"]]} />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>How many owners changing?</label>
-              <select style={inputStyle} value={form.ownersChanging} onChange={(e) => set("ownersChanging", e.target.value)}>
-                <option value="one">One owner</option>
-                <option value="two">Two owners</option>
-                <option value="more">More than two</option>
-              </select>
+              <ChoiceButtons ariaLabel="How many owners changing?" value={form.ownersChanging} onChange={(v) => set("ownersChanging", v)} options={[["one", "One owner"], ["two", "Two owners"], ["more", "More than two"]]} />
             </div>
           </div>
         </div>
