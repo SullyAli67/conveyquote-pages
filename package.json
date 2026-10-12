@@ -10,7 +10,8 @@
     "verify-engines": "node scripts/verify-engine-consistency.js",
     "generate-guides": "node scripts/generate-guides.cjs",
     "verify-enfranchisement": "node scripts/verify-enfranchisement-quotes.js",
-    "verify-all": "npm run verify-engines && npm run verify-enfranchisement"
+    "verify-text": "node scripts/verify-no-escape-text.js",
+    "verify-all": "npm run verify-engines && npm run verify-enfranchisement && npm run verify-text"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

@@ -644,6 +644,9 @@ type LenderEditorState = {
   notes: string;
 };
 
+// Referrer portal tabs. "client_email" is shown on demo accounts only.
+type ReferrerPortalTab = "dashboard" | "my_referrals" | "new_referral" | "payments" | "client_email";
+
 // Matter types a referrer can have custom client pricing for (Referrers >
 // Client pricing), in the order the admin sees them.
 const REFERRER_MATTER_TYPES: [string, string][] = [
@@ -2109,6 +2112,7 @@ function App() {
     portal_email: string; portal_active: number; notes: string; created_at: string;
     // Status fields from manage-referrers.js GET.
     has_password?: number; invite_expires_at?: string | null; last_login_at?: string | null;
+    demo_link_expires_at?: string | null;
     is_demo?: number; case_count?: number; completed_count?: number; sample_count?: number;
     custom_pricing_types?: string | null;
   };
@@ -2147,6 +2151,8 @@ function App() {
   const [referrerAccessMessage, setReferrerAccessMessage] = useState("");
   const [isReferrerAccessBusy, setIsReferrerAccessBusy] = useState(false);
   const [referrerNewPassword, setReferrerNewPassword] = useState("");
+  // The last demo link made for the open referrer, so it can be copied.
+  const [demoLinkUrl, setDemoLinkUrl] = useState("");
   const [referrerCases, setReferrerCases] = useState<ReferrerCaseRow[]>([]);
   const [isLoadingReferrerCases, setIsLoadingReferrerCases] = useState(false);
   const [demoForm, setDemoForm] = useState({ open: false, referrer_name: "Demo Estate Agents", portal_email: "", message: "", busy: false });
@@ -2646,14 +2652,18 @@ function App() {
   // Admin's read-only "Preview their portal" (opened as /referrer-portal/#preview=<token>).
   // The token is held in memory only — never saved — so it ends with the tab.
   const [referrerPreview, setReferrerPreview] = useState(false);
-  const [referrerPortalTab, setReferrerPortalTabRaw] = useState<"dashboard" | "my_referrals" | "new_referral" | "payments">(
-    () => (localStorage.getItem("cq_referrer_tab") as "dashboard" | "my_referrals" | "new_referral" | "payments") || "dashboard"
+  // Demo accounts: guided tour step (null = closed) and the logo picked on
+  // the Client email tab (kept in memory only).
+  const [demoTourStep, setDemoTourStep] = useState<number | null>(null);
+  const [demoLogo, setDemoLogo] = useState("");
+  const [referrerPortalTab, setReferrerPortalTabRaw] = useState<ReferrerPortalTab>(
+    () => (localStorage.getItem("cq_referrer_tab") as ReferrerPortalTab) || "dashboard"
   );
   // Tier 1: see setFirmPortalTab. The referrer portal currently has no
   // forms wired into the registry, but the prompt still fires if any
   // other dirty form exists when navigating in/out of this portal.
   const setReferrerPortalTab = (
-    tab: "dashboard" | "my_referrals" | "new_referral" | "payments",
+    tab: ReferrerPortalTab,
     options: { force?: boolean } = {}
   ): boolean => {
     if (!options.force && !confirmDiscardIfDirty()) return false;
@@ -4305,6 +4315,9 @@ function App() {
   const referrerStatus = (r: ReferrerRow): { label: string; bg: string; fg: string; detail: string } => {
     const active = Number(r.portal_active) === 1;
     const hasPw = Number(r.has_password) === 1;
+    if (active && Number(r.is_demo) === 1 && r.demo_link_expires_at) {
+      return { label: "Demo link active", bg: "#ede9fe", fg: "#5b21b6", detail: `${r.last_login_at ? `last opened ${formatShortDate(r.last_login_at)} · ` : ""}link expires ${formatShortDate(r.demo_link_expires_at)}` };
+    }
     if (active && hasPw) {
       return { label: "Active", bg: "#d1fae5", fg: "#065f46", detail: r.last_login_at ? `last login ${formatShortDate(r.last_login_at)}` : "not logged in yet" };
     }
@@ -4374,6 +4387,7 @@ function App() {
     setReferrerInviteMessage("");
     setReferrerAccessMessage("");
     setReferrerNewPassword("");
+    setDemoLinkUrl("");
     resetReferrerPricing();
     setReferrerCases([]);
     setReferrerPanelTab(tab);
@@ -4491,6 +4505,39 @@ function App() {
     }
   };
 
+  const handleDemoLink = async (send: boolean) => {
+    if (!referrerEditor.id) return;
+    setIsReferrerAccessBusy(true);
+    setReferrerAccessMessage("");
+    try {
+      const res = await adminFetch("/api/admin-referrer-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: referrerEditor.id, action: "demo_link", send }),
+      });
+      const result = await res.json();
+      if (result.url) setDemoLinkUrl(result.url);
+      if (!result.success) {
+        setReferrerAccessMessage(result.error || "Could not make the demo link.");
+        return;
+      }
+      let copied = false;
+      if (!send) {
+        try { await navigator.clipboard.writeText(result.url); copied = true; } catch {}
+      }
+      setReferrerAccessMessage(
+        send
+          ? `✓ Demo access emailed to ${result.sent_to}. The link opens the demo with no password and works for ${result.days} days.`
+          : `✓ New demo link made${copied ? " and copied" : ""} — paste it into an email, text or WhatsApp. It works for ${result.days} days.`
+      );
+      await reloadReferrers();
+    } catch {
+      setReferrerAccessMessage("Something went wrong.");
+    } finally {
+      setIsReferrerAccessBusy(false);
+    }
+  };
+
   const handleSetReferrerPassword = async () => {
     if (referrerNewPassword.length < 8) {
       setReferrerAccessMessage("The password must be at least 8 characters.");
@@ -4551,7 +4598,7 @@ function App() {
       setDemoForm({ open: false, referrer_name: "Demo Estate Agents", portal_email: "", message: "", busy: false });
       if (created) {
         openReferrer(created, "access");
-        setReferrerAccessMessage("✓ Demo account created with five sample cases. Press Send invite to email the login link.");
+        setReferrerAccessMessage("✓ Demo account created with five sample cases. Press Email demo access to send it — no password needed.");
       }
     } catch {
       setDemoForm((p) => ({ ...p, busy: false, message: "Something went wrong." }));
@@ -6577,7 +6624,39 @@ function App() {
       // Admin portal preview: /referrer-portal/#preview=<token>. Takes the
       // place of any referrer login saved in this browser, for this tab only.
       const previewMatch = window.location.hash.match(/^#preview=([0-9a-f]{64})$/);
-      const savedReferrerToken = previewMatch ? null : localStorage.getItem("cq_referrer_token");
+      // Demo account link from "Email demo access": swap it for an ordinary
+      // referrer login, then open the portal with the tour running.
+      const demoMatch = previewMatch ? null : window.location.hash.match(/^#demo=([0-9a-f]{64})$/);
+      if (demoMatch) {
+        window.history.replaceState(null, "", window.location.pathname);
+        fetch("/api/referrer-demo-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: demoMatch[1] }),
+        })
+          .then((r) => r.json())
+          .then((result: { success: boolean; token?: string; referrer_id?: number; referrer_name?: string; error?: string }) => {
+            if (!result.success || !result.token) {
+              window.alert(result.error || "This demo link has expired. Please ask ConveyQuote for a new one.");
+              return;
+            }
+            const session = { referrer_id: Number(result.referrer_id), referrer_name: String(result.referrer_name) };
+            localStorage.setItem("cq_referrer_token", result.token);
+            localStorage.setItem("cq_referrer_session", JSON.stringify(session));
+            localStorage.setItem("cq_referrer_tab", "dashboard");
+            setReferrerToken(result.token);
+            setReferrerSession(session);
+            setReferrerPortalTabRaw("dashboard");
+            setDemoTourStep(0);
+            return fetch("/api/referrer-portal-data", { headers: { Authorization: `Bearer ${result.token}` } })
+              .then((r) => r.json())
+              .then((d: { success: boolean; referrer?: ReferrerInfo; enquiries?: ReferrerEnquiry[]; is_demo?: boolean }) => {
+                if (d.success && d.referrer) setReferrerPortalData({ referrer: d.referrer, enquiries: d.enquiries || [], is_demo: d.is_demo });
+              });
+          })
+          .catch(() => {});
+      }
+      const savedReferrerToken = previewMatch || demoMatch ? null : localStorage.getItem("cq_referrer_token");
       const savedReferrerSession = localStorage.getItem("cq_referrer_session");
       if (previewMatch) {
         const previewToken = previewMatch[1];
@@ -12998,7 +13077,7 @@ function App() {
                     {demoForm.open && (
                       <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "14px", padding: "14px", marginBottom: "14px" }}>
                         <p style={{ margin: "0 0 10px", fontSize: "13px", color: "#4c1d95" }}>
-                          Creates a ready-made demo login with five sample cases (£150 / £100 fees). Anything they refer from it becomes a sample case: it is priced on screen and never emailed to anyone or sent to Quote Review. You then press <strong>Send invite</strong>.
+                          Creates a ready-made demo login with five sample cases (£150 / £100 fees). Anything they refer from it becomes a sample case: it is priced on screen and never emailed to anyone or sent to Quote Review. You then press <strong>Email demo access</strong> — no password needed.
                         </p>
                         <div className="field" style={{ marginBottom: "8px" }}>
                           <label htmlFor="demoName">Name shown in the portal</label>
@@ -13185,7 +13264,36 @@ function App() {
                             <div className="detail-row"><div className="detail-row__label">Last login</div><div className="detail-row__value">{selected.last_login_at ? formatShortDate(selected.last_login_at, true) : "Never"}</div></div>
                           </div>
 
-                          <h4 style={{ margin: "0 0 6px", color: "var(--navy)" }}>Invite and passwords</h4>
+                          {Number(selected.is_demo) === 1 && (
+                            <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "14px", padding: "14px 16px", marginBottom: "18px" }}>
+                              <h4 style={{ margin: "0 0 6px", color: "#4c1d95" }}>Demo access</h4>
+                              <p className="form-note" style={{ marginTop: 0, color: "#4c1d95" }}>
+                                Emails {selected.portal_email || "the login email"} a button that opens this demo straight away with a guided tour. <strong>No password needed.</strong> The link works for 14 days; making a new one cancels the old one.
+                              </p>
+                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                <button type="button" className="primary-button" style={{ minHeight: 40, padding: "0 16px" }}
+                                  disabled={isReferrerAccessBusy || !selected.portal_email}
+                                  onClick={() => void handleDemoLink(true)}>
+                                  {isReferrerAccessBusy ? "Sending…" : "Email demo access"}
+                                </button>
+                                <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }}
+                                  disabled={isReferrerAccessBusy}
+                                  onClick={() => void handleDemoLink(false)}>
+                                  Copy a link instead
+                                </button>
+                              </div>
+                              {selected.demo_link_expires_at && (
+                                <p className="form-note" style={{ margin: "10px 0 0", color: "#4c1d95" }}>Current link works until {formatShortDate(selected.demo_link_expires_at)}.</p>
+                              )}
+                              {demoLinkUrl && (
+                                <input type="text" readOnly value={demoLinkUrl} aria-label="Demo link"
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  style={{ marginTop: "10px", width: "100%", boxSizing: "border-box", fontSize: "13px", fontFamily: "monospace", padding: "8px 10px", border: "1px solid #ddd6fe", borderRadius: "8px", background: "#fff" }} />
+                              )}
+                            </div>
+                          )}
+
+                          <h4 style={{ margin: "0 0 6px", color: "var(--navy)" }}>{Number(selected.is_demo) === 1 ? "Or log in with a password" : "Invite and passwords"}</h4>
                           <p className="form-note" style={{ marginTop: 0 }}>
                             {hasPw
                               ? "Sends a link so they choose a new password themselves (lasts 7 days). Their current password keeps working until they use it."
@@ -14569,7 +14677,7 @@ function App() {
                               {info.payment ? (
                                 <>
                                   <p style={{ color: "#065f46", fontWeight: 600, margin: "6px 0" }}>
-                                    \u2713 Paid £{info.payment.amount.toFixed(2)} on {fmtDate(info.payment.paid_at)}
+                                    ✓ Paid £{info.payment.amount.toFixed(2)} on {fmtDate(info.payment.paid_at)}
                                     {info.payment.note ? ` \u2014 ${info.payment.note}` : ""}
                                   </p>
                                   {!isSample && (
@@ -14578,7 +14686,7 @@ function App() {
                                   )}
                                 </>
                               ) : isSample ? (
-                                <p className="form-note">Sample case \u2014 payments are set by the demo scripts.</p>
+                                <p className="form-note">Sample case — no real payment can be recorded on it.</p>
                               ) : info.case_status !== "completed" ? (
                                 <p className="form-note">The referrer fee can be marked paid once the case is completed.</p>
                               ) : !info.referrer_fee ? (
@@ -15734,6 +15842,10 @@ function App() {
       {(isReferrerPortalPage || (isReferrerLoginPage && referrerSession)) && referrerSession && (() => {
         const enquiries = referrerPortalData?.enquiries || [];
         const referrer = referrerPortalData?.referrer;
+        const isDemo = Boolean(referrerPortalData?.is_demo);
+        // "Client email" exists on demo accounts only; anyone else who last
+        // had it open lands on the dashboard.
+        const portalTab: ReferrerPortalTab = referrerPortalTab === "client_email" && !isDemo ? "dashboard" : referrerPortalTab;
         const thisMonth = new Date().toISOString().slice(0, 7);
         const sentThisMonth = enquiries.filter((e) => String(e.created_at || "").startsWith(thisMonth)).length;
         const active = enquiries.filter((e) => e.assigned_firm_name && e.case_status !== "completed" && e.case_status !== "withdrawn" && e.case_status !== "fallen_through").length;
@@ -15828,7 +15940,21 @@ function App() {
           { id: "my_referrals" as const, label: `My Referrals${enquiries.length ? ` (${enquiries.length})` : ""}` },
           { id: "new_referral" as const, label: "+ New Referral" },
           { id: "payments" as const, label: "Payments" },
+          ...(isDemo ? [{ id: "client_email" as const, label: "Client email" }] : []),
         ];
+
+        // The demo tour: each step opens the tab it describes.
+        const TOUR: { tab: ReferrerPortalTab; title: string; text: string }[] = [
+          { tab: "dashboard", title: "Your dashboard", text: "Everything at a glance: referrals sent this month, active cases, completions and the fees you've earned. Cases completing soon are flagged at the top." },
+          { tab: "new_referral", title: "Get an instant quote", text: "Enter the property and your client's details and the quote appears on screen in seconds. Try it now: as this is a demo, nothing is sent to anyone." },
+          { tab: "client_email", title: "What your client receives", text: "ConveyQuote checks the quote and emails your client a clear estimate, copying you in. Upload your logo to see how a co-branded email would look." },
+          { tab: "my_referrals", title: "Track every case", text: "Follow each case from instruction through searches and exchange to completion. Open a case for the details, or use Request update to message the solicitor." },
+          { tab: "payments", title: "Get paid", text: "Your fee on every completed case, what's due and when it was paid." },
+        ];
+        const goTourStep = (i: number) => {
+          setDemoTourStep(i);
+          setReferrerPortalTab?.(TOUR[i].tab, { force: true });
+        };
 
         return (
           <div className="public-page" style={{ maxWidth: 1000, width: "100%", boxSizing: "border-box" /* .page is a flex column and .public-page has auto margins, so without a set width the Payments table stretches the portal past a phone's width */ }}>
@@ -15862,6 +15988,36 @@ function App() {
             {referrerPortalData?.is_demo && (
               <div role="status" style={{ background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", fontSize: "14px", color: "#4c1d95" }}>
                 <strong>Demo account.</strong> The cases here are samples. Referrals you make are priced on screen and saved as samples — nothing is sent to your clients or anyone else.
+                {demoTourStep === null && (
+                  <>{" "}<button type="button" onClick={() => goTourStep(0)}
+                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "#5b21b6", fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>Take the tour</button></>
+                )}
+              </div>
+            )}
+            {isDemo && demoTourStep !== null && (
+              <div role="region" aria-label="Demo tour" style={{ background: "#fff", border: "2px solid #8b5cf6", borderRadius: "14px", padding: "16px 18px", marginBottom: "18px", boxShadow: "0 6px 18px rgba(91,33,182,0.12)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "#6d28d9", textTransform: "uppercase", letterSpacing: "0.4px" }}>Tour · step {demoTourStep + 1} of {TOUR.length}</span>
+                  <button type="button" aria-label="Close the tour" onClick={() => setDemoTourStep(null)}
+                    style={{ background: "none", border: "none", fontSize: "20px", lineHeight: 1, color: "#6b7280", cursor: "pointer", minWidth: 32, minHeight: 32 }}>×</button>
+                </div>
+                <h3 style={{ margin: "0 0 4px", color: "var(--navy)" }}>{TOUR[demoTourStep].title}</h3>
+                <p style={{ margin: "0 0 12px", fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>{TOUR[demoTourStep].text}</p>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  {demoTourStep > 0 && (
+                    <button type="button" className="muted-button" style={{ minHeight: 38, padding: "0 14px" }} onClick={() => goTourStep(demoTourStep - 1)}>Back</button>
+                  )}
+                  {demoTourStep < TOUR.length - 1 ? (
+                    <button type="button" className="primary-button" style={{ minHeight: 38, padding: "0 16px" }} onClick={() => goTourStep(demoTourStep + 1)}>Next: {TOUR[demoTourStep + 1].title}</button>
+                  ) : (
+                    <button type="button" className="primary-button" style={{ minHeight: 38, padding: "0 16px" }} onClick={() => setDemoTourStep(null)}>Finish — explore on your own</button>
+                  )}
+                  <span style={{ display: "flex", gap: "4px", marginLeft: "auto" }} aria-hidden="true">
+                    {TOUR.map((_, i) => (
+                      <span key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: i === demoTourStep ? "#7c3aed" : "#ddd6fe" }} />
+                    ))}
+                  </span>
+                </div>
               </div>
             )}
 
@@ -15884,7 +16040,7 @@ function App() {
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "24px", borderBottom: "2px solid var(--border)", paddingBottom: "0" }}>
               {TABS.map((tab) => (
                 <button key={tab.id} type="button"
-                  style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: referrerPortalTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: referrerPortalTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
+                  style={{ minHeight: 40, padding: "0 18px", fontSize: "14px", fontWeight: 600, border: "none", background: "none", cursor: "pointer", color: portalTab === tab.id ? "var(--teal)" : "var(--muted)", borderBottom: portalTab === tab.id ? "2px solid var(--teal)" : "2px solid transparent", marginBottom: "-2px", transition: "color 0.15s" }}
                   onClick={() => { if (!setReferrerPortalTab?.(tab.id)) return; if (tab.id !== "new_referral") refreshPortal(); }}>
                   {tab.label}
                 </button>
@@ -15892,7 +16048,7 @@ function App() {
             </div>
 
             {/* ── DASHBOARD ── */}
-            {referrerPortalTab === "dashboard" && (
+            {portalTab === "dashboard" && (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "28px" }}>
                   {[
@@ -15953,7 +16109,7 @@ function App() {
             )}
 
             {/* ── MY REFERRALS ── */}
-            {referrerPortalTab === "my_referrals" && (() => {
+            {portalTab === "my_referrals" && (() => {
               const visibleEnquiries = enquiries.filter((e) => String(e.status || "") !== "archived");
 
               const handleArchive = (ref: string) => {
@@ -16009,7 +16165,7 @@ function App() {
 
               return (
                 <div>
-                  {!referrerPortalData && <p className="form-note">Loading\u2026</p>}
+                  {!referrerPortalData && <p className="form-note">Loading…</p>}
                   {referrerPortalData && visibleEnquiries.length === 0 && (
                     <div style={{ textAlign: "center", padding: "40px" }}>
                       <p className="form-note">No referrals yet.</p>
@@ -16268,7 +16424,7 @@ function App() {
                                     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-end" }}>
                                       <div>
                                         <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Referral fee</div>
-                                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>\u00a3{Number(enq.referrer_fee || 0).toFixed(2)}</div>
+                                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>£{Number(enq.referrer_fee || 0).toFixed(2)}</div>
                                       </div>
                                       <div>
                                         <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Payment status</div>
@@ -16341,23 +16497,36 @@ function App() {
             })()}
 
             {/* ── NEW REFERRAL ── */}
-            {referrerPortalTab === "new_referral" && (
+            {portalTab === "new_referral" && (
               <>
                 {referrerPreview && (
-                  <p className="form-note" style={{ marginTop: 0 }}>This is the referral form {referrerSession.referrer_name} uses. It can't be submitted from a preview.</p>
+                  <p className="form-note" style={{ marginTop: 0 }}>This is the referral form {referrerSession.referrer_name} uses. You can get a quote here, but it can't be submitted from a preview.</p>
                 )}
-                <fieldset disabled={referrerPreview} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-                  <ReferrerSimpleForm
-                    referrerToken={referrerToken ?? ""}
-                    demo={Boolean(referrerPortalData?.is_demo)}
-                    onSuccess={() => { setReferrerPortalTab?.("my_referrals"); refreshPortal(); }}
-                  />
-                </fieldset>
+                <ReferrerSimpleForm
+                  referrerToken={referrerToken ?? ""}
+                  demo={isDemo}
+                  previewOnly={referrerPreview}
+                  onSuccess={() => { setReferrerPortalTab?.("my_referrals"); refreshPortal(); }}
+                />
               </>
             )}
 
+            {portalTab === "client_email" && isDemo && (() => {
+              // The latest referral they priced in the demo, else a sample purchase.
+              const own = enquiries.find((e) => e.quote && Number((e.quote as { grandTotal?: number }).grandTotal) > 0);
+              const fallback = buildQuoteData({ type: "purchase", price: "285000", tenure: "freehold", mortgage: "mortgage", firstTimeBuyer: "no", additionalProperty: "no", ukResidentForSdlt: "yes" });
+              const typeNames: Record<string, string> = { purchase: "Purchase", sale: "Sale", sale_purchase: "Sale & Purchase", remortgage: "Remortgage", transfer: "Transfer of Equity", remortgage_transfer: "Remortgage & Transfer of Equity" };
+              const ownQuote = own?.quote as import("./buildQuoteData").BuiltQuoteData | undefined;
+              const sample = own && ownQuote && Array.isArray(ownQuote.legalFees)
+                ? { reference: String(own.reference), clientName: String(own.client_name || "Sample Client"), typeLabel: typeNames[String(own.transaction_type)] || String(own.transaction_type || "Conveyancing").replace(/_/g, " "), price: Number(own.price) || 0, data: { ...ownQuote, disbursements: ownQuote.disbursements || [] } }
+                : { reference: "SAMPLE-CQ-20261012-0001", clientName: "Sample Buyer", typeLabel: "Purchase", price: 285000, data: fallback };
+              return (
+                <ClientEmailSample referrerName={referrerSession.referrer_name} logoDataUrl={demoLogo} onLogoChange={setDemoLogo} quote={sample} />
+              );
+            })()}
+
             {/* ── PAYMENTS ── */}
-            {referrerPortalTab === "payments" && (
+            {portalTab === "payments" && (
               <div>
                 {feeRates && (
                   <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "10px", padding: "12px 16px", marginBottom: "20px" }}>
@@ -17769,6 +17938,120 @@ const REFERRER_FORM_DEFAULTS: ReferrerFormState = {
   referrerNote: "",
 };
 
+// Demo accounts only: a sample of the quote email a referred client
+// receives, laid out like send-approved-quote.js's email, with the
+// referrer's name — and, if they pick one, their logo — at the top. The
+// logo stays in the browser; nothing is uploaded or sent.
+function ClientEmailSample({
+  referrerName,
+  logoDataUrl,
+  onLogoChange,
+  quote,
+}: {
+  referrerName: string;
+  logoDataUrl: string;
+  onLogoChange: (dataUrl: string) => void;
+  quote: { reference: string; clientName: string; typeLabel: string; price: number; data: import("./buildQuoteData").BuiltQuoteData };
+}) {
+  const [logoError, setLogoError] = useState("");
+  const fmt = (n: number) => `£${Number(n || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const q = quote.data;
+  const total = typeof q.totalIncludingSdlt === "number" ? q.totalIncludingSdlt : q.grandTotal;
+  const cell = { padding: "8px 12px", border: "1px solid #d9d9d9", fontSize: "14px" } as const;
+  const pickLogo = (file: File | undefined) => {
+    setLogoError("");
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|svg\+xml|webp)$/.test(file.type)) { setLogoError("Choose a PNG, JPEG, SVG or WebP image."); return; }
+    if (file.size > 2 * 1024 * 1024) { setLogoError("Choose an image under 2 MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => onLogoChange(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div>
+      <div style={{ background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "12px", padding: "14px 16px", marginBottom: "16px" }}>
+        <h3 style={{ margin: "0 0 4px", color: "var(--navy)" }}>What your client receives</h3>
+        <p style={{ margin: "0 0 12px", fontSize: "14px", color: "var(--muted)" }}>
+          A sample of the quote email ConveyQuote sends your client once the quote is checked, with you copied in. Add your logo to see how a co-branded email would look.
+        </p>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <label className="primary-button" style={{ minHeight: 40, padding: "0 16px", display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
+            {logoDataUrl ? "Change logo" : "Upload your logo"}
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style={{ display: "none" }}
+              onChange={(e) => pickLogo(e.target.files?.[0])} />
+          </label>
+          {logoDataUrl && (
+            <button type="button" className="muted-button" style={{ minHeight: 40, padding: "0 14px" }} onClick={() => onLogoChange("")}>Remove logo</button>
+          )}
+          <span style={{ fontSize: "12px", color: "var(--muted)" }}>Preview only — your logo stays on this screen and isn't saved.</span>
+        </div>
+        {logoError && <p style={{ color: "#dc2626", fontSize: "13px", margin: "8px 0 0" }}>{logoError}</p>}
+      </div>
+
+      <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px", overflowWrap: "anywhere" }}>
+        <div><strong>From:</strong> ConveyQuote &lt;quotes@conveyquote.uk&gt;</div>
+        <div><strong>To:</strong> {quote.clientName} · <strong>Cc:</strong> {referrerName}</div>
+        <div><strong>Subject:</strong> {quote.clientName.split(" ")[0]}, your conveyancing quote is ready ({fmt(total)})</div>
+      </div>
+
+      <div style={{ background: "#f2f4f7", borderRadius: "12px", padding: "20px 12px", fontFamily: "Arial, Helvetica, sans-serif", color: "#222" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", flexWrap: "wrap", marginBottom: "12px" }}>
+            <img src={logoSquare256} alt="ConveyQuote" style={{ width: 72, height: 72, borderRadius: "8px" }} />
+            {logoDataUrl ? (
+              <>
+                <span style={{ fontSize: "20px", color: "#9ca3af" }}>+</span>
+                <img src={logoDataUrl} alt={`${referrerName} logo`} style={{ maxWidth: 160, maxHeight: 72, objectFit: "contain" }} />
+              </>
+            ) : null}
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #e5e5e5", borderRadius: "12px", overflow: "hidden" }}>
+            <div style={{ background: "#0f2747", color: "#fff", padding: "22px 24px" }}>
+              <div style={{ fontSize: "12px", letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.85 }}>ConveyQuote · referred by {referrerName}</div>
+              <div style={{ fontSize: "26px", fontWeight: "bold", marginTop: "8px", lineHeight: 1.2 }}>Your Conveyancing Estimate</div>
+              <div style={{ fontSize: "14px", marginTop: "8px", opacity: 0.95 }}>A reviewed estimate prepared from the information currently available for your proposed transaction.</div>
+            </div>
+            <div style={{ padding: "22px 24px", fontSize: "14px", lineHeight: 1.7 }}>
+              <p style={{ margin: "0 0 12px" }}>Dear {quote.clientName},</p>
+              <p style={{ margin: 0, color: "#4b5563" }}>Thank you for your enquiry, passed to us by {referrerName}. We have reviewed the information provided and set out our current conveyancing estimate below.</p>
+            </div>
+            <div style={{ padding: "0 24px 18px" }}>
+              <div style={{ background: "#f8fafc", border: "1px solid #d9e2ec", padding: "16px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.4px", color: "#486581" }}>Estimated total cost</div>
+                <div style={{ fontSize: "30px", fontWeight: "bold", color: "#0f2747", marginTop: "6px" }}>{fmt(total)}</div>
+                <div style={{ fontSize: "13px", color: "#52606d", marginTop: "6px" }}>{typeof q.sdltAmount === "number" ? "Including VAT, disbursements and estimated SDLT" : "Including VAT and disbursements"}</div>
+                <div style={{ fontSize: "13px", color: "#52606d", marginTop: "4px" }}>Reference: <strong>{quote.reference}</strong></div>
+              </div>
+            </div>
+            <div style={{ padding: "0 24px 18px" }}>
+              <div style={{ fontSize: "17px", fontWeight: "bold", color: "#0f2747", margin: "0 0 8px" }}>{quote.typeLabel} · {fmt(quote.price)}</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {q.legalFees.map((f, i) => (
+                    <tr key={`l${i}`}><td style={cell}>{f.label}</td><td style={{ ...cell, textAlign: "right", whiteSpace: "nowrap" }}>{fmt(f.amount)}</td></tr>
+                  ))}
+                  <tr><td style={cell}>VAT</td><td style={{ ...cell, textAlign: "right" }}>{fmt(q.vat)}</td></tr>
+                  {q.disbursements.map((f, i) => (
+                    <tr key={`d${i}`}><td style={{ ...cell, color: "#4b5563" }}>{f.label}</td><td style={{ ...cell, textAlign: "right", whiteSpace: "nowrap" }}>{fmt(f.amount)}</td></tr>
+                  ))}
+                  {typeof q.sdltAmount === "number" && (
+                    <tr><td style={cell}>Stamp Duty Land Tax (estimate)</td><td style={{ ...cell, textAlign: "right" }}>{fmt(q.sdltAmount)}</td></tr>
+                  )}
+                  <tr><td style={{ ...cell, fontWeight: "bold", background: "#f7f7f7" }}>Total</td><td style={{ ...cell, fontWeight: "bold", textAlign: "right", background: "#f7f7f7" }}>{fmt(total)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "0 24px 24px", textAlign: "center" }}>
+              <span style={{ display: "inline-block", background: "#0f2747", color: "#fff", padding: "12px 24px", borderRadius: "6px", fontWeight: "bold", fontSize: "15px" }}>Accept Quote</span>
+              <p style={{ fontSize: "12px", color: "#6b7280", margin: "12px 0 0" }}>Your client accepts online in one click. You are copied in and can follow the case in your portal.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReferrerSimpleForm({
   referrerToken,
   onSuccess,
@@ -17777,11 +18060,15 @@ function ReferrerSimpleForm({
   submitLabel,
   onCancel,
   demo = false,
+  previewOnly = false,
 }: {
   referrerToken: string;
   onSuccess: () => void;
   // Demo account: the referral is saved as a sample case and nothing is sent.
   demo?: boolean;
+  // Admin's read-only portal preview: the quote can be worked out on
+  // screen, but not submitted.
+  previewOnly?: boolean;
   initialValues?: Partial<ReferrerFormState>;
   parentEnquiryId?: number;
   submitLabel?: string;
@@ -17953,7 +18240,7 @@ function ReferrerSimpleForm({
               Cancel
             </button>
           )}
-          <button type="button" className="primary-button" disabled={submitting} onClick={() => void handleSubmit()}
+          <button type="button" className="primary-button" disabled={submitting || previewOnly} title={previewOnly ? "Not available in a preview" : undefined} onClick={() => void handleSubmit()}
             style={{ flex: 1, minHeight: 48, fontSize: "15px" }}>
             {submitting ? "Submitting…" : submitLabel ? submitLabel : "Submit Referral for Checking"}
           </button>

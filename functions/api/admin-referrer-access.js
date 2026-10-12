@@ -21,6 +21,12 @@
 //                                then presses Send invite.
 //   preview                      A 30-minute read-only token for "Preview
 //                                their portal" (see referrer-portal-data.js).
+//   demo_link      { send }      Demo accounts only: a 14-day link that opens
+//                                the demo portal with no password (see
+//                                lib/referrer-demo-link.js). Switches portal
+//                                access on. send: true emails it to the
+//                                login email; the link is returned either
+//                                way so admin can copy it.
 
 import {
   getTokenFromRequest,
@@ -36,7 +42,8 @@ import {
   PREVIEW_SESSION_TYPE,
   PREVIEW_MINUTES,
 } from "../lib/referrer-portal-data.js";
-import { countSampleCases, loadSampleCases, removeSampleCases } from "../lib/sample-cases.js";
+import { countSampleCases, loadSampleCases, removeSampleCases, isDemoReferrer } from "../lib/sample-cases.js";
+import { DEMO_LINK_TOKEN_TYPE, DEMO_LINK_DAYS, createDemoLink, sendDemoLinkEmail } from "../lib/referrer-demo-link.js";
 
 const DEMO_FEES = { referral_fee: 150, remortgage_referral_fee: 100 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -148,7 +155,7 @@ export async function onRequestPost(context) {
         .prepare(`UPDATE referrers SET portal_active = ?, updated_at = datetime('now') WHERE id = ?`)
         .bind(active, id)
         .run();
-      if (!active) await endSessions(db, id, ["referrer", SETUP_TOKEN_TYPE, PREVIEW_SESSION_TYPE]);
+      if (!active) await endSessions(db, id, ["referrer", SETUP_TOKEN_TYPE, PREVIEW_SESSION_TYPE, DEMO_LINK_TOKEN_TYPE]);
       return jsonResponse({ success: true, active: Boolean(active) });
     }
 
@@ -160,6 +167,8 @@ export async function onRequestPost(context) {
           .run();
       } else {
         await db.prepare(`DELETE FROM referrer_demo_accounts WHERE referrer_id = ?`).bind(id).run();
+        // A real account must never open from a password-free demo link.
+        await endSessions(db, id, [DEMO_LINK_TOKEN_TYPE]);
       }
       return jsonResponse({ success: true, demo: Boolean(body.demo) });
     }
@@ -178,6 +187,43 @@ export async function onRequestPost(context) {
     if (action === "remove_samples") {
       const removed = await removeSampleCases(db, id);
       return jsonResponse({ success: true, removed });
+    }
+
+    if (action === "demo_link") {
+      if (!(await isDemoReferrer(db, id))) {
+        return jsonResponse({ success: false, error: "Demo links are only for demo accounts." }, 400);
+      }
+      if (body.send && !referrer.portal_email) {
+        return jsonResponse({ success: false, error: "Add a login email first." }, 400);
+      }
+      if (!referrer.portal_active) {
+        await db
+          .prepare(`UPDATE referrers SET portal_active = 1, updated_at = datetime('now') WHERE id = ?`)
+          .bind(id)
+          .run();
+      }
+      const { url, expires } = await createDemoLink(db, id);
+      let sent = false;
+      if (body.send) {
+        const result = await sendDemoLinkEmail(env, {
+          to: referrer.portal_email,
+          referrerName: referrer.referrer_name,
+          url,
+          expires,
+        });
+        if (!result.sent) {
+          return jsonResponse({ success: false, error: `Email could not be sent: ${result.error}`, url }, 502);
+        }
+        sent = true;
+      }
+      return jsonResponse({
+        success: true,
+        url,
+        sent,
+        sent_to: sent ? referrer.portal_email : null,
+        days: DEMO_LINK_DAYS,
+        expires_at: expires.toISOString(),
+      });
     }
 
     if (action === "preview") {
