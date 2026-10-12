@@ -20,6 +20,9 @@ WHERE enquiry_id IN (SELECT id FROM enquiries WHERE substr(reference, 1, 7) = 'S
 DELETE FROM referrer_workflow
 WHERE enquiry_id IN (SELECT id FROM enquiries WHERE substr(reference, 1, 7) = 'SAMPLE-');
 
+DELETE FROM referrer_case_fees
+WHERE enquiry_id IN (SELECT id FROM enquiries WHERE substr(reference, 1, 7) = 'SAMPLE-');
+
 -- The next four should delete nothing (samples never create these),
 -- but are included in case anything was clicked during a demo.
 DELETE FROM followup_state

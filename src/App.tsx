@@ -643,11 +643,29 @@ type LenderEditorState = {
   notes: string;
 };
 
+// GET /api/admin-case-fees — the two fees on one case. The firm fee is what
+// the panel firm pays ConveyQuote (billed on its invoice); the referrer fee
+// is what ConveyQuote pays the referrer (shown only in their portal).
+type CaseFeesInfo = {
+  referred: boolean;
+  referrer_name: string;
+  case_status: string;
+  allocated: boolean;
+  firm_name: string;
+  firm_fee: number | null;
+  referrer_fee: number | null;
+  marketing_fee: number;
+  conveyquote_keeps: number | null;
+  rates: { main: number; remortgage: number };
+  rate_for_this_matter: number;
+  payment: { amount: number; paid_at: string; note: string } | null;
+};
+
 type PanelAssignmentState = {
   firm_id: number | "";
   firm_name: string;
-  referral_fee_payable: boolean;
-  referral_fee_amount: string;
+  firm_fee: string;
+  referrer_fee: string;
   admin_notes: string;
 };
 
@@ -1174,8 +1192,8 @@ const initialLenderEditorState: LenderEditorState = {
 const initialPanelAssignmentState: PanelAssignmentState = {
   firm_id: "",
   firm_name: "",
-  referral_fee_payable: false,
-  referral_fee_amount: "",
+  firm_fee: "",
+  referrer_fee: "",
   admin_notes: "",
 };
 
@@ -2654,6 +2672,12 @@ function App() {
 
   const [panelAssignment, setPanelAssignment] = useState<PanelAssignmentState>(initialPanelAssignmentState);
   const [panelAssignMessage, setPanelAssignMessage] = useState("");
+  // Referred cases: the referrer's fee on the case and any recorded payment.
+  const [caseFees, setCaseFees] = useState<CaseFeesInfo | null>(null);
+  const [feePaidForm, setFeePaidForm] = useState({ amount: "", paid_at: "", note: "", notify: true });
+  const [editFeesForm, setEditFeesForm] = useState<{ open: boolean; firm_fee: string; referrer_fee: string }>({ open: false, firm_fee: "", referrer_fee: "" });
+  const [feePaidMessage, setFeePaidMessage] = useState("");
+  const [isSavingFeePaid, setIsSavingFeePaid] = useState(false);
   const [isSavingPanelAssignment, setIsSavingPanelAssignment] = useState(false);
 
   const [enquirySearchQuery, setEnquirySearchQuery] = useState("");
@@ -3301,9 +3325,9 @@ function App() {
         ...prev,
         firm_id: value === "" ? "" : Number(value),
         firm_name: firm?.firm_name || "",
-        // Auto-fill default fee if one is set on the firm
-        referral_fee_payable: defaultFee > 0 ? true : prev.referral_fee_payable,
-        referral_fee_amount: defaultFee > 0 ? String(defaultFee) : prev.referral_fee_amount,
+        // The firm fee defaults to the chosen firm's own default fee. The
+        // referrer fee is never touched by choosing a firm.
+        firm_fee: defaultFee > 0 ? String(defaultFee) : prev.firm_fee,
       }));
       return;
     }
@@ -3347,6 +3371,102 @@ function App() {
     }
   };
 
+  // Loads both fees for the case and pre-fills the allocation form: the
+  // firm fee already on an allocated case (blank otherwise — it fills from
+  // the firm's default when a firm is chosen), and the referrer fee on the
+  // case or, failing that, the referrer's rate for this matter type.
+  const loadCaseFees = async (reference: string) => {
+    setCaseFees(null);
+    setFeePaidMessage("");
+    setEditFeesForm({ open: false, firm_fee: "", referrer_fee: "" });
+    try {
+      const res = await adminFetch(`/api/admin-case-fees?ref=${encodeURIComponent(reference)}`);
+      const info = (await res.json()) as CaseFeesInfo & { success: boolean };
+      if (!info.success) return;
+      setCaseFees(info);
+      const referrerFee = info.referrer_fee ?? info.rate_for_this_matter;
+      setPanelAssignment((prev) => ({
+        ...prev,
+        firm_fee: info.allocated && info.firm_fee ? String(info.firm_fee) : "",
+        referrer_fee: info.referred ? String(referrerFee) : "",
+      }));
+      setFeePaidForm({
+        amount: String(info.payment?.amount ?? (info.referrer_fee || "")),
+        paid_at: new Date().toISOString().slice(0, 10),
+        note: "",
+        notify: true,
+      });
+    } catch {
+      // Panel stays hidden; the allocation form still requires the fees.
+    }
+  };
+
+  const postCaseFees = async (body: Record<string, unknown>) => {
+    const res = await adminFetch("/api/admin-case-fees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reference: loadedEnquiry?.reference, ...body }),
+    });
+    return (await res.json()) as CaseFeesInfo & { success: boolean; error?: string; emailed?: boolean; email_error?: string };
+  };
+
+  const handleReferrerFeePayment = async (action: "mark_paid" | "undo") => {
+    if (!loadedEnquiry?.reference) return;
+    if (action === "undo" && !window.confirm("Remove the recorded payment? The referrer's portal will show the fee as due again.")) return;
+    setIsSavingFeePaid(true);
+    setFeePaidMessage("");
+    try {
+      const result = await postCaseFees({
+        action,
+        amount: Number(feePaidForm.amount),
+        paid_at: feePaidForm.paid_at,
+        note: feePaidForm.note,
+        notify: feePaidForm.notify,
+      });
+      if (!result.success) {
+        setFeePaidMessage(result.error || "Failed.");
+        return;
+      }
+      setCaseFees(result);
+      setFeePaidMessage(
+        action === "undo"
+          ? "Payment removed."
+          : result.emailed
+          ? `\u2713 Marked paid. ${result.referrer_name || "The referrer"} has been emailed.`
+          : result.email_error
+          ? `\u2713 Marked paid, but the email was not sent: ${result.email_error}`
+          : "\u2713 Marked paid."
+      );
+    } catch {
+      setFeePaidMessage("Something went wrong.");
+    } finally {
+      setIsSavingFeePaid(false);
+    }
+  };
+
+  const handleSaveCaseFees = async () => {
+    setIsSavingFeePaid(true);
+    setFeePaidMessage("");
+    try {
+      const result = await postCaseFees({
+        action: "save_fees",
+        firm_fee: Number(editFeesForm.firm_fee),
+        referrer_fee: editFeesForm.referrer_fee === "" ? "" : Number(editFeesForm.referrer_fee),
+      });
+      if (!result.success) {
+        setFeePaidMessage(result.error || "Failed.");
+        return;
+      }
+      setCaseFees(result);
+      setEditFeesForm({ open: false, firm_fee: "", referrer_fee: "" });
+      setFeePaidMessage("\u2713 Fees updated.");
+    } catch {
+      setFeePaidMessage("Something went wrong.");
+    } finally {
+      setIsSavingFeePaid(false);
+    }
+  };
+
   const handleAssignPanelFirm = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!loadedEnquiry?.reference || !panelAssignment.firm_id) return;
@@ -3362,8 +3482,8 @@ function App() {
           reference: loadedEnquiry.reference,
           firm_id: panelAssignment.firm_id,
           firm_name: panelAssignment.firm_name,
-          referral_fee_payable: panelAssignment.referral_fee_payable,
-          referral_fee_amount: panelAssignment.referral_fee_amount,
+          firm_fee: Number(panelAssignment.firm_fee),
+          referrer_fee: panelAssignment.referrer_fee === "" ? "" : Number(panelAssignment.referrer_fee),
           admin_notes: panelAssignment.admin_notes,
         }),
       });
@@ -3375,6 +3495,7 @@ function App() {
       }
 
       setPanelAssignMessage(`Assigned to ${panelAssignment.firm_name}.`);
+      await loadCaseFees(loadedEnquiry.reference);
       await loadDashboardData();
     } catch (error) {
       console.error("Assign panel firm error:", error);
@@ -6026,6 +6147,7 @@ function App() {
         // Seed panel assignment state
         setPanelAssignment(initialPanelAssignmentState);
         setPanelAssignMessage("");
+        void loadCaseFees(reference);
         setStatusUpdateMessage("");
 
         setLoadedEnquiryMessage(`Loaded enquiry ${reference}`);
@@ -12489,7 +12611,7 @@ function App() {
                                 <div style={{ fontSize: "12px", color: "#7c3aed" }}>Remortgage / transfer fee: £{Number(r.remortgage_referral_fee).toFixed(2)}</div>
                               )}
                               {Number(r.marketing_fee) > 0 && (
-                                <div style={{ fontSize: "12px", color: "#0369a1" }}>Marketing fee: £{Number(r.marketing_fee).toFixed(2)} + VAT</div>
+                                <div style={{ fontSize: "12px", color: "#0369a1" }}>Marketing fee: £{Number(r.marketing_fee).toFixed(2)}</div>
                               )}
                               <div style={{ fontSize: "11px", marginTop: "2px" }}>
                                 <span style={{ background: Number(r.portal_active) === 1 ? "#d1fae5" : "#f3f4f6", color: Number(r.portal_active) === 1 ? "#065f46" : "#6b7280", padding: "1px 6px", borderRadius: "8px", fontSize: "11px" }}>
@@ -12561,7 +12683,7 @@ function App() {
                             placeholder="e.g. 40.00" />
                         </div>
                         <div className="field">
-                          <label>Marketing fee (£ ex. VAT) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Fixed: £50 + VAT per matter</span></label>
+                          <label>Marketing fee (£) <span style={{ fontSize: "11px", color: "var(--muted)" }}>Fixed: £50 per referred matter, no VAT</span></label>
                           <input type="number" step="0.01" value={referrerEditor.marketing_fee}
                             onChange={(e) => setReferrerEditor((p) => ({ ...p, marketing_fee: e.target.value }))}
                             placeholder="50.00" />
@@ -12948,7 +13070,7 @@ function App() {
                     <div style={{ border: "1px solid var(--border)", borderRadius: "10px", overflow: "hidden" }}>
                       <div style={{ background: "var(--navy)", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div style={{ color: "#fff", fontWeight: 700, fontSize: "18px" }}>TAX INVOICE</div>
+                          <div style={{ color: "#fff", fontWeight: 700, fontSize: "18px" }}>INVOICE</div>
                           <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px" }}>ConveyQuote · Essentially Law Limited</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
@@ -12970,30 +13092,40 @@ function App() {
                           </div>
                         </div>
 
-                        <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: "16px" }}>
-                          <thead>
-                            <tr style={{ background: "#f7f9fc" }}>
-                              <th style={{ padding: "10px 12px", border: "1px solid var(--border)", textAlign: "left", fontSize: "13px" }}>Description</th>
-                              <th style={{ padding: "10px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>Net</th>
-                              <th style={{ padding: "10px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>VAT</th>
-                              <th style={{ padding: "10px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>Gross</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {((selectedInvoice.line_items as { label: string; net: number; vat: number; gross: number }[]) || []).map((item, i) => (
-                              <tr key={i}>
-                                <td style={{ padding: "9px 12px", border: "1px solid var(--border)", fontSize: "13px" }}>{item.label}</td>
-                                <td style={{ padding: "9px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>£{item.net.toFixed(2)}</td>
-                                <td style={{ padding: "9px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>£{item.vat.toFixed(2)}</td>
-                                <td style={{ padding: "9px 12px", border: "1px solid var(--border)", textAlign: "right", fontSize: "13px" }}>£{item.gross.toFixed(2)}</td>
-                              </tr>
-                            ))}
-                            <tr style={{ background: "var(--navy)", color: "#fff" }}>
-                              <td style={{ padding: "11px 12px", fontWeight: 700, fontSize: "14px" }} colSpan={3}>Total Due</td>
-                              <td style={{ padding: "11px 12px", textAlign: "right", fontWeight: 700, fontSize: "14px" }}>£{Number(selectedInvoice.total_gross || 0).toFixed(2)}</td>
-                            </tr>
-                          </tbody>
-                        </table>
+                        {/* Older invoices carried VAT; new ones don't (ConveyQuote is not
+                            VAT registered), so the VAT columns only show when an invoice has VAT. */}
+                        {(() => {
+                          const items = (selectedInvoice.line_items as { label: string; net: number; vat: number; gross: number }[]) || [];
+                          const hasVat = items.some((item) => Number(item.vat) > 0);
+                          const th = { padding: "10px 12px", border: "1px solid var(--border)", textAlign: "right" as const, fontSize: "13px" };
+                          const td = { padding: "9px 12px", border: "1px solid var(--border)", textAlign: "right" as const, fontSize: "13px" };
+                          return (
+                            <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: "16px" }}>
+                              <thead>
+                                <tr style={{ background: "#f7f9fc" }}>
+                                  <th style={{ ...th, textAlign: "left" }}>Description</th>
+                                  {hasVat && <th style={th}>Net</th>}
+                                  {hasVat && <th style={th}>VAT</th>}
+                                  <th style={th}>{hasVat ? "Gross" : "Amount"}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {items.map((item, i) => (
+                                  <tr key={i}>
+                                    <td style={{ ...td, textAlign: "left" }}>{item.label}</td>
+                                    {hasVat && <td style={td}>£{item.net.toFixed(2)}</td>}
+                                    {hasVat && <td style={td}>£{item.vat.toFixed(2)}</td>}
+                                    <td style={td}>£{item.gross.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                                <tr style={{ background: "var(--navy)", color: "#fff" }}>
+                                  <td style={{ padding: "11px 12px", fontWeight: 700, fontSize: "14px" }} colSpan={hasVat ? 3 : 1}>Total Due</td>
+                                  <td style={{ padding: "11px 12px", textAlign: "right", fontWeight: 700, fontSize: "14px" }}>£{Number(selectedInvoice.total_gross || 0).toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          );
+                        })()}
 
                         {selectedInvoice.bank_details && (
                           <div style={{ background: "#f7f9fc", border: "1px solid var(--border)", borderRadius: "8px", padding: "14px 18px" }}>
@@ -13654,31 +13786,51 @@ function App() {
                             </select>
                           </div>
 
-                          <div className="field field--full">
-                            <CheckboxField
-                              label="Referral fee payable"
-                              checked={panelAssignment.referral_fee_payable}
-                              onChange={(checked) =>
-                                setPanelAssignment((prev) => ({
-                                  ...prev,
-                                  referral_fee_payable: checked,
-                                }))
-                              }
+                          {/* Two separate fees. Allocation is blocked until both are set. */}
+                          <div className="field">
+                            <label htmlFor="assignFirmFee">Firm fee (£)</label>
+                            <p className="form-note" style={{ margin: "0 0 6px" }}>What the panel firm pays ConveyQuote. Billed on the firm's invoice.</p>
+                            <input
+                              id="assignFirmFee"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              required
+                              name="firm_fee"
+                              value={panelAssignment.firm_fee}
+                              onChange={handlePanelAssignmentChange}
+                              placeholder="Choose a firm, or enter the fee"
                             />
                           </div>
 
-                          {panelAssignment.referral_fee_payable && (
-                            <div className="field field--full">
-                              <label htmlFor="referralFeeAmount">Referral fee amount (£)</label>
+                          {caseFees?.referred && (
+                            <div className="field">
+                              <label htmlFor="assignReferrerFee">Referrer fee (£)</label>
+                              <p className="form-note" style={{ margin: "0 0 6px" }}>
+                                Paid by ConveyQuote to {caseFees.referrer_name || "the referrer"}. Their rates: £{caseFees.rates.main} purchase or sale, £{caseFees.rates.remortgage} remortgage or transfer.
+                              </p>
                               <input
-                                id="referralFeeAmount"
+                                id="assignReferrerFee"
                                 type="number"
                                 step="0.01"
-                                name="referral_fee_amount"
-                                value={panelAssignment.referral_fee_amount}
+                                min="0"
+                                required
+                                name="referrer_fee"
+                                value={panelAssignment.referrer_fee}
                                 onChange={handlePanelAssignmentChange}
-                                placeholder="e.g. 150.00"
+                                placeholder="0 if none is due"
                               />
+                            </div>
+                          )}
+
+                          {Number(panelAssignment.firm_fee) > 0 && (
+                            <div className="field field--full">
+                              <p className="form-note" style={{ margin: 0 }}>
+                                Firm invoice: £{Number(panelAssignment.firm_fee).toFixed(2)}
+                                {caseFees?.referred ? ` + £${caseFees.marketing_fee.toFixed(2)} marketing fee` : ""}
+                                {caseFees?.referred ? ` \u00b7 Referrer: £${(Number(panelAssignment.referrer_fee) || 0).toFixed(2)}` : ""}
+                                {" \u00b7 "}<strong>ConveyQuote keeps £{(Number(panelAssignment.firm_fee) + (caseFees?.referred ? caseFees.marketing_fee - (Number(panelAssignment.referrer_fee) || 0) : 0)).toFixed(2)}</strong>
+                              </p>
                             </div>
                           )}
 
@@ -13705,13 +13857,135 @@ function App() {
                           <button
                             type="submit"
                             className="primary-button"
-                            disabled={isSavingPanelAssignment || !panelAssignment.firm_id}
+                            disabled={
+                              isSavingPanelAssignment ||
+                              !panelAssignment.firm_id ||
+                              !(Number(panelAssignment.firm_fee) > 0) ||
+                              (Boolean(caseFees?.referred) && panelAssignment.referrer_fee === "")
+                            }
                           >
                             {isSavingPanelAssignment ? "Assigning…" : "Assign Firm"}
                           </button>
                         </div>
                       </form>
                     </SummaryCard>
+
+                    {caseFees && caseFees.allocated && (() => {
+                      const info = caseFees;
+                      const money = (n: number | null) => (n === null ? "not set" : `£${n.toFixed(2)}`);
+                      const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                      const isSample = String(loadedEnquiry?.reference || "").startsWith("SAMPLE-");
+                      const row = (label: string, value: string, strong = false) => (
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: "14px" }}>
+                          <span style={{ color: "var(--muted)" }}>{label}</span>
+                          <span style={{ fontWeight: strong ? 700 : 600, color: "var(--navy)" }}>{value}</span>
+                        </div>
+                      );
+                      return (
+                        <SummaryCard title="Fees">
+                          {row(`Firm fee \u2014 paid by ${info.firm_name || "the firm"}`, money(info.firm_fee))}
+                          {info.referred && row("ConveyQuote marketing fee", money(info.marketing_fee))}
+                          {info.referred && row(`Referrer fee \u2014 paid to ${info.referrer_name || "the referrer"}`, money(info.referrer_fee))}
+                          {row("ConveyQuote keeps", money(info.conveyquote_keeps), true)}
+                          <p className="form-note" style={{ margin: "6px 0 0" }}>
+                            The firm's invoice shows the firm fee{info.referred ? " and the marketing fee" : ""} only. {info.referred ? "The referrer's portal shows the referrer fee only." : ""} No VAT is charged.
+                          </p>
+
+                          {!isSample && !editFeesForm.open && (
+                            <button type="button" className="muted-button" style={{ marginTop: "10px" }}
+                              onClick={() => setEditFeesForm({
+                                open: true,
+                                firm_fee: info.firm_fee === null ? "" : String(info.firm_fee),
+                                referrer_fee: info.referrer_fee === null ? String(info.rate_for_this_matter) : String(info.referrer_fee),
+                              })}>Edit fees</button>
+                          )}
+                          {editFeesForm.open && (
+                            <form style={{ marginTop: "10px" }} onSubmit={(e) => { e.preventDefault(); void handleSaveCaseFees(); }}>
+                              <div className="form-grid">
+                                <div className="field">
+                                  <label htmlFor="editFirmFee">Firm fee (£)</label>
+                                  <input id="editFirmFee" type="number" step="0.01" min="0.01" required value={editFeesForm.firm_fee}
+                                    onChange={(e) => setEditFeesForm((p) => ({ ...p, firm_fee: e.target.value }))} />
+                                </div>
+                                {info.referred && (
+                                  <div className="field">
+                                    <label htmlFor="editReferrerFee">Referrer fee (£)</label>
+                                    <input id="editReferrerFee" type="number" step="0.01" min="0" required value={editFeesForm.referrer_fee}
+                                      onChange={(e) => setEditFeesForm((p) => ({ ...p, referrer_fee: e.target.value }))} />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="form-footer action-row" style={{ marginTop: "8px" }}>
+                                <button type="button" className="muted-button" onClick={() => setEditFeesForm({ open: false, firm_fee: "", referrer_fee: "" })}>Cancel</button>
+                                <button type="submit" className="primary-button" disabled={isSavingFeePaid}>Save fees</button>
+                              </div>
+                            </form>
+                          )}
+
+                          {info.referred && (
+                            <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--border)" }}>
+                              <div style={{ color: "var(--navy)", fontSize: "14px", fontWeight: 700, marginBottom: "8px" }}>Paying {info.referrer_name || "the referrer"}</div>
+                              {info.payment ? (
+                                <>
+                                  <p style={{ color: "#065f46", fontWeight: 600, margin: "6px 0" }}>
+                                    \u2713 Paid £{info.payment.amount.toFixed(2)} on {fmtDate(info.payment.paid_at)}
+                                    {info.payment.note ? ` \u2014 ${info.payment.note}` : ""}
+                                  </p>
+                                  {!isSample && (
+                                    <button type="button" className="muted-button" disabled={isSavingFeePaid}
+                                      onClick={() => void handleReferrerFeePayment("undo")}>Undo payment</button>
+                                  )}
+                                </>
+                              ) : isSample ? (
+                                <p className="form-note">Sample case \u2014 payments are set by the demo scripts.</p>
+                              ) : info.case_status !== "completed" ? (
+                                <p className="form-note">The referrer fee can be marked paid once the case is completed.</p>
+                              ) : !info.referrer_fee ? (
+                                <p className="form-note">No referrer fee is set on this case.</p>
+                              ) : (
+                                <form onSubmit={(e) => { e.preventDefault(); void handleReferrerFeePayment("mark_paid"); }}>
+                                  <div className="form-grid">
+                                    <div className="field">
+                                      <label htmlFor="feePaidAmount">Amount paid (£)</label>
+                                      <input id="feePaidAmount" type="number" step="0.01" min="0.01" required value={feePaidForm.amount}
+                                        onChange={(e) => setFeePaidForm((p) => ({ ...p, amount: e.target.value }))} />
+                                    </div>
+                                    <div className="field">
+                                      <label htmlFor="feePaidAt">Date paid</label>
+                                      <input id="feePaidAt" type="date" required value={feePaidForm.paid_at}
+                                        max={new Date().toISOString().slice(0, 10)}
+                                        onChange={(e) => setFeePaidForm((p) => ({ ...p, paid_at: e.target.value }))} />
+                                    </div>
+                                    <div className="field field--full">
+                                      <label htmlFor="feePaidNote">Note (optional)</label>
+                                      <input id="feePaidNote" type="text" maxLength={200} value={feePaidForm.note}
+                                        placeholder="e.g. Bank transfer"
+                                        onChange={(e) => setFeePaidForm((p) => ({ ...p, note: e.target.value }))} />
+                                    </div>
+                                    <div className="field field--full">
+                                      <CheckboxField
+                                        label={`Email ${info.referrer_name || "the referrer"} to confirm (ConveyQuote copied in)`}
+                                        checked={feePaidForm.notify}
+                                        onChange={(checked) => setFeePaidForm((p) => ({ ...p, notify: checked }))} />
+                                    </div>
+                                  </div>
+                                  <div className="form-footer action-row" style={{ marginTop: "10px" }}>
+                                    <button type="submit" className="primary-button" disabled={isSavingFeePaid}>
+                                      {isSavingFeePaid ? "Saving\u2026" : "Mark fee paid"}
+                                    </button>
+                                  </div>
+                                </form>
+                              )}
+                            </div>
+                          )}
+                          {feePaidMessage && (
+                            <p className="form-note" style={{ marginTop: "8px", color: feePaidMessage.startsWith("\u2713") || feePaidMessage === "Payment removed." ? "#065f46" : "#dc2626" }}>
+                              {feePaidMessage}
+                            </p>
+                          )}
+                        </SummaryCard>
+                      );
+                    })()}
                   </div>
 
                   <div className="admin-two-col">
@@ -14823,7 +15097,7 @@ function App() {
         const sentThisMonth = enquiries.filter((e) => String(e.created_at || "").startsWith(thisMonth)).length;
         const active = enquiries.filter((e) => e.assigned_firm_name && e.case_status !== "completed" && e.case_status !== "withdrawn" && e.case_status !== "fallen_through").length;
         const completed = enquiries.filter((e) => e.case_status === "completed").length;
-        const feesEarned = enquiries.filter((e) => e.case_status === "completed" && Number(e.referral_fee_payable) === 1).reduce((s, e) => s + Number(e.referral_fee_amount || 0), 0);
+        const feesEarned = enquiries.filter((e) => e.case_status === "completed" && Number(e.referrer_fee) > 0).reduce((s, e) => s + Number(e.referrer_fee || 0), 0);
         const dueToComplete = enquiries.filter((e) => {
           if (!e.target_completion_date) return false;
           const d = new Date(String(e.target_completion_date));
@@ -15275,7 +15549,7 @@ function App() {
                                   </div>
                                 </div>
                                 {/* Status */}
-                                <div style={{ padding: "14px 20px", borderBottom: (Number(enq.referral_fee_payable) === 1 || enq.referrer_note) ? "1px solid #e5e7eb" : undefined }}>
+                                <div style={{ padding: "14px 20px", borderBottom: (Number(enq.referrer_fee) > 0 || enq.referrer_note) ? "1px solid #e5e7eb" : undefined }}>
                                   <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Status</div>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px 20px" }}>
                                     <div>
@@ -15320,7 +15594,7 @@ function App() {
                                 </div>
                                 {/* Your note */}
                                 {Boolean(enq.referrer_note) && (
-                                  <div style={{ padding: "14px 20px", borderBottom: Number(enq.referral_fee_payable) === 1 ? "1px solid #e5e7eb" : undefined }}>
+                                  <div style={{ padding: "14px 20px", borderBottom: Number(enq.referrer_fee) > 0 ? "1px solid #e5e7eb" : undefined }}>
                                     <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Your note</div>
                                     <div style={{ fontSize: "13px", color: "#334155", whiteSpace: "pre-wrap", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px 12px" }}>
                                       {String(enq.referrer_note)}
@@ -15328,13 +15602,13 @@ function App() {
                                   </div>
                                 )}
                                 {/* Payments */}
-                                {Number(enq.referral_fee_payable) === 1 && (
+                                {Number(enq.referrer_fee) > 0 && (
                                   <div style={{ padding: "14px 20px", borderBottom: requoteOpen === ref ? "1px solid #e5e7eb" : undefined }}>
                                     <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b7280", marginBottom: "8px" }}>Payments</div>
                                     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-end" }}>
                                       <div>
                                         <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "2px" }}>Referral fee</div>
-                                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>\u00a3{Number(enq.referral_fee_amount || 0).toFixed(2)}</div>
+                                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#7c3aed" }}>\u00a3{Number(enq.referrer_fee || 0).toFixed(2)}</div>
                                       </div>
                                       <div>
                                         <div style={{ fontSize: "11px", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "4px" }}>Payment status</div>
@@ -15422,7 +15696,7 @@ function App() {
                     <strong style={{ color: "#15803d" }}>Your referral fees: {feeRates}</strong>
                   </div>
                 )}
-                {enquiries.filter((e) => e.referral_fee_payable).length === 0 ? (
+                {enquiries.filter((e) => Number(e.referrer_fee) > 0).length === 0 ? (
                   <p className="form-note">No fee-bearing referrals yet. Fees appear here once matters complete.</p>
                 ) : (
                   <>
@@ -15436,14 +15710,14 @@ function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {enquiries.filter((e) => e.referral_fee_payable).map((enq, i) => {
+                          {enquiries.filter((e) => Number(e.referrer_fee) > 0).map((enq, i) => {
                             const fs = feeStatus(enq);
                             return (
                               <tr key={String(enq.reference)} style={{ background: i % 2 === 0 ? "#f9fafb" : "#fff", borderBottom: "1px solid var(--border)" }}>
                                 <td style={{ padding: "10px 14px", fontWeight: 600 }}>{String(enq.property_address || enq.reference)}{sampleBadge(enq)}</td>
                                 <td style={{ padding: "10px 14px", color: "var(--muted)" }}>{String(enq.client_name || enq.client_email || "—")}</td>
                                 <td style={{ padding: "10px 14px" }}>{statusLabel(enq)}</td>
-                                <td style={{ padding: "10px 14px", fontWeight: 600 }}>£{Number(enq.referral_fee_amount || 0).toFixed(2)}</td>
+                                <td style={{ padding: "10px 14px", fontWeight: 600 }}>£{Number(enq.referrer_fee || 0).toFixed(2)}</td>
                                 <td style={{ padding: "10px 14px" }}>
                                   <span style={{ padding: "2px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, background: fs.bg, color: fs.col, whiteSpace: "nowrap" }}>
                                     {fs.label}
@@ -15457,7 +15731,7 @@ function App() {
                           <tr style={{ background: "#f0f4ff", fontWeight: 700 }}>
                             <td colSpan={3} style={{ padding: "10px 14px" }}>Total fees on completed matters</td>
                             <td colSpan={2} style={{ padding: "10px 14px", color: "var(--navy)" }}>
-                              £{enquiries.filter((e) => e.case_status === "completed" && e.referral_fee_payable).reduce((s, e) => s + Number(e.referral_fee_amount || 0), 0).toFixed(2)}
+                              £{enquiries.filter((e) => e.case_status === "completed" && Number(e.referrer_fee) > 0).reduce((s, e) => s + Number(e.referrer_fee || 0), 0).toFixed(2)}
                             </td>
                           </tr>
                           <tr style={{ background: "#f0fdf4", fontWeight: 700 }}>
