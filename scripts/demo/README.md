@@ -12,10 +12,10 @@ statement on its own, in order.
 
 1. `migrations/0020_referrer_fees.sql` — already applied.
 2. `migrations/0021_referrer_case_fees.sql` — already applied.
-3. `migrations/0022_firm_remortgage_fee_and_demo_referrers.sql` — STEP 1,
-   STEP 2, then the two STEP 3 checks, **before** the pull request that
-   ships it is merged. STEP 4 (Cambridge's £200 remortgage fee) is
-   optional; you can set it in the **Firms** tab instead.
+3. `migrations/0022_firm_remortgage_fee_and_demo_referrers.sql` — already
+   applied.
+4. `migrations/0023_referrer_branding.sql` — STEP 1 then the STEP 2 check,
+   **before** the pull request that ships referrer logos is merged.
 
 ## Part 2 — add a referrer
 
@@ -77,6 +77,24 @@ nothing can be submitted or sent. No password is needed.
 3. **Copy a link instead** gives you the link to paste into your own
    email, text or WhatsApp. Making a new link cancels the old one;
    **Turn off access** cancels it too.
+
+## Converting a demo to a real account
+
+When a prospect signs up: open their demo account → **Details & fees** and
+check the name, email and fees → **2. Portal access** → **Convert to real
+account**. In one step this removes the sample cases and sample quotes,
+ends the demo link, and emails them a link to choose their password. Their
+details, client pricing and logo are kept. From then on their referrals go
+to Quote Review and their clients are emailed as normal.
+
+## Logos ("Powered by ConveyQuote")
+
+A referrer's logo goes at the top of the quote email their referred
+clients receive, with "Powered by ConveyQuote" underneath. They upload it
+themselves on the **Your branding** tab of their portal (which also shows
+the real email with sample figures), or you upload it on **1. Details &
+fees**. PNG or JPG, up to 500KB and 800 × 800 pixels. Without a logo the
+email is exactly as before.
 
 ## Demo accounts — details
 

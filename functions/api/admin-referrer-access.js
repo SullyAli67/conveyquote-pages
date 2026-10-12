@@ -19,6 +19,12 @@
 //                                New demo referrer (£150 / £100, access off)
 //                                with the five sample cases loaded. Admin
 //                                then presses Send invite.
+//   convert_to_real              Demo → real account in one step: takes off
+//                                the demo flag, cancels the demo link and
+//                                any open sessions, removes the sample
+//                                cases (and sample quotes), switches access
+//                                on and emails a set-password link. Name,
+//                                email, fees, pricing and logo are kept.
 //   preview                      A 30-minute read-only token for "Preview
 //                                their portal" (see referrer-portal-data.js).
 //   demo_link      { send }      Demo accounts only: a 14-day link that opens
@@ -36,7 +42,7 @@ import {
   jsonResponse,
   unauthorised,
 } from "../lib/auth.js";
-import { SETUP_TOKEN_TYPE } from "../lib/referrer-setup-link.js";
+import { SETUP_TOKEN_TYPE, issueSetupLink } from "../lib/referrer-setup-link.js";
 import {
   loadReferrerPortalData,
   PREVIEW_SESSION_TYPE,
@@ -223,6 +229,32 @@ export async function onRequestPost(context) {
         sent_to: sent ? referrer.portal_email : null,
         days: DEMO_LINK_DAYS,
         expires_at: expires.toISOString(),
+      });
+    }
+
+    if (action === "convert_to_real") {
+      if (!(await isDemoReferrer(db, id))) {
+        return jsonResponse({ success: false, error: "This is already a real account." }, 400);
+      }
+      if (!referrer.portal_email) {
+        return jsonResponse({ success: false, error: "Add their login email on Details & fees first." }, 400);
+      }
+      await db.prepare(`DELETE FROM referrer_demo_accounts WHERE referrer_id = ?`).bind(id).run();
+      await endSessions(db, id, ["referrer", DEMO_LINK_TOKEN_TYPE, PREVIEW_SESSION_TYPE]);
+      const removed = await removeSampleCases(db, id);
+      await db
+        .prepare(`UPDATE referrers SET portal_active = 1, notes = CASE WHEN notes = 'Demo account' THEN '' ELSE notes END, updated_at = datetime('now') WHERE id = ?`)
+        .bind(id)
+        .run();
+      const pw = await db.prepare(`SELECT portal_password_hash FROM referrers WHERE id = ? LIMIT 1`).bind(id).first();
+      const invite = await issueSetupLink(env, referrer, pw?.portal_password_hash ? "reset" : "welcome");
+      return jsonResponse({
+        success: true,
+        removed_samples: removed,
+        invite_sent: Boolean(invite.sent),
+        invite_error: invite.sent ? undefined : invite.error,
+        sent_to: referrer.portal_email,
+        days: invite.days,
       });
     }
 
