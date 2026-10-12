@@ -7038,12 +7038,13 @@ function App() {
             <a href="/about/" className={isAboutPage ? "active" : ""}>About Us</a>
             <a href="/conveyancing-fees/" className={isFeesPage ? "active" : ""}>Fees Guide</a>
             <a href="/firm-login/" className={isFirmLoginPage || isFirmPortalPage ? "active" : ""}>Firm Login</a>
-            <a href="/referrer-login/" className={isReferrerLoginPage || isReferrerPortalPage || isReferrerSetPasswordPage ? "active" : ""}>Referrer Login</a>
+            <a href={referrerSession ? "/referrer-portal/" : "/referrer-login/"} className={isReferrerLoginPage || isReferrerPortalPage || isReferrerSetPasswordPage ? "active" : ""}>{referrerSession ? "Referrer Portal" : "Referrer Login"}</a>
           </div>
         </div>
       </nav>
 
-      {/* ── Hero ── */}
+      {/* ── Hero ── (hidden once a referrer is logged in: the portal has its own header) */}
+      {!(referrerSession && (isReferrerPortalPage || isReferrerLoginPage)) && (
       <header className="hero">
         <div className="hero__inner">
           <div className="hero__brand">
@@ -7060,6 +7061,7 @@ function App() {
           </div>
         </div>
       </header>
+      )}
       </>
       )}
 
@@ -14961,7 +14963,7 @@ function App() {
             {/* ── DASHBOARD ── */}
             {referrerPortalTab === "dashboard" && (
               <div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", marginBottom: "28px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "28px" }}>
                   {[
                     { label: "Sent this month", value: sentThisMonth, icon: "📤" },
                     { label: "Active cases", value: active, icon: "⚡" },
@@ -17408,14 +17410,14 @@ function ReferrerSimpleForm({
         <h4 style={{ margin: "0 0 14px", color: "var(--navy)" }}>Note (optional)</h4>
         <div style={fieldStyle}>
           <label style={labelStyle}>
-            Add a short note for your client — included in the quote email and visible on this matter in My Referrals.
+            Add a short note for ConveyQuote — we see it when we check the quote, and it stays on this matter in My Referrals.
           </label>
           <textarea
             value={form.referrerNote}
             onChange={(e) => set("referrerNote", e.target.value.slice(0, 500))}
             maxLength={500}
             rows={3}
-            placeholder="e.g. We've already discussed your preference to complete before the school holidays."
+            placeholder="e.g. Client is keen to complete before the school holidays; property has solar panels."
             style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
           />
           <div style={{ fontSize: "12px", color: "var(--muted)", textAlign: "right" }}>
