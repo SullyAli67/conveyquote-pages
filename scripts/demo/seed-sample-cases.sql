@@ -4,11 +4,15 @@
 -- portal, so the Dashboard, My Referrals and Payments tabs all show
 -- realistic content from day one.
 --
---   SAMPLE-0001  Quote sent            Purchase     £75
---   SAMPLE-0002  Instructed            Sale         £75
---   SAMPLE-0003  In progress           Remortgage   £40   (searches ordered)
---   SAMPLE-0004  Exchanged             Sale         £75   (completes in 10 days)
---   SAMPLE-0005  Completed, fee paid   Purchase     £75   (paid 5 days ago)
+--   SAMPLE-0001  Quote sent            Purchase     main fee
+--   SAMPLE-0002  Instructed            Sale         main fee
+--   SAMPLE-0003  In progress           Remortgage   remortgage / transfer fee   (searches ordered)
+--   SAMPLE-0004  Exchanged             Sale         main fee   (completes in 10 days)
+--   SAMPLE-0005  Completed, fee paid   Purchase     main fee   (paid 5 days ago)
+--
+-- The fees are read from the referrer's own record (referral_fee and
+-- remortgage_referral_fee), so they always match what is set in the admin
+-- Referrers tab — for Trusted Conveyancers, £150 and £100.
 --
 -- How the sample rows are identified
 -- ----------------------------------
@@ -37,8 +41,8 @@
 -- -------------------------------------------------------------------
 -- Prerequisites: migration 0020 applied, and the Trusted Conveyancers
 -- referrer created in the admin Referrers tab with portal email
--- info@trustedconveyancers.co.uk, referral fee 75 and remortgage /
--- transfer fee 40.
+-- info@trustedconveyancers.co.uk, referral fee 150 and remortgage /
+-- transfer fee 100.
 --
 -- Paste ONE statement at a time, in order. Every INSERT only runs when
 -- exactly one referrer has that portal email, so it cannot attach the
@@ -46,7 +50,8 @@
 
 -- ── STEP 1 — checks ───────────────────────────────────────────────
 
--- (1a) Expect exactly ONE row, with referral_fee 75 and remortgage_referral_fee 40.
+-- (1a) Expect exactly ONE row, with referral_fee 150 and remortgage_referral_fee 100.
+--      If either fee is 0, set it in the admin Referrers tab first.
 SELECT id, referrer_name, referral_fee, remortgage_referral_fee, portal_active
 FROM referrers
 WHERE portal_email = 'info@trustedconveyancers.co.uk';
@@ -68,7 +73,7 @@ INSERT INTO enquiries (
 SELECT
   'SAMPLE-0001', 'Sample Buyer One', 'sample.buyer.one@example.com', '07700 900101', 'purchase',
   'freehold', 285000, 'DT1 1AA', '1 Example Street, Demo Town', 'Sample Negotiator', 'mortgage',
-  'quote_sent', r.id, 1, 75,
+  'quote_sent', r.id, 1, r.referral_fee,
   datetime('now', '-3 days'), datetime('now', '-3 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -86,13 +91,13 @@ SELECT
   'SAMPLE-0002', 'Sample Seller Two', 'sample.seller.two@example.com', '07700 900102', 'sale',
   'freehold', 240000, 'DT1 2BB', '2 Example Road, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'accepted', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-9 days'), date('now', '+55 days'), r.id, 1, 75,
+  datetime('now', '-9 days'), date('now', '+55 days'), r.id, 1, r.referral_fee,
   datetime('now', '-12 days'), datetime('now', '-9 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
   AND (SELECT COUNT(*) FROM referrers WHERE portal_email = 'info@trustedconveyancers.co.uk') = 1;
 
--- (2c) SAMPLE-0003 — remortgage in progress (searches ordered), lower £40 fee.
+-- (2c) SAMPLE-0003 — remortgage in progress (searches ordered), remortgage / transfer fee.
 INSERT INTO enquiries (
   reference, client_name, client_email, client_phone, transaction_type,
   tenure, price, postcode, property_address, negotiator_name,
@@ -104,7 +109,7 @@ SELECT
   'SAMPLE-0003', 'Sample Owner Three', 'sample.owner.three@example.com', '07700 900103', 'remortgage',
   'leasehold', 320000, 'DT2 3CC', 'Flat 3, Example Court, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'searches_ordered', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-24 days'), date('now', '+20 days'), r.id, 1, 40,
+  datetime('now', '-24 days'), date('now', '+20 days'), r.id, 1, r.remortgage_referral_fee,
   datetime('now', '-26 days'), datetime('now', '-4 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -122,7 +127,7 @@ SELECT
   'SAMPLE-0004', 'Sample Seller Four', 'sample.seller.four@example.com', '07700 900104', 'sale',
   'freehold', 195000, 'DT3 4DD', '4 Example Avenue, Demo Town', 'Sample Negotiator',
   'accepted', 'panel_referred', 'exchanged', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-42 days'), date('now', '+10 days'), date('now', '+10 days'), r.id, 1, 75,
+  datetime('now', '-42 days'), date('now', '+10 days'), date('now', '+10 days'), r.id, 1, r.referral_fee,
   datetime('now', '-45 days'), datetime('now', '-2 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -140,7 +145,7 @@ SELECT
   'SAMPLE-0005', 'Sample Buyer Five', 'sample.buyer.five@example.com', '07700 900105', 'purchase',
   'freehold', 310000, 'DT4 5EE', '5 Example Close, Demo Town', 'Sample Negotiator', 'mortgage',
   'accepted', 'panel_referred', 'completed', 'Sample Panel Solicitors', 'accepted',
-  datetime('now', '-72 days'), r.id, 1, 75,
+  datetime('now', '-72 days'), r.id, 1, r.referral_fee,
   datetime('now', '-75 days'), datetime('now', '-12 days')
 FROM referrers r
 WHERE r.portal_email = 'info@trustedconveyancers.co.uk'
@@ -155,15 +160,15 @@ SELECT id, strftime('%Y-%m-%dT%H:%M:%SZ', referred_at)
 FROM enquiries
 WHERE reference IN ('SAMPLE-0002', 'SAMPLE-0003', 'SAMPLE-0004', 'SAMPLE-0005');
 
--- (3b) Record the £75 fee on SAMPLE-0005 as paid 5 days ago.
+-- (3b) Record the fee on SAMPLE-0005 as paid 5 days ago.
 INSERT INTO referrer_fee_payments (enquiry_id, amount, paid_at, payment_note)
-SELECT id, 75, date('now', '-5 days'), 'Sample payment'
+SELECT id, referral_fee_amount, date('now', '-5 days'), 'Sample payment'
 FROM enquiries
 WHERE reference = 'SAMPLE-0005';
 
 -- ── STEP 4 — confirm ──────────────────────────────────────────────
 
--- Expect 5 rows: stages as listed at the top, fees 75/75/40/75/75,
+-- Expect 5 rows: stages as listed at the top, fees 150/150/100/150/150,
 -- allocated on 0002–0005, paid only on 0005.
 SELECT e.reference, e.transaction_type, e.status, e.case_status,
        e.referral_fee_amount, w.allocated_at, p.paid_at

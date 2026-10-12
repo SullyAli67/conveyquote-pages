@@ -22,8 +22,8 @@ merged. The new code reads the new table and column.
    - **Contact email:** `info@trustedconveyancers.co.uk`
      (spelt *conveyancers*, with an **r** — this address is copied into every
      quote David refers)
-   - **Referral fee (£):** 75 — purchase, sale, sale & purchase
-   - **Remortgage / transfer fee (£):** 40 — remortgage, transfer of equity
+   - **Referral fee (£):** 150 — purchase, sale, sale & purchase
+   - **Remortgage / transfer fee (£):** 100 — remortgage, transfer of equity
    - **Portal login email:** `info@trustedconveyancers.co.uk`
    - **Portal password:** leave blank (David sets his own in Part 4)
    - **Portal access active:** leave **unticked** for now — this is what stops
@@ -34,7 +34,7 @@ merged. The new code reads the new table and column.
 
 1. Open `scripts/demo/seed-sample-cases.sql`.
 2. Paste the two STEP 1 checks. The first must return exactly **one** row
-   showing fees 75 and 40. The second must return **0**.
+   showing fees 150 and 100. The second must return **0**.
 3. Paste the five STEP 2 inserts, one at a time.
 4. Paste the two STEP 3 inserts.
 5. Paste the STEP 4 check. It should list SAMPLE-0001 to SAMPLE-0005.
