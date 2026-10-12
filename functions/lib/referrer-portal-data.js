@@ -1,0 +1,102 @@
+// functions/lib/referrer-portal-data.js
+//
+// Everything the referrer portal shows for one referrer: their record and
+// their cases. Shared by the portal itself (referrer-portal-data.js), the
+// admin "Preview their portal" view and the admin Referrers > Cases tab,
+// so all three always show the same figures. Only the referrer's own fee
+// (referrer_case_fees) is included — never the firm fee.
+
+// Session type for admin's read-only portal preview. Only
+// referrer-portal-data.js accepts it; every endpoint that changes
+// anything requires a real "referrer" session.
+export const PREVIEW_SESSION_TYPE = "referrer_preview";
+export const PREVIEW_MINUTES = 30;
+
+export async function loadReferrerPortalData(db, referrerId) {
+  const referrer = await db.prepare(
+    `SELECT id, referrer_name, contact_email, contact_phone, referral_fee, remortgage_referral_fee, notes, created_at
+     FROM referrers WHERE id = ? LIMIT 1`
+  ).bind(referrerId).first();
+
+  if (!referrer) return null;
+
+  // Phase 1: include property_address, target_completion_date, fall_through_reason, negotiator_name
+  // Workflow fields (referrer_note, parent_enquiry_id, allocated_at)
+  // live in the referrer_workflow side-table — see migration 0013.
+  // Referral fee payouts to the referrer live in referrer_fee_payments
+  // (migration 0020); a row there means the fee has been paid.
+  // The referrer's fee on each case comes from referrer_case_fees
+  // (migration 0021). enquiries.referral_fee_* is the firm fee and is
+  // deliberately NOT selected here — it must never reach the referrer.
+  const enquiriesResult = await db.prepare(
+    `SELECT
+       e.id, e.reference, e.client_name, e.client_email, e.client_phone,
+       e.transaction_type, e.tenure, e.price, e.postcode,
+       e.property_address, e.negotiator_name,
+       e.status, e.panel_status, e.case_status, e.eta_date,
+       e.target_completion_date, e.fall_through_reason,
+       e.assigned_firm_name, e.firm_response,
+       e.referred_at, e.created_at, c.amount AS referrer_fee,
+       w.referrer_note,
+       e.mortgage, e.lender, e.ownership_type, e.first_time_buyer, e.new_build,
+       e.shared_ownership, e.help_to_buy, e.is_company, e.buy_to_let,
+       e.gifted_deposit, e.additional_property, e.uk_resident_for_sdlt,
+       e.lifetime_isa, e.right_to_buy,
+       e.management_company, e.tenanted, e.number_of_sellers,
+       e.additional_borrowing, e.remortgage_transfer, e.transfer_mortgage,
+       e.owners_changing,
+       w.parent_enquiry_id, w.allocated_at, w.allocation_requested_at,
+       p.paid_at AS fee_paid_at, p.amount AS fee_paid_amount,
+       e.quote_json, e.approved_quote_json, e.approved_quote_amount
+     FROM enquiries e
+     LEFT JOIN referrer_workflow w ON w.enquiry_id = e.id
+     LEFT JOIN referrer_fee_payments p ON p.enquiry_id = e.id
+     LEFT JOIN referrer_case_fees c ON c.enquiry_id = e.id
+     WHERE e.referrer_id = ?
+     ORDER BY e.created_at DESC`
+  ).bind(referrerId).all();
+
+  // Build a set of enquiry ids that have at least one child (i.e.
+  // they were re-quoted). Used by the portal to render a "Superseded
+  // by [ref]" indicator on the parent row and to disable Re-quote /
+  // Request allocation actions on a row that already has a successor.
+  const rows = enquiriesResult.results || [];
+  const childByParent = new Map();
+  for (const e of rows) {
+    if (e.parent_enquiry_id != null) {
+      childByParent.set(Number(e.parent_enquiry_id), {
+        id: Number(e.id),
+        reference: String(e.reference || ""),
+      });
+    }
+  }
+
+  // Prefer approved_quote_json (admin-reviewed, sent to client) over
+  // auto-generated quote_json. sale_mortgage used to be SELECTed from
+  // its own column; migration 0016 drops that column, and PR #49 + the
+  // Phase B backfill guarantee quote_json carries saleMortgage instead.
+  // The portal's re-quote pre-fill reads enq.sale_mortgage, so surface
+  // it here from the parsed quote.
+  const enquiries = rows.map((e) => {
+    let quote = null;
+    const rawJson = e.approved_quote_json || e.quote_json;
+    if (rawJson) {
+      try { quote = JSON.parse(rawJson); } catch {}
+    }
+    let baseQuote = null;
+    if (e.quote_json) {
+      try { baseQuote = JSON.parse(e.quote_json); } catch {}
+    }
+    const { quote_json, approved_quote_json, ...rest } = e;
+    const successor = childByParent.get(Number(e.id)) || null;
+    return {
+      ...rest,
+      sale_mortgage: (baseQuote && baseQuote.saleMortgage) || "",
+      quote,
+      has_approved_quote: Boolean(e.approved_quote_json),
+      successor_reference: successor ? successor.reference : null,
+    };
+  });
+
+  return { referrer, enquiries };
+}

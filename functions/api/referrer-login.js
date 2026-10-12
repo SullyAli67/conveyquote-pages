@@ -37,6 +37,16 @@ export async function onRequestPost(context) {
 
     const token = await createSession(env.DB, "referrer", referrer.id);
 
+    // Sessions are deleted on logout and expiry, so the admin Referrers
+    // tab reads "last login" from here instead.
+    try {
+      await env.DB.prepare(
+        `INSERT INTO audit_log (action, reference, actor, details) VALUES ('referrer_login', NULL, ?, NULL)`
+      ).bind(`referrer:${referrer.id}`).run();
+    } catch (e) {
+      console.error("Audit log error:", e);
+    }
+
     return jsonResponse({
       success: true,
       token,
