@@ -14,6 +14,7 @@ import {
 } from "../lib/auth.js";
 import { loadReferrerPortalData, PREVIEW_SESSION_TYPE } from "../lib/referrer-portal-data.js";
 import { isDemoReferrer } from "../lib/sample-cases.js";
+import { getReferrerLogo } from "../lib/referrer-branding.js";
 
 export async function onRequestGet(context) {
   try {
@@ -32,7 +33,7 @@ export async function onRequestGet(context) {
 
     return jsonResponse({
       success: true,
-      referrer: data.referrer,
+      referrer: { ...data.referrer, logo_url: (await getReferrerLogo(env.DB, session.user_id))?.path || null },
       enquiries: data.enquiries,
       is_demo: await isDemoReferrer(env.DB, session.user_id),
       preview,

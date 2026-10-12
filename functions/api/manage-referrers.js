@@ -7,6 +7,7 @@ import {
   unauthorised,
 } from "../lib/auth.js";
 import { issueSetupLink } from "../lib/referrer-setup-link.js";
+import { logoPathFor } from "../lib/referrer-branding.js";
 
 const toFlag = (v) => (v ? 1 : 0);
 
@@ -39,12 +40,17 @@ export async function onRequestGet(context) {
               (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) <> 'SAMPLE-') AS case_count,
               (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) <> 'SAMPLE-' AND e.case_status = 'completed') AS completed_count,
               (SELECT COUNT(*) FROM enquiries e WHERE e.referrer_id = r.id AND substr(e.reference, 1, 7) = 'SAMPLE-') AS sample_count,
-              (SELECT GROUP_CONCAT(DISTINCT f.transaction_type) FROM referrer_fee_configs f WHERE f.referrer_id = r.id) AS custom_pricing_types
+              (SELECT GROUP_CONCAT(DISTINCT f.transaction_type) FROM referrer_fee_configs f WHERE f.referrer_id = r.id) AS custom_pricing_types,
+              (SELECT b.logo_key FROM referrer_branding b WHERE b.referrer_id = r.id) AS logo_key
          FROM referrers r
         ORDER BY r.referrer_name COLLATE NOCASE ASC`
     ).all();
 
-    return jsonResponse({ success: true, referrers: result.results || [] });
+    const referrers = (result.results || []).map(({ logo_key, ...r }) => ({
+      ...r,
+      logo_url: logo_key ? logoPathFor(r.id, logo_key) : null,
+    }));
+    return jsonResponse({ success: true, referrers });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message }, 500);
   }
