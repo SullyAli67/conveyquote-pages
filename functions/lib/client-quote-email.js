@@ -7,6 +7,8 @@
 //
 // body:  the Send Approved Quote request body.
 // opts:  unsubUrl — the reminder opt-out link.
+//        linkToken — the signed code for the Accept / Decline links
+//                   (functions/lib/quote-link.js).
 //        brand    — { name, logoUrl } when the referrer has a logo
 //                   (migration 0023): the email then leads with their logo
 //                   and says "Powered by ConveyQuote".
@@ -16,7 +18,7 @@ import {
   isSpecialistMatterType,
 } from "./matter-families.js";
 
-export function buildClientQuoteEmail(body, { unsubUrl = "", brand = null } = {}) {
+export function buildClientQuoteEmail(body, { unsubUrl = "", brand = null, linkToken = "" } = {}) {
   const {
     name,
     email,
@@ -267,13 +269,14 @@ export function buildClientQuoteEmail(body, { unsubUrl = "", brand = null } = {}
       },
     ];
 
+    const linkCode = linkToken ? `&t=${encodeURIComponent(linkToken)}` : "";
     const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(
       safe(quoteReference)
-    )}`;
+    )}${linkCode}`;
 
     const rejectUrl = `https://conveyquote.uk/api/reject-quote?ref=${encodeURIComponent(
       safe(quoteReference)
-    )}`;
+    )}${linkCode}`;
 
     // Quote expiry — 14 days from today
     const expiryDate = new Date();

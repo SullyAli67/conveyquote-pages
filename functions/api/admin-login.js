@@ -1,6 +1,11 @@
 // functions/api/admin-login.js
 import {
   hashPassword,
+  verifyPassword,
+  passwordNeedsUpgrade,
+  loginLocked,
+  recordFailedLogin,
+  TOO_MANY_ATTEMPTS,
   createSession,
   cleanExpiredSessions,
   jsonResponse,
@@ -21,27 +26,28 @@ export async function onRequestPost(context) {
     // Clean up old sessions opportunistically
     await cleanExpiredSessions(env.DB);
 
+    if (await loginLocked(env.DB, request, "admin", email)) {
+      return jsonResponse({ success: false, error: TOO_MANY_ATTEMPTS }, 429);
+    }
+
     // Look up the admin user
     const admin = await env.DB.prepare(
-      `SELECT * FROM admin_users WHERE email = ? LIMIT 1`
+      `SELECT id, email, password_hash FROM admin_users WHERE email = ? LIMIT 1`
     )
       .bind(String(email).toLowerCase().trim())
       .first();
 
-    if (!admin) {
+    if (!admin || !(await verifyPassword(password, admin.password_hash))) {
+      await recordFailedLogin(env.DB, request, "admin", email);
       return jsonResponse(
         { success: false, error: "Invalid email or password." },
         401
       );
     }
 
-    // Verify password
-    const hash = await hashPassword(password);
-    if (hash !== admin.password_hash) {
-      return jsonResponse(
-        { success: false, error: "Invalid email or password." },
-        401
-      );
+    if (passwordNeedsUpgrade(admin.password_hash)) {
+      await env.DB.prepare(`UPDATE admin_users SET password_hash = ? WHERE id = ?`)
+        .bind(await hashPassword(password), admin.id).run();
     }
 
     // Create session
