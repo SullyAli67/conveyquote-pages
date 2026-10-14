@@ -3,6 +3,7 @@ import { buildUnsubUrl } from "../lib/unsub.js";
 import { getTokenFromRequest, validateSession, unauthorised } from "../lib/auth.js";
 import { isSampleReference } from "../lib/sample-cases.js";
 import { buildClientQuoteEmail } from "../lib/client-quote-email.js";
+import { quoteLinkToken } from "../lib/quote-link.js";
 
 export async function onRequestPost(context) {
   const jsonResponse = (payload, status = 200) =>
@@ -76,7 +77,7 @@ export async function onRequestPost(context) {
 
     const unsubUrl = await buildUnsubUrl(quoteReference, env);
     const { clientHtml, emailSubject, approvedQuoteRecord, finalQuoteAmountValue } =
-      buildClientQuoteEmail(body, { unsubUrl, brand });
+      buildClientQuoteEmail(body, { unsubUrl, brand, linkToken: await quoteLinkToken(quoteReference, env) });
 
     // ── Step 1: Send the email FIRST ───────────────────────────────────────
     // Risk 1 — send-failure ordering. Previously we wrote

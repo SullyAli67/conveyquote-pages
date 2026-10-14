@@ -1,5 +1,6 @@
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { isSampleReference } from "../lib/sample-cases.js";
+import { quoteLinkAllowed, invalidQuoteLinkHtml } from "../lib/quote-link.js";
 
 const htmlResponse = (html, status = 200) =>
   new Response(html, {
@@ -64,7 +65,8 @@ export async function onRequestGet(context) {
         property_address,
         price,
         tenure,
-        mortgage
+        mortgage,
+        notification_email_sent_at
       FROM enquiries
       WHERE reference = ?
       LIMIT 1
@@ -73,8 +75,10 @@ export async function onRequestGet(context) {
       .bind(reference)
       .first();
 
-    if (!enquiry) {
-      return textResponse(`Quote reference not found: ${reference}`, 404);
+    // Signed link check (functions/lib/quote-link.js). An unknown reference
+    // gets the same page as a bad code, so references can't be probed.
+    if (!(await quoteLinkAllowed(env, reference, url.searchParams.get("t"), enquiry))) {
+      return htmlResponse(invalidQuoteLinkHtml, 403);
     }
 
     const clientName = enquiry.client_name || "Client";

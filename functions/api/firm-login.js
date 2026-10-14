@@ -1,6 +1,11 @@
 // functions/api/firm-login.js
 import {
   hashPassword,
+  verifyPassword,
+  passwordNeedsUpgrade,
+  loginLocked,
+  recordFailedLogin,
+  TOO_MANY_ATTEMPTS,
   createSession,
   cleanExpiredSessions,
   jsonResponse,
@@ -20,6 +25,10 @@ export async function onRequestPost(context) {
 
     await cleanExpiredSessions(env.DB);
 
+    if (await loginLocked(env.DB, request, "firm", email)) {
+      return jsonResponse({ success: false, error: TOO_MANY_ATTEMPTS }, 429);
+    }
+
     // Look up firm by portal email
     const firm = await env.DB.prepare(
       `SELECT id, firm_name, portal_email, portal_password_hash, portal_active
@@ -30,7 +39,10 @@ export async function onRequestPost(context) {
       .bind(String(email).toLowerCase().trim())
       .first();
 
-    if (!firm || !firm.portal_password_hash) {
+    // The password is checked before anything else is said about the
+    // account, so a wrong password never reveals whether access is on.
+    if (!firm || !firm.portal_password_hash || !(await verifyPassword(password, firm.portal_password_hash))) {
+      await recordFailedLogin(env.DB, request, "firm", email);
       return jsonResponse(
         { success: false, error: "Invalid email or password." },
         401
@@ -44,13 +56,9 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Verify password
-    const hash = await hashPassword(password);
-    if (hash !== firm.portal_password_hash) {
-      return jsonResponse(
-        { success: false, error: "Invalid email or password." },
-        401
-      );
+    if (passwordNeedsUpgrade(firm.portal_password_hash)) {
+      await env.DB.prepare(`UPDATE panel_firms SET portal_password_hash = ? WHERE id = ?`)
+        .bind(await hashPassword(password), firm.id).run();
     }
 
     // Create session tied to this firm

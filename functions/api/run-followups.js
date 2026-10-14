@@ -5,6 +5,7 @@
 // env.FOLLOWUP_SECRET; unauthenticated requests get an intentionally vague 401.
 
 import { buildUnsubUrl } from "../lib/unsub.js";
+import { quoteLinkToken } from "../lib/quote-link.js";
 //
 // Decision logic for an eligible enquiry (quote_sent_at NOT NULL, status not
 // terminal, follow-ups not paused, less than 15 days old):
@@ -155,8 +156,10 @@ export function renderFollowupEmail(stage, data) {
     ? formatLongDate(data.expiryDate)
     : "";
 
-  const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(reference)}`;
-  const rejectUrl = `https://conveyquote.uk/api/reject-quote?ref=${encodeURIComponent(reference)}`;
+  // data.linkToken: the signed code for these links (functions/lib/quote-link.js).
+  const linkCode = data.linkToken ? `&t=${encodeURIComponent(data.linkToken)}` : "";
+  const acceptUrl = `https://conveyquote.uk/api/accept-quote?ref=${encodeURIComponent(reference)}${linkCode}`;
+  const rejectUrl = `https://conveyquote.uk/api/reject-quote?ref=${encodeURIComponent(reference)}${linkCode}`;
   const unsubUrl = safe(data.unsubUrl);
 
   const subject = config.subject(firstName);
@@ -423,6 +426,7 @@ async function runFollowups(context, { dryRun }) {
       amount: row.approved_quote_amount,
       expiryDate,
       unsubUrl,
+      linkToken: await quoteLinkToken(row.reference, env),
     });
 
     const stageKey = STAGE_LABELS[nextStage];

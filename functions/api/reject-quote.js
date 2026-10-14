@@ -2,6 +2,7 @@
 // Keys are persisted in enquiries.decline_reason; labels are user-facing.
 import { getSpecialistMatterLabel } from "../lib/matter-families.js";
 import { isSampleReference } from "../lib/sample-cases.js";
+import { quoteLinkAllowed, invalidQuoteLinkHtml } from "../lib/quote-link.js";
 
 const REASONS = {
   price: "Price was higher than expected",
@@ -178,8 +179,8 @@ const renderShell = (title, bodyHtml) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const renderPickerPage = (reference) => {
-  const ref = encodeURIComponent(reference);
+const renderPickerPage = (reference, linkToken = "") => {
+  const ref = encodeURIComponent(reference) + (linkToken ? `&t=${encodeURIComponent(linkToken)}` : "");
   const buttonRows = ["price", "different_firm", "not_ready", "timeline", "other"]
     .map(
       (code) => `
@@ -205,8 +206,8 @@ const renderPickerPage = (reference) => {
   );
 };
 
-const renderFreeTextPage = (reference) => {
-  const ref = encodeURIComponent(reference);
+const renderFreeTextPage = (reference, linkToken = "") => {
+  const ref = encodeURIComponent(reference) + (linkToken ? `&t=${encodeURIComponent(linkToken)}` : "");
 
   return renderShell(
     "Tell us a bit more",
@@ -497,7 +498,7 @@ const recordEmailOutcome = async (env, reference, outcome) => {
 
 const loadEnquiry = async (env, reference) =>
   env.DB.prepare(
-    `SELECT reference, client_name, client_email, transaction_type, status
+    `SELECT reference, client_name, client_email, transaction_type, status, notification_email_sent_at
      FROM enquiries WHERE reference = ? LIMIT 1`
   )
     .bind(reference)
@@ -534,23 +535,26 @@ export async function onRequestGet(context) {
 
     const enquiry = await loadEnquiry(env, reference);
 
-    if (!enquiry) {
-      return textResponse(`Quote reference not found: ${reference}`, 404);
+    // Signed link check (functions/lib/quote-link.js). An unknown reference
+    // gets the same page as a bad code, so references can't be probed.
+    const linkToken = url.searchParams.get("t") || "";
+    if (!(await quoteLinkAllowed(env, reference, linkToken, enquiry))) {
+      return htmlResponse(invalidQuoteLinkHtml, 403);
     }
 
     // No reason yet → reason picker
     if (!reason) {
-      return htmlResponse(renderPickerPage(reference));
+      return htmlResponse(renderPickerPage(reference, linkToken));
     }
 
     // Free-text path (state 2). Does not record yet — the POST handler does.
     if (reason === "other") {
-      return htmlResponse(renderFreeTextPage(reference));
+      return htmlResponse(renderFreeTextPage(reference, linkToken));
     }
 
     // Unknown reason → fall back to picker rather than recording bad data
     if (!TERMINAL_GET_REASONS.has(reason)) {
-      return htmlResponse(renderPickerPage(reference));
+      return htmlResponse(renderPickerPage(reference, linkToken));
     }
 
     // Idempotency — already declined, do not re-record or re-email
@@ -607,8 +611,11 @@ export async function onRequestPost(context) {
 
     const enquiry = await loadEnquiry(env, reference);
 
-    if (!enquiry) {
-      return textResponse(`Quote reference not found: ${reference}`, 404);
+    // Signed link check (functions/lib/quote-link.js). An unknown reference
+    // gets the same page as a bad code, so references can't be probed.
+    const linkToken = url.searchParams.get("t") || "";
+    if (!(await quoteLinkAllowed(env, reference, linkToken, enquiry))) {
+      return htmlResponse(invalidQuoteLinkHtml, 403);
     }
 
     if (enquiry.status === "rejected") {

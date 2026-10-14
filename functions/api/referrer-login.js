@@ -1,6 +1,11 @@
 // functions/api/referrer-login.js
 import {
   hashPassword,
+  verifyPassword,
+  passwordNeedsUpgrade,
+  loginLocked,
+  recordFailedLogin,
+  TOO_MANY_ATTEMPTS,
   createSession,
   cleanExpiredSessions,
   jsonResponse,
@@ -17,12 +22,19 @@ export async function onRequestPost(context) {
 
     await cleanExpiredSessions(env.DB);
 
+    if (await loginLocked(env.DB, request, "referrer", email)) {
+      return jsonResponse({ success: false, error: TOO_MANY_ATTEMPTS }, 429);
+    }
+
     const referrer = await env.DB.prepare(
       `SELECT id, referrer_name, portal_email, portal_password_hash, portal_active
        FROM referrers WHERE portal_email = ? LIMIT 1`
     ).bind(String(email).toLowerCase().trim()).first();
 
-    if (!referrer || !referrer.portal_password_hash) {
+    // The password is checked before anything else is said about the
+    // account, so a wrong password never reveals whether access is on.
+    if (!referrer || !referrer.portal_password_hash || !(await verifyPassword(password, referrer.portal_password_hash))) {
+      await recordFailedLogin(env.DB, request, "referrer", email);
       return jsonResponse({ success: false, error: "Invalid email or password." }, 401);
     }
 
@@ -30,9 +42,9 @@ export async function onRequestPost(context) {
       return jsonResponse({ success: false, error: "Portal access is not enabled for this account. Please contact ConveyQuote." }, 403);
     }
 
-    const hash = await hashPassword(password);
-    if (hash !== referrer.portal_password_hash) {
-      return jsonResponse({ success: false, error: "Invalid email or password." }, 401);
+    if (passwordNeedsUpgrade(referrer.portal_password_hash)) {
+      await env.DB.prepare(`UPDATE referrers SET portal_password_hash = ? WHERE id = ?`)
+        .bind(await hashPassword(password), referrer.id).run();
     }
 
     const token = await createSession(env.DB, "referrer", referrer.id);
